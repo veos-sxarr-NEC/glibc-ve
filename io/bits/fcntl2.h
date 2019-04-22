@@ -77,7 +77,7 @@ open64 (const char *__path, int __oflag, ...)
 
   if (__builtin_constant_p (__oflag))
     {
-      if ((__oflag & O_CREAT) != 0 && __va_arg_pack_len () < 1)
+      if (__OPEN_NEEDS_MODE (__oflag) != 0 && __va_arg_pack_len () < 1)
 	{
 	  __open64_missing_mode ();
 	  return __open64_2 (__path, __oflag);
@@ -121,7 +121,7 @@ openat (int __fd, const char *__path, int __oflag, ...)
 
   if (__builtin_constant_p (__oflag))
     {
-      if ((__oflag & O_CREAT) != 0 && __va_arg_pack_len () < 1)
+      if (__OPEN_NEEDS_MODE (__oflag) && __va_arg_pack_len () < 1)
 	{
 	  __openat_missing_mode ();
 	  return __openat_2 (__fd, __path, __oflag);
@@ -155,7 +155,7 @@ openat64 (int __fd, const char *__path, int __oflag, ...)
 
   if (__builtin_constant_p (__oflag))
     {
-      if ((__oflag & O_CREAT) != 0 && __va_arg_pack_len () < 1)
+      if (__OPEN_NEEDS_MODE (__oflag) && __va_arg_pack_len () < 1)
 	{
 	  __openat64_missing_mode ();
 	  return __openat64_2 (__fd, __path, __oflag);

@@ -496,10 +496,10 @@ tst-getpid2-ENV = LD_BIND_NOW=1
 
 $(objpfx)tst-atfork2: $(libdl) $(shared-thread-library)
 LDFLAGS-tst-atfork2 = -rdynamic
-tst-atfork2-ENV = MALLOC_TRACE=$(objpfx)tst-atfork2.mtrace
+tst-atfork2-ENV = VE_MALLOC_TRACE=$(objpfx)tst-atfork2.mtrace
 $(objpfx)tst-atfork2mod.so: $(shared-thread-library)
 
-tst-stack3-ENV = MALLOC_TRACE=$(objpfx)tst-stack3.mtrace
+tst-stack3-ENV = VE_MALLOC_TRACE=$(objpfx)tst-stack3.mtrace
 $(objpfx)tst-stack3-mem.out: $(objpfx)tst-stack3.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-stack3.mtrace > $@; \
 	$(evaluate-test)

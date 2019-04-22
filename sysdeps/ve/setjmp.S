@@ -57,9 +57,9 @@ ENTRY(__sigsetjmp)
 #else
 	/* Make a tail call to __sigjmp_save; it takes the same args.  */
 #ifndef SHARED
-	lea	%s12, __sigjmp_save@lo
+	lea	%s12, __sigjmp_save@CALL_LO
 	and	%s12,%s12,(32)0
-	lea.sl	%s12, __sigjmp_save@hi(,%s12)
+	lea.sl	%s12, __sigjmp_save@CALL_HI(,%s12)
 #else
         lea     %s12, __sigjmp_save@PC_LO(-24)
         and     %s12,%s12,(32)0

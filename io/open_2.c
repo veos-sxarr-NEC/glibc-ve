@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -22,7 +23,7 @@
 int
 __open_2 (const char *file, int oflag)
 {
-  if (oflag & O_CREAT)
+  if (__OPEN_NEEDS_MODE (oflag))
     __fortify_fail ("invalid open call: O_CREAT without mode");
 
   return __open (file, oflag);

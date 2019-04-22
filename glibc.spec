@@ -4,7 +4,7 @@
 %define _unpackaged_files_terminate_build 0
 Name:		glibc-ve
 Version:	2.21
-Release:	1%{?dist}
+Release:	3%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 #Group:

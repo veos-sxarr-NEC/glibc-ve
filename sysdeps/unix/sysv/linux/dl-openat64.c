@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <assert.h>
 #include <errno.h>
@@ -28,7 +29,7 @@ openat64 (dfd, file, oflag)
      const char *file;
      int oflag;
 {
-  assert ((oflag & O_CREAT) == 0);
+  assert (!__OPEN_NEEDS_MODE (oflag));
 
 #ifdef __NR_openat
   return INLINE_SYSCALL (openat, 3, dfd, file, oflag | O_LARGEFILE);

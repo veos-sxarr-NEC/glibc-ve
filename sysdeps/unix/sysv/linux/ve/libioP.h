@@ -751,8 +751,12 @@ extern _IO_off64_t _IO_seekpos_unlocked (_IO_FILE *, _IO_off64_t, int)
 #  undef EXEC_PAGESIZE
 # endif
 #define EXEC_PAGESIZE __getpagesize()
+
+/* In printf(), local buffer  size will be modified to 2MB aligned and mmap  */
+/* will be invoked with MAP_2MB flag to allocated 2MB pagesize. #1485        */
+#define EXEC_PAGESIZE_VE 0x200000
 # define ROUND_TO_PAGE(_S) \
-       (((_S) + EXEC_PAGESIZE - 1) & ~(EXEC_PAGESIZE - 1))
+       (((_S) + EXEC_PAGESIZE_VE - 1) & ~(EXEC_PAGESIZE_VE - 1))
 
 # define FREE_BUF(_B, _S) \
        munmap ((_B), ROUND_TO_PAGE (_S))
@@ -760,7 +764,8 @@ extern _IO_off64_t _IO_seekpos_unlocked (_IO_FILE *, _IO_off64_t, int)
        do {								      \
 	  (_B) = (char *) mmap (0, ROUND_TO_PAGE (_S),			      \
 				PROT_READ | PROT_WRITE,			      \
-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);	      \
+				MAP_PRIVATE | MAP_ANONYMOUS | MAP_2MB         \
+				, -1, 0);				      \
 	  if ((_B) == (char *) MAP_FAILED)				      \
 	    return (_R);						      \
        } while (0)
@@ -768,7 +773,8 @@ extern _IO_off64_t _IO_seekpos_unlocked (_IO_FILE *, _IO_off64_t, int)
        do {								      \
 	  (_B) = (wchar_t *) mmap (0, ROUND_TO_PAGE (_S),		      \
 				   PROT_READ | PROT_WRITE,		      \
-				   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);	      \
+				   MAP_PRIVATE | MAP_ANONYMOUS | MAP_2MB      \
+				   , -1, 0);	      			      \
 	  if ((_B) == (wchar_t *) MAP_FAILED)				      \
 	    return (_R);						      \
        } while (0)

@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -29,7 +30,7 @@ __libc_open64 (const char *file, int oflag, ...)
 {
   int mode = 0;
 
-  if (oflag & O_CREAT)
+  if (__OPEN_NEEDS_MODE (oflag))
     {
       va_list arg;
       va_start (arg, oflag);

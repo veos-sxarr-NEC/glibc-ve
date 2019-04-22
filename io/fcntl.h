@@ -34,6 +34,15 @@ __BEGIN_DECLS
    numbers and flag bits for `open', `fcntl', et al.  */
 #include <bits/fcntl.h>
 
+/* Detect if open needs mode as a third argument (or for openat as a fourth
+ *    argument).  */
+#ifdef __O_TMPFILE
+# define __OPEN_NEEDS_MODE(oflag) \
+  (((oflag) & O_CREAT) != 0 || ((oflag) & __O_TMPFILE) == __O_TMPFILE)
+#else
+# define __OPEN_NEEDS_MODE(oflag) (((oflag) & O_CREAT) != 0)
+#endif
+
 /* POSIX.1-2001 specifies that these types are defined by <fcntl.h>.
    Earlier POSIX standards permitted any type ending in `_t' to be defined
    by any POSIX header, so we don't conditionalize the definitions here.  */

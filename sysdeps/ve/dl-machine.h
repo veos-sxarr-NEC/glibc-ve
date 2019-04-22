@@ -384,10 +384,12 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 
 # ifndef RTLD_BOOTSTRAP
 	case R_VE_HI32:
-	  *(Elf64_Addr *) reloc_addr = ((Elf64_Addr) value + reloc->r_addend) >> 32;
+	case R_VE_CALL_HI32:
+	  *(Elf32_Addr *) reloc_addr = ((Elf64_Addr) value + reloc->r_addend) >> 32;
 	  break;
 	case R_VE_LO32:
-	  *(Elf64_Addr *) reloc_addr = ((Elf64_Addr) value + reloc->r_addend) & 0xffffffff;
+	case R_VE_CALL_LO32:
+	  *(Elf32_Addr *) reloc_addr = ((Elf64_Addr) value + reloc->r_addend) & 0xffffffff;
 	  break;
 #  ifndef RESOLVE_CONFLICT_FIND_MAP
 	  /* Not needed for dl-conflict.c.  */

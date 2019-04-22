@@ -18,7 +18,7 @@
 
 #ifndef _SYS_USER_H
 #define _SYS_USER_H	1
-
+#include <stdint.h>
 /* The whole purpose of this file is for GDB and GDB only.  Don't read
    too much into it.  Don't use it for anything other than GDB unless
    you know what you are doing.  */

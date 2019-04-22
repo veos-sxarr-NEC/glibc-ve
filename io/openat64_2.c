@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -22,7 +23,7 @@
 int
 __openat64_2 (int fd, const char *file, int oflag)
 {
-  if (oflag & O_CREAT)
+  if (__OPEN_NEEDS_MODE (oflag))
     __fortify_fail ("invalid openat64 call: O_CREAT without mode");
 
   return __openat64 (fd, file, oflag);

@@ -3547,7 +3547,8 @@ enum
 #define R_VE_DTPMOD64       22
 #define R_VE_DTPOFF64       23
 #define R_VE_TPOFF64        24
-
+#define R_VE_CALL_HI32      35
+#define R_VE_CALL_LO32      36
 
 
 __END_DECLS

@@ -37,7 +37,6 @@
 #include <atomic.h>
 #include <not-cancel.h>
 
-#define SYS_sysve 316
 #define VE_SYSVE_GET_VE_INFO 51
 
 static ssize_t __ve_get_ve_info(const char *name, char *buffer, size_t size)
@@ -45,7 +44,7 @@ static ssize_t __ve_get_ve_info(const char *name, char *buffer, size_t size)
 	int res = -1;
 
 	INTERNAL_SYSCALL_DECL(err);
-	res = INTERNAL_SYSCALL_NCS(SYS_sysve, err, 4, VE_SYSVE_GET_VE_INFO, (uint64_t)name,
+	res = INTERNAL_SYSCALL (sysve, err, 4, VE_SYSVE_GET_VE_INFO, (uint64_t)name,
 			(uint64_t)buffer, size);
 	if (__glibc_unlikely (INTERNAL_SYSCALL_ERROR_P (res, err))) {
 		__set_errno (INTERNAL_SYSCALL_ERRNO (res, err));

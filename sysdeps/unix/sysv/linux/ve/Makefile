@@ -14,6 +14,10 @@ gen-as-const-headers += ucontext_i.sym
 sysdep_routines += __start_context
 endif
 
+ifeq ($(subdir),csu)
+gen-as-const-headers += ucontext_i.sym
+endif
+
 ifeq ($(subdir),elf)
 sysdep_routines += dl-vdso
 sysdep-dl-routines += dl-static

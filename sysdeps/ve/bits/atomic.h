@@ -236,7 +236,7 @@ typedef uintmax_t uatomic_max_t;
 		 : "+&r" (__result), "+r" (__temp)			      \
 		 : "r" (mem), "r" (val), "i"(1), "i"(2));				      \
     else if (sizeof (*mem) == 8)					      \
-	 __asm __volatile ("1:\tld %1, %2\n\t"				      \
+	 __asm __volatile ("1:\tld %1, (,%2)\n\t"				      \
 		 "mins.l %0, %1, %3\n\t"					      \
 		"fencem %4\n\t"						\
 		 "cas.l %0, %2, %1\n\t"					      \
@@ -251,21 +251,21 @@ typedef uintmax_t uatomic_max_t;
 /* Atomically adds value to *MEM and returns true if the result is negative,
  * or false when result is greater than or equal to zero */
 #define atomic_add_negative(mem, value) \
-  ({ __typeof (*(mem)) __result;					      \
+  ({ __typeof (*(mem)) __result = 0;					      \
      __typeof (*(mem)) __temp = 2;					      \
-     __typeof (value) val = value;                                        \
+     __typeof (value) val = value;                                            \
      if (sizeof (*mem) == 4)						      \
-	 __asm __volatile ("1:\tldl.sx %1, %2\n\t"			      \
-		 "adds.w %0, %1, %3\n\t"				      \
-		 "or  %s1, 0, %0\n\t"					      \
-		 "fencem %4\n\t"						\
+	 __asm __volatile ("1:\tldl.sx %1, 0(0,%2)\n\t"			      \
+		 "adds.l %0, %1, %3\n\t"				      \
+		 "or  %%s63, 0, %0\n\t"					      \
+		 "fencem %4\n\t"					      \
 		 "cas.w %0, %2, %1\n\t"				 	      \
 		 "fencem %5\n\t"						\
 		 "brne.w %0, %1, 1b\n\t"				      \
-		 "or %1, 0, %s1"					      \
-		 : "+&r" (__result), "=r" (__temp)			      \
+		 "or %1, 0, %%s63"					      \
+		 : "+&r" (__result), "+r" (__temp)			      \
 		 : "r" (mem), "r" (val), "i"(1), "i"(2)			      \
-		 : "%s1");						      \
+		 : "%s63");						      \
      else if (sizeof (*mem) == 8)					      \
 	 __asm __volatile ("or %0, 0, %3\n\t"				      \
 		 "fencem %4\n\t"						\
@@ -335,14 +335,14 @@ typedef uintmax_t uatomic_max_t;
     else if (sizeof (*mem) == 4)					      \
       __asm __volatile ("1:\tldl.sx %0, %1\n\t"				      \
 			"lea %%s2, %1\n\t"				      \
-			"or %%s1, %0, %2\n\t"				      \
+			"or %%s63, %0, %2\n\t"				      \
 			"fencem %3\n\t"						\
-			"cas.w %%s1, %%s2, %0\n\t"			      \
+			"cas.w %%s63, %%s2, %0\n\t"			      \
 			"fencem %4\n\t"						\
-			"brne.l %0, %%s1, 1b"				      \
+			"brne.l %0, %%s63, 1b"				      \
 			: "+r"(__temp)					      \
 			: "m" (*mem), "r" (__mask), "i"(1), "i"(2)			      \
-			: "%s1", "memory");				      \
+			: "%s63", "memory");				      \
     else								      \
       __asm __volatile ("or %0 , 0, %2\n\t"				      \
 			"fencem %4\n\t"						\
