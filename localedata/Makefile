@@ -27,7 +27,6 @@ charmaps := $(wildcard charmaps/[A-I]*) $(wildcard charmaps/[J-Z]*)
 # List with all available character set descriptions.
 locales := $(wildcard locales/*)
 
-
 subdir-dirs = tests-mbwc
 vpath %.c tests-mbwc
 vpath %.h tests-mbwc
@@ -161,19 +160,21 @@ $(objpfx)tst-fmon.out: tst-fmon.sh $(objpfx)tst-fmon tst-fmon.data \
 $(objpfx)tst-numeric.out: tst-numeric.sh $(objpfx)tst-numeric tst-numeric.data \
 		       $(objpfx)sort-test.out \
 		       $(addprefix $(objpfx),$(CTYPE_FILES))
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)' tst-numeric.data \
+	$(SHELL) $< $(common-objpfx) '$(run-program-prefix-before-env)' '$(run-program-env)' tst-numeric.data \
 	  > $@; \
 	$(evaluate-test)
 $(objpfx)tst-locale.out: tst-locale.sh $(common-objpfx)locale/localedef \
 			 $(ld-test-srcs) $(addprefix $(objpfx),$(CTYPE_FILES))
 	$(SHELL) $< $(common-objpfx) '$(built-program-cmd-before-env)' \
-		 '$(run-program-env)' '$(built-program-cmd-after-env)' > $@; \
+		 '$(run-program-env)' '$(built-program-file)' > $@; \
 	$(evaluate-test)
+
 $(objpfx)tst-rpmatch.out: tst-rpmatch.sh $(objpfx)tst-rpmatch \
-			  $(objpfx)tst-fmon.out \
-			  $(addprefix $(objpfx),$(CTYPE_FILES))
-	$(SHELL) $< $(common-objpfx) '$(test-program-cmd)' > $@; \
+			$(objpfx)tst-fmon.out \
+			$(addprefix $(objpfx),$(CTYPE_FILES))
+			$(SHELL) $< $(common-objpfx) '$(built-program-cmd-before-env) $(run-program-env) $(built-program-file)' > $@; \
 	$(evaluate-test)
+
 $(objpfx)tst-trans.out: tst-trans.sh $(objpfx)tst-trans \
 			$(addprefix $(objpfx),$(CTYPE_FILES))
 	$(SHELL) $< $(common-objpfx) '$(run-program-prefix-before-env)' \
@@ -208,8 +209,8 @@ include SUPPORTED
 INSTALL-SUPPORTED-LOCALES=$(addprefix install-, $(SUPPORTED-LOCALES))
 
 # Sometimes the whole collection of locale files should be installed.
-LOCALEDEF=I18NPATH=. GCONV_PATH=$(common-objpfx)iconvdata LC_ALL=C \
-$(rtld-prefix) $(common-objpfx)locale/localedef
+LOCALEDEF=VE_I18NPATH=. VE_GCONV_PATH=$(common-objpfx)iconvdata LC_ALL=C \
+$(common-objpfx)locale/localedef
 install-locales: $(INSTALL-SUPPORTED-LOCALES)
 
 install-locales-dir:
@@ -232,7 +233,7 @@ $(INSTALL-SUPPORTED-LOCALES): install-locales-dir
 tst-setlocale-ENV = LC_ALL=ja_JP.EUC-JP
 tst-wctype-ENV = LC_ALL=ja_JP.EUC-JP
 
-tst-leaks-ENV = MALLOC_TRACE=$(objpfx)tst-leaks.mtrace
+tst-leaks-ENV = VE_MALLOC_TRACE=$(objpfx)tst-leaks.mtrace
 $(objpfx)mtrace-tst-leaks.out: $(objpfx)tst-leaks.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-leaks.mtrace > $@; \
 	$(evaluate-test)

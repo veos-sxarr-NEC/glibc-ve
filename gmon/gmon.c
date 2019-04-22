@@ -26,6 +26,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
+
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/gmon.h>
@@ -346,7 +348,11 @@ write_gmon (void)
 # define O_NOFOLLOW	0
 #endif
 
+#ifdef __ve__
+    env = getenv ("VE_GMON_OUT_PREFIX");
+#else
     env = getenv ("GMON_OUT_PREFIX");
+#endif
     if (env != NULL && !__libc_enable_secure)
       {
 	size_t len = strlen (env);

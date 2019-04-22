@@ -80,7 +80,7 @@ CFLAGS-scheck.c = -Wno-strict-prototypes -DNOID -DHAVE_GETTEXT
 # Don't add leapseconds here since test-tz made checks that work only without
 # leapseconds.
 define build-testdata
-$(built-program-cmd) -d $(testdata) -y ./yearistype $<; \
+$(built-program-cmd-before-env) $(run-program-env) $(built-program-file) -d $(testdata) -y ./yearistype $<; \
 $(evaluate-test)
 endef
 

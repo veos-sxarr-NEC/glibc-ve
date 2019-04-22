@@ -253,7 +253,7 @@ inst_auditdir = $(install_root)$(auditdir)
 # Where to install default configuration files.  These include the local
 # timezone specification and network data base files.
 ifndef sysconfdir
-sysconfdir = $(prefix)/etc
+sysconfdir = /etc/$(prefix)
 endif
 inst_sysconfdir = $(install_root)$(sysconfdir)
 
@@ -268,8 +268,9 @@ inst_vardbdir = $(install_root)$(vardbdir)
 # relative to $(zonedir).  It is a good idea to put this somewhere
 # other than there, so the zoneinfo directory contains only universal data,
 # localizing the configuration data elsewhere.
+# defect refs #1329
 ifndef localtime-file
-localtime-file = $(sysconfdir)/localtime
+localtime-file = /etc/localtime
 endif
 
 # What to use for leap second specifications in compiling the default
@@ -336,11 +337,12 @@ BUILD_CC = $(CC)
 endif
 
 # Default flags to pass the C compiler.
+# GCC-WORKAROUND: Removed "-g" compiler option as vegcc doesn't support this completely.
 ifndef default_cflags
 ifeq ($(release),stable)
-default_cflags := -g -O2
+default_cflags := -O2
 else
-default_cflags := -g -O
+default_cflags := -O
 endif
 endif
 
@@ -548,7 +550,7 @@ ifneq ($(have-cc-with-libunwind),yes)
 else
   libunwind = -lunwind
 endif
-libgcc_eh := -Wl,--as-needed -lgcc_s $(libunwind) -Wl,--no-as-needed
+libgcc_eh := -Wl,--as-needed $(libunwind) -Wl,--no-as-needed
 gnulib-arch =
 gnulib = -lgcc $(gnulib-arch)
 gnulib-tests := -lgcc $(libgcc_eh)
@@ -561,7 +563,7 @@ static-gnulib = -lgcc $(static-gnulib-arch)
 else
 static-gnulib = -lgcc -lgcc_eh $(static-gnulib-arch)
 endif
-static-gnulib-tests := -lgcc -lgcc_eh $(libunwind)
+static-gnulib-tests := -lgcc $(libunwind)
 libc.so-gnulib := -lgcc
 endif
 +preinit = $(addprefix $(csu-objpfx),crti.o)
@@ -630,8 +632,8 @@ run-via-rtld-prefix =
 endif
 # $(run-program-env) is the default environment variable settings to
 # use when running a program built with the newly built library.
-run-program-env = GCONV_PATH=$(common-objpfx)iconvdata \
-		  LOCPATH=$(common-objpfx)localedata LC_ALL=C
+run-program-env = VE_GCONV_PATH=$(common-objpfx)iconvdata \
+		  VE_LOCPATH=$(common-objpfx)localedata LC_ALL=C
 # $(run-program-prefix) is a command that, when prepended to the name
 # of a program built with the newly built library, produces a command
 # that, executed on the build system on which "make" is run, runs that
@@ -656,7 +658,9 @@ built-program-cmd = $(built-program-cmd-before-env) $(run-program-env) \
 # for which the library is built, runs the newly built program that is
 # the second dependency of the makefile target in which
 # $(host-built-program-cmd) is used.
-host-built-program-cmd = $(run-via-rtld-prefix) $(built-program-file)
+#host-built-program-cmd = $(run-via-rtld-prefix) $(ve_exec_cmd) $(built-program-file)
+
+host-built-program-cmd = $(built-program-file)
 
 ifndef LD
 LD := ld -X
@@ -718,7 +722,7 @@ else
 endif
 +gccwarn += -Wundef
 ifeq ($(enable-werror),yes)
-+gccwarn += -Werror -Wno-error=undef
++gccwarn += -Wno-error=undef
 endif
 +gccwarn-c = -Wstrict-prototypes
 
@@ -891,8 +895,9 @@ pic-ccflag = -fPIC
 # This one should always stay like this unless there is a very good reason.
 PIC-ccflag = -fPIC
 endif
+# GCC-WORKAROUND: Removed "-fpie" compiler option as vegcc doesn't support this.
 # This can be changed by a sysdep makefile
-pie-ccflag = -fpie
+pie-ccflag = 
 # This one should always stay like this unless there is a very good reason.
 PIE-ccflag = -fPIE
 ifeq (yes,$(build-profile))

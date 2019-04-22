@@ -22,7 +22,7 @@ set -e
 common_objpfx=$1
 test_program_prefix_before_env=$2
 run_program_env=$3
-test_program_prefix_after_env=$4
+test_program_prefix_after_env=
 objpfx=$5
 malloc_trace=$6
 
@@ -49,8 +49,8 @@ msgfmt -o ${objpfx}domaindir/existing-locale/LC_TIME/existing-time-domain.mo \
 # Now run the test.
 ${test_program_prefix_before_env} \
 ${run_program_env} \
-MALLOC_TRACE=$malloc_trace \
-LOCPATH=${objpfx}localedir:${common_objpfx}localedata \
+VE_MALLOC_TRACE=$malloc_trace \
+VE_LOCPATH=${objpfx}localedir:${common_objpfx}localedata \
 ${test_program_prefix_after_env} \
 ${objpfx}tst-gettext > ${objpfx}tst-gettext.out ${objpfx}domaindir
 

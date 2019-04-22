@@ -35,7 +35,7 @@ for l in $lang; do
   cns=`echo $l | sed 's/\(.*\)[.][^.]*/\1/'`
   ${test_program_prefix_before_env} \
    ${run_program_env} \
-   LC_ALL=$l ${test_program_prefix_after_env} \
+   LC_ALL=$l \
    ${common_objpfx}localedata/collate-test $id < $cns.in \
    > ${common_objpfx}localedata/$cns.out || here=1
   cmp -s $cns.in ${common_objpfx}localedata/$cns.out || here=1
@@ -49,13 +49,13 @@ for l in $lang; do
 
   ${test_program_prefix_before_env} \
    ${run_program_env} \
-   LC_ALL=$l ${test_program_prefix_after_env} \
+   LC_ALL=$l \
    ${common_objpfx}localedata/xfrm-test $id < $cns.in \
    > ${common_objpfx}localedata/$cns.xout || here=1
   cmp -s $cns.in ${common_objpfx}localedata/$cns.xout || here=1
   ${test_program_prefix_before_env} \
    ${run_program_env} \
-   LC_ALL=$l ${test_program_prefix_after_env} \
+   LC_ALL=$l \
    ${common_objpfx}localedata/xfrm-test $id -nocache < $cns.in \
    > ${common_objpfx}localedata/$cns.nocache.xout || here=1
   cmp -s $cns.in ${common_objpfx}localedata/$cns.nocache.xout || here=1

@@ -16,6 +16,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
    not, see <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <stdbool.h>
 
@@ -318,7 +319,21 @@ next_env_entry (char ***position)
 
   while (*current != NULL)
     {
-      if (__builtin_expect ((*current)[0] == 'M', 0)
+#ifdef __ve__
+      if (__builtin_expect ((*current)[0] == 'V', 0)
+          && (*current)[1] == 'E'
+          && (*current)[2] == '_'
+          && (*current)[3] == 'M'
+          && (*current)[4] == 'A'
+          && (*current)[5] == 'L'
+          && (*current)[6] == 'L'
+          && (*current)[7] == 'O'
+          && (*current)[8] == 'C'
+          && (*current)[9] == '_')
+        {
+          result = &(*current)[10];
+#else
+	 if (__builtin_expect ((*current)[0] == 'M', 0)
           && (*current)[1] == 'A'
           && (*current)[2] == 'L'
           && (*current)[3] == 'L'
@@ -327,6 +342,7 @@ next_env_entry (char ***position)
           && (*current)[6] == '_')
         {
           result = &(*current)[7];
+#endif
 
           /* Save current position for next visit.  */
           *position = ++current;

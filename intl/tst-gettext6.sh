@@ -20,14 +20,17 @@
 set -e
 
 common_objpfx=$1
-test_program_prefix=$2
-objpfx=$3
+test_program_prefix_before_env=$2
+run_program_env=$3
+objpfx=$4
 
 # Create the domain directory.
 mkdir -p ${objpfx}domaindir/ja_JP/LC_MESSAGES
 # Populate it.
 msgfmt -o ${objpfx}domaindir/ja_JP/LC_MESSAGES/tstgettext6.mo ../po/ja.po
 
-${test_program_prefix} ${objpfx}tst-gettext6 > ${objpfx}tst-gettext6.out
+${test_program_prefix_before_env} \
+${run_program_env} \
+${objpfx}tst-gettext6 > ${objpfx}tst-gettext6.out
 
 exit $?

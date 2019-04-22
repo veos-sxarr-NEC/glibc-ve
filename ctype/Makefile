@@ -26,7 +26,8 @@ headers	:= ctype.h
 
 routines	:= ctype ctype-c99 ctype-extn ctype-c99_l ctype_l isctype
 aux		:= ctype-info
-
 tests	:= test_ctype
+
+CFLAGS-ctype-info.c = -O0
 
 include ../Rules

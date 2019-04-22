@@ -93,7 +93,7 @@ CPPFLAGS-locale-programs = -DLOCALE_PATH='$(localepath)' \
 CFLAGS-charmap.c = -Wno-write-strings -Wno-char-subscripts
 CFLAGS-locfile.c = -Wno-write-strings -Wno-char-subscripts
 CFLAGS-charmap-dir.c = -Wno-write-strings
-
+CFLAGS-lc-ctype.c = -O0
 # Set libof-* for each routine.
 cpp-srcs-left := $(localedef-modules) $(localedef-aux) $(locale-modules) \
 		 $(lib-modules)

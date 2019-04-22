@@ -20,12 +20,12 @@
 TEXTDOMAIN=libc
 TEXTDOMAINDIR=@TEXTDOMAINDIR@
 
-unset SOTRUSS_FROMLIST
-unset SOTRUSS_TOLIST
-unset SOTRUSS_OUTNAME
-unset SOTRUSS_EXIT
-unset SOTRUSS_NOINDENT
-SOTRUSS_WHICH=$$
+unset VE_SOTRUSS_FROMLIST
+unset VE_SOTRUSS_TOLIST
+unset VE_SOTRUSS_OUTNAME
+unset VE_SOTRUSS_EXIT
+unset VE_SOTRUSS_NOINDENT
+VE_SOTRUSS_WHICH=$$
 lib='@PREFIX@/$LIB/audit/sotruss-lib.so'
 
 do_help() {
@@ -94,24 +94,24 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
       do_missing_arg "$1"
     fi
     shift
-    SOTRUSS_FROMLIST="$1"
+    VE_SOTRUSS_FROMLIST="$1"
     ;;
   -T | --t | --to)
     if test $# -eq 1; then
       do_missing_arg "$1"
     fi
     shift
-    SOTRUSS_TOLIST="$1"
+    VE_SOTRUSS_TOLIST="$1"
     ;;
   -o | --o | --ou | --out | --outp | --outpu | --output)
     if test $# -eq 1; then
       do_missing_arg "$1"
     fi
     shift
-    SOTRUSS_OUTNAME="$1"
+    VE_SOTRUSS_OUTNAME="$1"
     ;;
   -f | --fo | --fol | --foll | --follo | --follow)
-    unset SOTRUSS_WHICH
+    unset VE_SOTRUSS_WHICH
     ;;
   -l | --l | --li | --lib)
     if test $# -eq 1; then
@@ -121,7 +121,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
     lib="$1"
     ;;
   -e | --e | --ex | --exi | --exit)
-    SOTRUSS_EXIT=1
+    VE_SOTRUSS_EXIT=1
     ;;
   --f)
     do_ambiguous '--from' '--follow'
@@ -142,11 +142,11 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
   shift
 done
 
-export SOTRUSS_FROMLIST
-export SOTRUSS_TOLIST
-export SOTRUSS_OUTNAME
-export SOTRUSS_WHICH
-export SOTRUSS_EXIT
+export VE_SOTRUSS_FROMLIST
+export VE_SOTRUSS_TOLIST
+export VE_SOTRUSS_OUTNAME
+export VE_SOTRUSS_WHICH
+export VE_SOTRUSS_EXIT
 export LD_AUDIT="$lib"
 
 exec "$@"

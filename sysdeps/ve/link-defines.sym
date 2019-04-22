@@ -1,0 +1,12 @@
+#include "link.h"
+#include <stddef.h>
+
+--
+LR_S1_OFFSET		offsetof (struct La_ve_regs, lr_s0)
+LR_S2_OFFSET		offsetof (struct La_ve_regs, lr_s1)
+LR_S3_OFFSET		offsetof (struct La_ve_regs, lr_s2)
+LR_S4_OFFSET		offsetof (struct La_ve_regs, lr_s3)
+LR_S5_OFFSET		offsetof (struct La_ve_regs, lr_s4)
+LR_S6_OFFSET		offsetof (struct La_ve_regs, lr_s5)
+LR_fp_OFFSET		offsetof (struct La_ve_regs, lr_fp)
+LR_SP_OFFSET		offsetof (struct La_ve_regs, lr_sp)

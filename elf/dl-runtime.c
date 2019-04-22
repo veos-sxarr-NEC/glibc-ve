@@ -380,6 +380,8 @@ _dl_profile_fixup (
       struct audit_ifaces *afct = GLRO(dl_audit);
       for (unsigned int cnt = 0; cnt < GLRO(dl_naudit); ++cnt)
 	{
+/* _TODO_PORT_HCLT */
+#if 0
 	  if (afct->ARCH_LA_PLTENTER != NULL
 	      && (reloc_result->enterexit
 		  & (LA_SYMB_NOPLTENTER << (2 * (cnt + 1)))) == 0)
@@ -417,7 +419,7 @@ _dl_profile_fixup (
 		    framesize = MAX (new_framesize, framesize);
 		}
 	    }
-
+#endif
 	  afct = afct->next;
 	}
 
@@ -462,6 +464,8 @@ _dl_call_pltexit (struct link_map *l, ElfW(Word) reloc_arg,
   const char *symname = strtab + sym.st_name;
 
   struct audit_ifaces *afct = GLRO(dl_audit);
+/* _TODO_PORT_HCLT */
+#if 0
   for (unsigned int cnt = 0; cnt < GLRO(dl_naudit); ++cnt)
     {
       if (afct->ARCH_LA_PLTEXIT != NULL
@@ -476,5 +480,6 @@ _dl_call_pltexit (struct link_map *l, ElfW(Word) reloc_arg,
 
       afct = afct->next;
     }
+#endif
 #endif
 }

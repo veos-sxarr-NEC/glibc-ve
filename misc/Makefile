@@ -104,7 +104,7 @@ $(objpfx)libg.a: $(dep-dummy-lib); $(make-dummy-lib)
 
 $(objpfx)tst-tsearch: $(libm)
 
-tst-error1-ENV = MALLOC_TRACE=$(objpfx)tst-error1.mtrace
+tst-error1-ENV = VE_MALLOC_TRACE=$(objpfx)tst-error1.mtrace
 tst-error1-ARGS = $(objpfx)tst-error1.out
 $(objpfx)tst-error1-mem.out: $(objpfx)tst-error1.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-error1.mtrace > $@; \

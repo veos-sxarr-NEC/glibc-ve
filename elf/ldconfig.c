@@ -14,6 +14,7 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #define PROCINFO_CLASS static
 #include <alloca.h>
@@ -1258,7 +1259,11 @@ parse_conf_include (const char *config_file, unsigned int lineno,
 static void
 set_hwcap (void)
 {
+#ifdef __ve_
+  char *mask = getenv ("VE_LD_HWCAP_MASK");
+#else
   char *mask = getenv ("LD_HWCAP_MASK");
+#endif
 
   if (mask)
     hwcap_mask = strtoul (mask, NULL, 0);

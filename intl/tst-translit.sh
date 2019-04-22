@@ -20,8 +20,10 @@
 set -e
 
 common_objpfx=$1
-test_program_prefix=$2
-objpfx=$3
+test_program_prefix_before_env=$2
+run_program_env=$3
+objpfx=$4
+
 
 # Create the locale directories.
 mkdir -p ${objpfx}localedir/existing-locale/LC_MESSAGES
@@ -29,7 +31,8 @@ mkdir -p ${objpfx}localedir/existing-locale/LC_MESSAGES
 msgfmt -o ${objpfx}domaindir/existing-locale/LC_MESSAGES/translit.mo \
        translit.po
 
-${test_program_prefix} \
+${test_program_prefix_before_env} \
+${run_program_env} \
 ${objpfx}tst-translit > ${objpfx}tst-translit.out ${objpfx}domaindir
 
 exit $?

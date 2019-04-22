@@ -278,7 +278,7 @@ cpp-srcs-left := $(modules) $(generated-modules) $(libJIS-routines) \
 lib := iconvdata
 include $(patsubst %,$(..)cppflags-iterator.mk,$(cpp-srcs-left))
 
-tst-loading-ENV = MALLOC_TRACE=$(objpfx)tst-loading.mtrace
+tst-loading-ENV = VE_MALLOC_TRACE=$(objpfx)tst-loading.mtrace
 $(objpfx)mtrace-tst-loading.out: $(objpfx)tst-loading.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-loading.mtrace > $@; \
 	$(evaluate-test)
@@ -311,7 +311,7 @@ $(objpfx)tst-tables.out: tst-tables.sh $(objpfx)gconv-modules \
 			 $(addprefix $(objpfx),$(modules.so)) \
 			 $(objpfx)tst-table-from $(objpfx)tst-table-to
 	$(SHELL) $< $(common-objpfx) $(common-objpfx)iconvdata/ \
-		'$(test-program-prefix)' > $@; \
+		'$(built-program-cmd-before-env) $(run-program-env)' > $@; \
 	$(evaluate-test)
 
 do-tests-clean common-mostlyclean: tst-tables-clean

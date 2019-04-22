@@ -22,7 +22,7 @@ set -e
 common_objpfx=$1
 tst_langinfo_before_env=$2
 run_program_env=$3
-tst_langinfo_after_env=$4
+tst_langinfo_after_env=
 
 # Run the test program.
 cat <<"EOF" |

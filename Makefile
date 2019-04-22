@@ -133,7 +133,7 @@ $(common-objpfx)testrun.sh: $(common-objpfx)config.make \
 			    $(..)Makeconfig $(..)Makefile
 	(echo '#!/bin/sh'; \
 	 echo 'builddir=`dirname "$$0"`'; \
-	 echo 'GCONV_PATH="$${builddir}/iconvdata" \'; \
+	 echo 'VE_GCONV_PATH="$${builddir}/iconvdata" \'; \
 	 echo 'exec $(subst $(common-objdir),"$${builddir}",\
 			    $(test-program-prefix)) $${1+"$$@"}'; \
 	) > $@T

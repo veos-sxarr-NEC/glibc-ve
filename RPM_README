@@ -1,0 +1,84 @@
+TITLE:
+-------
+GLIBC rpm package installation.
+
+DETAILS:
+--------
+Version: glibc base package: 2.21
+Branch:  develop-vegcc-v2.21
+
+GETTING STARTED:
+----------------
+These instructions will help you building,installing,testing and removing RPM packages
+on your system.
+
+PREREQUISITES:
+--------------
+1. vegcc compiler installed on your machine.
+   Please follow below steps to install vegcc
+	$ git clone -b gcc-7_1_0-ve https://<NEC-ID>@swf1000822.swf.nec.co.jp/git/gcc_meta.git
+	$ git clone -b gcc-7_1_0-ve https://<NEC-ID>@swf1000822.swf.nec.co.jp/git/gcc_source.git
+	$ mkdir <gcc build dir>
+	$ cd <gcc build dir>
+	$ ../gcc_meta/config.sh -s ../gcc_source $ make $ sudo make install
+
+2. Kernel headers installed on your machine at path /opt/nec/ve/include.
+   Please follow below steps to install kernel headers:
+	$ git clone -b RHEL_7.3-ve https://<NEC-ID>@swf1000822.swf.nec.co.jp/git/kernel-headers.git
+	$ cd kernel-headers
+	$ ./autogen.sh
+	$ ./configure
+	$ make
+	$ sudo make install
+
+3. Copy the libsysve file from musl directory as below:
+	$ sudo cp /opt/nec/ve/musl/libsysve* /opt/nec/ve/lib/
+
+INSTALLING:
+-----------
+Installation base path:
+/opt/nec/ve
+Steps:
+1. Clone glibc_source from :
+	git clone -b develop-vegcc-2.21 https://NECID@swf1000822.swf.nec.co.jp/git/glibc_source.git
+2. Rename folder glibc_source with glibc-ve-2.21 as:
+	mv glibc_source glibc-ve-2.21
+3. Create the tar of this folder:
+	tar -cvf glibc-ve-2.21.tar.gz glibc-ve-2.21
+4. Create the "rpmbuild" directory at home as:
+	mkdir ~/rpmbuild
+5. Run rpmbuild command as:
+	rpmbuild -D "%_topdir /home_directory_path/rpmbuild" -ta <Path of tar file>/glibc-ve-2.21.tar.gz
+6. Use below command to install those packages:
+	sudo rpm -ivh package-name
+
+7. Use below command to remove those packages:
+	sudo rpm -e package-name --nodeps
+
+
+PACKAGE DETAILS:
+----------------
+1. glibc-ve-2.21-1.x86_64.rpm
+-----------------------------
+It contains below directories:
+	a. lib
+	b. libexec
+	c. share
+	d. etc
+	e. bin
+	f. sbin
+
+2. glibc-ve-devel-2.21-1.x86_64.rpm
+-----------------------------------
+It contains all header files
+
+
+TEST PROGRAM BUILD COMMAND:
+---------------------------
+Dynamic:
+/usr/local/ve/bin/vegcc -g pthread.c -Xlinker -rpath=/opt/nec/ve/lib -Xlinker -I/opt/nec/ve/lib/ld-linux-ve.so.1 -I/opt/nec/ve/include/ -I/usr/local/ve/lib/gcc/ve/7.1.0/include -B/opt/nec/ve/lib/ -nostdinc -o test_dyn -lpthread
+
+Static:
+/usr/local/ve/bin/vegcc test.c -I/opt/nec/ve/include/ -I/usr/local/ve/lib/gcc/ve/7.1.0/include/ -B/opt/nec/ve/lib/ /usr/local/ve/lib/gcc/ve/7.1.0/libgcc.a -nostdinc -o test_static -static
+
+END

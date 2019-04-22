@@ -70,28 +70,31 @@ include ../Rules
 
 ifeq ($(run-built-tests),yes)
 $(objpfx)tst-unbputc.out: tst-unbputc.sh $(objpfx)tst-unbputc
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)'; \
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env) $(run-program-env)'; \
 	$(evaluate-test)
 
 $(objpfx)tst-printf.out: tst-printf.sh $(objpfx)tst-printf
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)'; \
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env) $(run-program-env)'; \
 	$(evaluate-test)
 endif
 
-CFLAGS-vfprintf.c = -Wno-uninitialized
+CFLAGS-printf-parsemb.c += -O0 #defect refs #1346 - Added O0
+CFLAGS-vfprintf.c += -Wno-uninitialized
 CFLAGS-vfwprintf.c = -Wno-uninitialized
+CFLAGS-printf_fphex.c += -O0 # defect refs 1339
 
 CFLAGS-tmpfile.c = -fexceptions
 CFLAGS-tmpfile64.c = -fexceptions
-CFLAGS-tempname.c = -fexceptions
+CFLAGS-tempname.c = -O0 -fexceptions
 CFLAGS-psignal.c = -fexceptions
 CFLAGS-vprintf.c = -fexceptions
 CFLAGS-cuserid.c = -fexceptions
 
-CFLAGS-vfprintf.c += $(exceptions)
+CFLAGS-vfprintf.c += -O0 $(exceptions)
+CFLAGS-printf_fp.c += -O0 $(exceptions)
 CFLAGS-fprintf.c += $(exceptions)
 CFLAGS-printf.c += $(exceptions)
-CFLAGS-vfwprintf.c += $(exceptions)
+CFLAGS-vfwprintf.c += -O0 $(exceptions)
 CFLAGS-vfscanf.c += $(exceptions)
 CFLAGS-vfwscanf.c += $(exceptions)
 CFLAGS-fscanf.c += $(exceptions)
@@ -113,6 +116,7 @@ CFLAGS-scanf17.c = -I../libio -I../stdlib -I../wcsmbs -I../time -I../string \
 
 CPPFLAGS += $(libio-mtsafe)
 
+test-program-cmd = $(test-program-cmd-before-env) $(run-program-env) $(built-program-file)
 $(objpfx)tst-setvbuf1.out: /dev/null $(objpfx)tst-setvbuf1
 	$(test-program-cmd) > $@ 2>&1; \
 	$(evaluate-test)

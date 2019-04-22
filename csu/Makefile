@@ -26,8 +26,8 @@ subdir := csu
 
 include ../Makeconfig
 
-routines = init-first libc-start $(libc-init) sysdep version check_fds \
-	   libc-tls elf-init dso_handle
+routines = init-first libc-start __setPthreadStruct $(libc-init) sysdep version check_fds \
+	   libc-tls elf-init dso_handle rodata
 aux	 = errno
 elide-routines.os = libc-tls
 static-only-routines = elf-init
@@ -42,7 +42,7 @@ install-lib = $(start-installed-name) g$(start-installed-name) $(csu-dummies)
 generated += version-info.h
 before-compile += $(objpfx)version-info.h
 
-tests := tst-empty tst-atomic tst-atomic-long
+tests := tst-empty
 tests-static := tst-empty
 
 ifeq (yes,$(build-shared))

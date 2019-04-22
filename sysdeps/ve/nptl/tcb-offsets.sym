@@ -1,0 +1,24 @@
+#include <sysdep.h>
+#include <tls.h>
+#include <dl-tlsdesc.h>
+
+#define thread_offsetof(mem)    (long)(offsetof(struct pthread, mem) - TLS_PRE_TCB_SIZE)
+
+PID				offsetof (struct pthread, pid) - TLS_PRE_TCB_SIZE
+TID				offsetof (struct pthread, tid) - TLS_PRE_TCB_SIZE
+PID_OFFSET			thread_offsetof (pid)
+TID_OFFSET			thread_offsetof (tid)
+MULTIPLE_THREADS_OFFSET		offsetof (struct pthread, header.multiple_threads)
+SHM_OFFSET			offsetof (tcbhead_t, shm_offset)
+SYSINFO_OFFSET			offsetof (tcbhead_t, __private)
+DTV_OFFSET			offsetof(tcbhead_t, dtv)
+POINTER_GUARD			offsetof (tcbhead_t, pointer_guard)
+TLSDESC_ARG			offsetof(struct tlsdesc, arg)
+
+TLSDESC_GEN_COUNT		offsetof(struct tlsdesc_dynamic_arg, gen_count)
+TLSDESC_MODID			offsetof(struct tlsdesc_dynamic_arg, tlsinfo.ti_module)
+TLSDESC_MODOFF			offsetof(struct tlsdesc_dynamic_arg, tlsinfo.ti_offset)
+
+#ifndef __ASSUME_PRIVATE_FUTEX
+	PRIVATE_FUTEX	offsetof (struct pthread, header.private_futex)
+#endif

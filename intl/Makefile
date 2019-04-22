@@ -85,9 +85,11 @@ $(objpfx)tst-gettext.out: tst-gettext.sh $(objpfx)tst-gettext
 	  '$(run-program-env)' '$(test-program-prefix-after-env)' \
 	  $(common-objpfx)intl/ $(objpfx)tst-gettext.mtrace; \
 	$(evaluate-test)
+
 $(objpfx)tst-translit.out: tst-translit.sh $(objpfx)tst-translit
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)' \
-	  $(common-objpfx)intl/; \
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
+	'$(run-program-env)' \
+	$(common-objpfx)intl/; \
 	$(evaluate-test)
 $(objpfx)tst-gettext2.out: tst-gettext2.sh $(objpfx)tst-gettext2
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
@@ -95,10 +97,13 @@ $(objpfx)tst-gettext2.out: tst-gettext2.sh $(objpfx)tst-gettext2
 	  $(common-objpfx)intl/; \
 	$(evaluate-test)
 $(objpfx)tst-gettext4.out: tst-gettext4.sh $(objpfx)tst-gettext4
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)' $(common-objpfx)intl/; \
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
+	'$(run-program-env)' $(common-objpfx)intl/; \
 	$(evaluate-test)
 $(objpfx)tst-gettext6.out: tst-gettext6.sh $(objpfx)tst-gettext6
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)' $(common-objpfx)intl/; \
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
+	'$(run-program-env)' \
+	 $(common-objpfx)intl/; \
 	$(evaluate-test)
 
 $(objpfx)tst-codeset.out: $(codeset_mo)

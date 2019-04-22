@@ -22,7 +22,7 @@ set -e
 common_objpfx=$1
 test_program_prefix_before_env=$2
 run_program_env=$3
-test_program_prefix_after_env=$4
+test_program_prefix_after_env=
 objpfx=$5
 
 test_pre="${test_program_prefix_before_env} ${run_program_env}"

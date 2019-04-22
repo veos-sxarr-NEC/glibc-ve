@@ -22,14 +22,14 @@ set -e
 common_objpfx=$1; shift
 test_program_prefix_before_env=$1; shift
 run_program_env=$1; shift
-test_program_prefix_after_env=$1; shift
+test_program_prefix_after_env=
 
 status=0
 trap "rm -f ${common_objpfx}malloc/tst-mtrace.leak; exit 1" 1 2 15
 
 ${test_program_prefix_before_env} \
 ${run_program_env} \
-MALLOC_TRACE=${common_objpfx}malloc/tst-mtrace.leak \
+VE_MALLOC_TRACE=${common_objpfx}malloc/tst-mtrace.leak \
 ${test_program_prefix_after_env} \
   ${common_objpfx}malloc/tst-mtrace || status=1
 

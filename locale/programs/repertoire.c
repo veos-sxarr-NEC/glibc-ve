@@ -76,7 +76,11 @@ repertoire_read (const char *filename)
     {
       if (strchr (filename, '/') == NULL)
 	{
+#ifdef __ve__
+	  char *i18npath = getenv ("VE_I18NPATH");
+#else
 	  char *i18npath = getenv ("I18NPATH");
+#endif
 	  if (i18npath != NULL && *i18npath != '\0')
 	    {
 	      const size_t pathlen = strlen (i18npath);

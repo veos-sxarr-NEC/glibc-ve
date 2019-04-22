@@ -14,6 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 /*
  *	ISO C99 Standard: 7.20 General utilities	<stdlib.h>
@@ -59,10 +60,15 @@ __BEGIN_DECLS
    allowed without complaint.  __WAIT_STATUS_DEFN is the type used in
    the actual function definitions.  */
 
+/*For __ve__, _NCC_VE_ARCH_ added to resolve ticket #1065*/
 #  if !defined __GNUC__ || __GNUC__ < 2 || defined __cplusplus
 #   define __WAIT_STATUS	void *
 #   define __WAIT_STATUS_DEFN	void *
 #  else
+#ifdef __ve__
+#   define __WAIT_STATUS	int *
+#   define __WAIT_STATUS_DEFN	int *
+#else
 /* This works in GCC 2.6.1 and later.  */
 typedef union
   {
@@ -70,6 +76,7 @@ typedef union
     int *__iptr;
   } __WAIT_STATUS __attribute__ ((__transparent_union__));
 #   define __WAIT_STATUS_DEFN	int *
+#endif
 #  endif
 
 # else /* Don't use misc.  */

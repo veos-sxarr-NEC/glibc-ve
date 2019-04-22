@@ -37,8 +37,8 @@ for cns in `cd ./tst-fmon-locales && ls tstfmon_*`; do
     fn=charmaps/ISO-8859-1
     ${run_program_prefix_before_env} \
     ${run_program_env} \
-    I18NPATH=. \
-    ${run_program_prefix_after_env} ${common_objpfx}locale/localedef \
+    VE_I18NPATH=. \
+    ${common_objpfx}locale/localedef \
     --quiet -i $cn -f $fn ${common_objpfx}localedata/$cns
 done
 
@@ -49,7 +49,7 @@ while IFS="	" read locale format value expect; do
     case "$locale" in '#'*) continue ;; esac
     if [ -n "$format" ]; then
 	expect=`echo "$expect" | sed 's/^\"\(.*\)\"$/\1/'`
-	${test_program_prefix} ${common_objpfx}localedata/tst-fmon \
+	${run_program_prefix_before_env} ${run_program_env} ${common_objpfx}localedata/tst-fmon \
 	"$locale" "$format" "$value" "$expect" < /dev/null ||
 	errcode=$?
     fi

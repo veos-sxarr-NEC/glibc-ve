@@ -21,8 +21,10 @@
 set -e
 
 common_objpfx=$1
-test_program_prefix=$2
-objpfx=$3
+common_objpfx=$1
+test_program_prefix_before_env=$2
+run_program_env=$3
+objpfx=$4
 
 # Create the domain directories.
 mkdir -p ${objpfx}domaindir/de_DE/LC_MESSAGES
@@ -31,6 +33,8 @@ mkdir -p ${objpfx}domaindir/fr_FR/LC_MESSAGES
 msgfmt -o ${objpfx}domaindir/de_DE/LC_MESSAGES/multithread.mo tst-gettext4-de.po
 msgfmt -o ${objpfx}domaindir/fr_FR/LC_MESSAGES/multithread.mo tst-gettext4-fr.po
 
-${test_program_prefix} ${objpfx}tst-gettext4 > ${objpfx}tst-gettext4.out
+${test_program_prefix_before_env} \
+${run_program_env} \
+ ${objpfx}tst-gettext4 > ${objpfx}tst-gettext4.out
 
 exit $?

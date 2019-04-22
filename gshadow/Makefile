@@ -30,10 +30,11 @@ tests = tst-gshadow
 
 CFLAGS-getsgent_r.c = -fexceptions
 CFLAGS-getsgent.c = -fexceptions
-CFLAGS-fgetsgent.c = -fexceptions
-CFLAGS-fgetsgent_r.c = -fexceptions $(libio-mtsafe)
+CFLAGS-fgetsgent.c = -fexceptions -O0
+CFLAGS-fgetsgent_r.c = -fexceptions $(libio-mtsafe) -O0
 CFLAGS-putsgent.c = -fexceptions $(libio-mtsafe)
 CFLAGS-getsgnam.c = -fexceptions
 CFLAGS-getsgnam_r.c = -fexceptions
+CFLAGS-sgetsgent_r.c += -O0
 
 include ../Rules

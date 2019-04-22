@@ -861,8 +861,11 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
 					const char *domainname,
 					const char *msgid1, const char *msgid2,
 					int plural);
+#ifdef __ve__
+      const char *logfilename = getenv ("VE_GETTEXT_LOG_UNTRANSLATED");
+#else
       const char *logfilename = getenv ("GETTEXT_LOG_UNTRANSLATED");
-
+#endif
       if (logfilename != NULL && logfilename[0] != '\0')
 	_nl_log_untranslated (logfilename, domainname, msgid1, msgid2, plural);
     }
@@ -1584,7 +1587,11 @@ guess_category_value (int category, const char *categoryname)
 
   /* The highest priority value is the value of the 'LANGUAGE' environment
      variable.  */
+#ifdef __ve__
+  language = getenv ("VE_LANGUAGE");
+#else
   language = getenv ("LANGUAGE");
+#endif
   if (language != NULL && language[0] != '\0')
     return language;
 #if !defined IN_LIBGLOCALE && !defined _LIBC
@@ -1624,8 +1631,11 @@ get_output_charset (struct binding *domainbinding)
 
       if (!output_charset_cached)
 	{
+#ifdef __ve__
+	  const char *value = getenv ("VE_OUTPUT_CHARSET");
+#else
 	  const char *value = getenv ("OUTPUT_CHARSET");
-
+#endif
 	  if (value != NULL && value[0] != '\0')
 	    {
 	      size_t len = strlen (value) + 1;

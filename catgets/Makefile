@@ -60,16 +60,16 @@ ifeq ($(run-built-tests),yes)
 $(objpfx)test1.cat: test1.msg $(objpfx)gencat
 	$(built-program-cmd-before-env) \
 	$(run-program-env) LC_ALL=hr_HR.ISO-8859-2 \
-	$(built-program-cmd-after-env) -H $(objpfx)test1.h $@ $<; \
+	$(objpfx)gencat -H $(objpfx)test1.h $@ $<; \
 	$(evaluate-test)
 $(objpfx)test2.cat: test2.msg $(objpfx)gencat
-	$(built-program-cmd) -H $(objpfx)test2.h $@ $<; \
+	$(objpfx)gencat -H $(objpfx)test2.h $@ $<; \
 	$(evaluate-test)
 $(objpfx)de/libc.cat: $(objpfx)de.msg $(objpfx)gencat
 	$(make-target-directory)
 	$(built-program-cmd-before-env) \
 	$(run-program-env) LC_ALL=de_DE.ISO-8859-1 \
-	$(built-program-cmd-after-env) $@ $<; \
+	$(objpfx)gencat $@ $<; \
 	$(evaluate-test)
 $(objpfx)tst-catgets.out: $(objpfx)de/libc.cat
 
@@ -80,10 +80,10 @@ $(objpfx)de.msg: xopen-msg.awk $(..)po/de.po
 $(objpfx)test-gencat.out: test-gencat.sh $(objpfx)test-gencat \
 			  $(objpfx)sample.SJIS.cat
 	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
-		 '$(run-program-env)' '$(test-program-cmd-after-env)'; \
+		 '$(run-program-env)' '$(built-program-file)';\
 	$(evaluate-test)
 
 $(objpfx)sample.SJIS.cat: sample.SJIS $(objpfx)gencat
-	$(built-program-cmd) -H $(objpfx)test-gencat.h < $(word 1,$^) > $@; \
+	$(objpfx)gencat -H $(objpfx)test-gencat.h < $(word 1,$^) > $@; \
 	$(evaluate-test)
 endif

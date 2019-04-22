@@ -32,8 +32,8 @@ cp ${common_objpfx}elf/pathoptobj.so ${common_objpfx}elf/for-renamed/renamed.so
 
 ${test_wrapper_env} \
 ${run_program_env} \
-LD_LIBRARY_PATH=${common_objpfx}elf/will-be-empty:${common_objpfx}elf/for-renamed:${common_objpfx}.:${common_objpfx}dlfcn \
-  ${common_objpfx}elf/ld.so ${common_objpfx}elf/tst-pathopt \
+VE_LD_LIBRARY_PATH=${common_objpfx}elf/will-be-empty:${common_objpfx}elf/for-renamed:${common_objpfx}.:${common_objpfx}dlfcn \
+  ${common_objpfx}elf/tst-pathopt \
     > ${common_objpfx}elf/tst-pathopt.out
 
 exit $?

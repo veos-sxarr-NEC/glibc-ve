@@ -1,7 +1,7 @@
 libc {
   GLIBC_2.0 {
     # helper functions
-    __libc_init_first; __libc_start_main;
+    __libc_init_first; __libc_start_main; __setPthreadStruct; __ve_hw_specific01;
   }
   GLIBC_2.1 {
     # New special glibc functions.

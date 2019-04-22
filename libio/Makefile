@@ -84,7 +84,7 @@ endif
 CPPFLAGS += $(libio-mtsafe)
 
 # Support for exception handling.
-CFLAGS-fileops.c = $(exceptions)
+CFLAGS-fileops.c = -O0 $(exceptions)
 CFLAGS-fputc.c = $(exceptions)
 CFLAGS-fputwc.c = $(exceptions)
 CFLAGS-freopen64.c = $(exceptions)
@@ -102,8 +102,8 @@ CFLAGS-getwc.c = $(exceptions)
 CFLAGS-getwchar.c = $(exceptions)
 CFLAGS-iofclose.c = $(exceptions)
 CFLAGS-iofflush.c = $(exceptions)
-CFLAGS-iofgetpos64.c = $(exceptions)
-CFLAGS-iofgetpos.c = $(exceptions)
+CFLAGS-iofgetpos64.c = $(exceptions) -O0
+CFLAGS-iofgetpos.c = $(exceptions) -O0
 CFLAGS-iofgets.c = $(exceptions)
 CFLAGS-iofgetws.c = $(exceptions)
 CFLAGS-iofputs.c = $(exceptions)
@@ -126,8 +126,8 @@ CFLAGS-ioungetc.c = $(exceptions)
 CFLAGS-ioungetwc.c = $(exceptions)
 CFLAGS-oldfileops.c = $(exceptions)
 CFLAGS-oldiofclose.c = $(exceptions)
-CFLAGS-oldiofgetpos64.c = $(exceptions)
-CFLAGS-oldiofgetpos.c = $(exceptions)
+CFLAGS-oldiofgetpos64.c = $(exceptions) -O0
+CFLAGS-oldiofgetpos.c = $(exceptions) -O0
 CFLAGS-oldiofsetpos64.c = $(exceptions)
 CFLAGS-oldiofsetpos.c = $(exceptions)
 CFLAGS-peekc.c = $(exceptions)
@@ -148,7 +148,7 @@ CFLAGS-tst_putwc.c = -DOBJPFX=\"$(objpfx)\"
 
 tst_wprintf2-ARGS = "Some Text"
 
-tst-fopenloc-ENV = MALLOC_TRACE=$(objpfx)tst-fopenloc.mtrace
+tst-fopenloc-ENV = VE_MALLOC_TRACE=$(objpfx)tst-fopenloc.mtrace
 
 generated += tst-fopenloc.mtrace tst-fopenloc.check
 
@@ -175,7 +175,7 @@ endif
 include ../Rules
 
 $(objpfx)test-freopen.out: test-freopen.sh $(objpfx)test-freopen
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)'	\
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env) $(run-program-env)' \
 	$(common-objpfx)libio/; \
 	$(evaluate-test)
 

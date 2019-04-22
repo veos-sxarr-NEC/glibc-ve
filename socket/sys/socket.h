@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #ifndef	_SYS_SOCKET_H
 #define	_SYS_SOCKET_H	1
@@ -65,7 +66,14 @@ enum
    uses with any of the listed types to be allowed without complaint.
    G++ 2.7 does not support transparent unions so there we want the
    old-style declaration, too.  */
+
+/*For __ve__, _NCC_VE_ARCH_ added to resolve ticket #1065*/
+
 #if defined __cplusplus || !__GNUC_PREREQ (2, 7) || !defined __USE_GNU
+# define __SOCKADDR_ARG		struct sockaddr *__restrict
+# define __CONST_SOCKADDR_ARG	const struct sockaddr *
+#else
+#ifdef __ve__
 # define __SOCKADDR_ARG		struct sockaddr *__restrict
 # define __CONST_SOCKADDR_ARG	const struct sockaddr *
 #else
@@ -94,6 +102,7 @@ typedef union { __SOCKADDR_ALLTYPES
 typedef union { __SOCKADDR_ALLTYPES
 	      } __CONST_SOCKADDR_ARG __attribute__ ((__transparent_union__));
 # undef __SOCKADDR_ONETYPE
+#endif
 #endif
 
 #ifdef __USE_GNU

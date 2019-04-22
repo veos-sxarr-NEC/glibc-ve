@@ -18,7 +18,7 @@ endif
 ifeq ($(subdir),misc)
 include $(firstword $(wildcard $(sysdirs:=/sysctl.mk)))
 
-sysdep_routines += clone llseek umount umount2 readahead \
+sysdep_routines += clone veclone llseek umount umount2 readahead \
 		   setfsuid setfsgid makedev epoll_pwait signalfd \
 		   eventfd eventfd_read eventfd_write prlimit
 
@@ -188,6 +188,8 @@ endif
 ifeq ($(subdir),rt)
 CFLAGS-mq_send.c += -fexceptions
 CFLAGS-mq_receive.c += -fexceptions
+CFLAGS-aio_sigqueue.c += -O0
+
 endif
 
 ifeq ($(subdir),nscd)
@@ -197,4 +199,5 @@ endif
 
 ifeq ($(subdir),nptl)
 tests += tst-setgetname
+CFLAGS-pthread_sigqueue.c += -O0
 endif

@@ -398,7 +398,11 @@ for linking")
 # define attribute_hidden
 #endif
 
+#ifdef VE
+#define attribute_tls_model_ie __attribute__ ((tls_model ("global-dynamic")))
+#else
 #define attribute_tls_model_ie __attribute__ ((tls_model ("initial-exec")))
+#endif
 
 #define attribute_relro __attribute__ ((section (".data.rel.ro")))
 

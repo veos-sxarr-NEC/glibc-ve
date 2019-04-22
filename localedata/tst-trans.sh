@@ -29,8 +29,7 @@ test_program_prefix_after_env=$6
 # Generate the necessary locale data.
 ${run_program_prefix_before_env} \
 ${run_program_env} \
-I18NPATH=. \
-${run_program_prefix_after_env} \
+VE_I18NPATH=. \
 ${common_objpfx}locale/localedef --quiet \
 -i tests/trans.def -f charmaps/ISO-8859-1 \
 ${common_objpfx}localedata/tt_TT ||
@@ -39,7 +38,7 @@ exit 1
 # Run the test program.
 ${test_program_prefix_before_env} \
 ${run_program_env} \
-LC_ALL=tt_TT ${test_program_prefix_after_env} \
+LC_ALL=tt_TT  \
 ${common_objpfx}localedata/tst-trans > ${common_objpfx}localedata/tst-trans.out
 
 exit $?

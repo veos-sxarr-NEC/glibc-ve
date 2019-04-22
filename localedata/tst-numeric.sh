@@ -21,8 +21,9 @@
 set -e
 
 common_objpfx=$1
-test_program_prefix=$2
-datafile=$3
+program_prefix_before_env=$2
+run_program_env=$3
+datafile=$4
 
 # Run the tests.
 errcode=0
@@ -30,7 +31,7 @@ errcode=0
 while IFS="	" read locale format value expect; do
     case "$locale" in '#'*) continue ;; esac
     if [ -n "$format" ]; then
-	if ${test_program_prefix} ${common_objpfx}localedata/tst-numeric \
+	if ${program_prefix_before_env} ${run_program_env} ${common_objpfx}localedata/tst-numeric \
 	    "$locale" "$format" "$value" "$expect" < /dev/null
 	then
 	    echo "Locale: \"${locale}\" Format: \"${format}\"" \

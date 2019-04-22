@@ -488,7 +488,11 @@ environment SPEC.\n\n"));
       return 0;
     }
 
+#ifdef __ve__
+  const char *getconf_dir = getenv ("VE_GETCONF_DIR") ?: GETCONF_DIR;
+#else
   const char *getconf_dir = getenv ("GETCONF_DIR") ?: GETCONF_DIR;
+#endif
   size_t getconf_dirlen = strlen (getconf_dir);
 
   const char *spec = NULL;

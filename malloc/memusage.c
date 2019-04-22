@@ -217,7 +217,11 @@ int_handler (int signo)
 static void
 me (void)
 {
+#ifdef __ve__
+  const char *env = getenv ("VE_MEMUSAGE_PROG_NAME");
+#else
   const char *env = getenv ("MEMUSAGE_PROG_NAME");
+#endif
   size_t prog_len = strlen (__progname);
 
   initialized = -1;
@@ -252,8 +256,11 @@ me (void)
 
       if (!start_sp)
         start_sp = GETSP ();
-
+#ifdef __ve__
+      outname = getenv ("VE_MEMUSAGE_OUTPUT");
+#else
       outname = getenv ("MEMUSAGE_OUTPUT");
+#endif
       if (outname != NULL && outname[0] != '\0'
           && (access (outname, R_OK | W_OK) == 0 || errno == ENOENT))
         {
@@ -276,15 +283,25 @@ me (void)
               /* Determine the buffer size.  We use the default if the
                  environment variable is not present.  */
               buffer_size = DEFAULT_BUFFER_SIZE;
+#ifdef __ve__
+              if (getenv ("VE_MEMUSAGE_BUFFER_SIZE") != NULL)
+                {
+                  buffer_size = atoi (getenv ("VE_MEMUSAGE_BUFFER_SIZE"));
+#else
               if (getenv ("MEMUSAGE_BUFFER_SIZE") != NULL)
                 {
                   buffer_size = atoi (getenv ("MEMUSAGE_BUFFER_SIZE"));
+#endif
                   if (buffer_size == 0 || buffer_size > DEFAULT_BUFFER_SIZE)
                     buffer_size = DEFAULT_BUFFER_SIZE;
                 }
 
               /* Possibly enable timer-based stack pointer retrieval.  */
+#ifdef __ve__
+              if (getenv ("VE_MEMUSAGE_NO_TIMER") == NULL)
+#else
               if (getenv ("MEMUSAGE_NO_TIMER") == NULL)
+#endif
                 {
                   struct sigaction act;
 
@@ -304,8 +321,11 @@ me (void)
                 }
             }
         }
-
+#ifdef __ve__
+      if (!not_me && getenv ("VE_MEMUSAGE_TRACE_MMAP") != NULL)
+#else
       if (!not_me && getenv ("MEMUSAGE_TRACE_MMAP") != NULL)
+#endif
         trace_mmap = true;
     }
 }

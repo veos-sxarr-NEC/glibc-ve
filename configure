@@ -826,7 +826,7 @@ sbindir='${exec_prefix}/sbin'
 libexecdir='${exec_prefix}/libexec'
 datarootdir='${prefix}/share'
 datadir='${datarootdir}'
-sysconfdir='${prefix}/etc'
+sysconfdir='/etc/${prefix}'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
 includedir='${prefix}/include'
@@ -2435,6 +2435,46 @@ ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
+if test "$host" = ve-unknown-linux-gnu; then
+# Extract the first word of "ncc", so it can be a program name with args.
+set dummy ncc; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_CC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$CC"; then
+  ac_cv_prog_CC="$CC" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy=""$PATH:/opt/nec/ve/bin""
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_CC="/opt/nec/ve/bin/gcc"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+CC=$ac_cv_prog_CC
+if test -n "$CC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CC" >&5
+$as_echo "$CC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
 if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
@@ -4437,7 +4477,7 @@ AS=`$CC -print-prog-name=as`
 LD=`$CC -print-prog-name=ld`
 AR=`$CC -print-prog-name=ar`
 
-OBJDUMP=`$CC -print-prog-name=objdump`
+OBJDUMP=`$CC -print-prog-name=/opt/nec/ve/bin/nobjdump`
 
 OBJCOPY=`$CC -print-prog-name=objcopy`
 
@@ -6505,6 +6545,7 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __thread" >&5
 $as_echo_n "checking for __thread... " >&6; }
+CFLAGS="-O2"
 if ${libc_cv_gcc___thread+:} false; then :
   $as_echo_n "(cached) " >&6
 else

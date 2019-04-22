@@ -17,6 +17,7 @@
 
 # Makefile for elf subdirectory of GNU C Library.
 
+# Removing cc files instances
 subdir		:= elf
 
 include ../Makeconfig
@@ -49,6 +50,8 @@ all-rtld-routines = $(rtld-routines) $(sysdep-rtld-routines)
 CFLAGS-dl-runtime.c = -fexceptions -fasynchronous-unwind-tables
 CFLAGS-dl-lookup.c = -fexceptions -fasynchronous-unwind-tables
 CFLAGS-dl-iterate-phdr.c = $(uses-callbacks)
+CFLAGS-dl-open.c = -O0 -fexceptions -fasynchronous-unwind-tables
+CFLAGS-dl-addr.c = -O0 -fexceptions -fasynchronous-unwind-tables
 
 ifeq ($(unwind-find-fde),yes)
 routines += unwind-dw2-fde-glibc
@@ -116,16 +119,18 @@ $(inst_auditdir)/sotruss-lib.so: $(objpfx)sotruss-lib.so $(+force)
 	$(do-install-program)
 endif
 
-tests = tst-tls1 tst-tls2 tst-tls9 tst-leaks1 \
+# Removed tst-tls1 tst-tls2 tst-tls3 tst-tlsmod1 tst-tlsmod2 tst-tlsmod3
+# tst-tlsmod4 tst-tlsmod5 tst-tlsmod6
+tests = tst-tls9 tst-leaks1 \
 	tst-array1 tst-array2 tst-array3 tst-array4 tst-array5 \
 	tst-auxv
-tests-static = tst-tls1-static tst-tls2-static tst-stackguard1-static \
+tests-static = tst-stackguard1-static \
 	       tst-leaks1-static tst-array1-static tst-array5-static \
 	       tst-ptrguard1-static tst-dl-iter-static
 ifeq (yes,$(build-shared))
 tests-static += tst-tls9-static
 tst-tls9-static-ENV = \
-       LD_LIBRARY_PATH=$(objpfx):$(common-objpfx):$(common-objpfx)dlfcn
+       VE_LD_LIBRARY_PATH=$(objpfx):$(common-objpfx):$(common-objpfx)dlfcn
 endif
 tests += $(tests-static)
 ifeq (yes,$(build-shared))
@@ -135,7 +140,7 @@ tests += loadtest restest1 preloadtest loadfail multiload origtest resolvfail \
 	 nodlopen nodlopen2 neededtest neededtest2 \
 	 neededtest3 neededtest4 unload2 lateglobal initfirst global \
 	 restest2 next dblload dblunload reldep5 reldep6 reldep7 reldep8 \
-	 circleload1 tst-tls3 tst-tls4 tst-tls5 tst-tls6 tst-tls7 tst-tls8 \
+	 circleload1 tst-tls4 tst-tls5 tst-tls6 tst-tls7 tst-tls8 \
 	 tst-tls10 tst-tls11 tst-tls12 tst-tls13 tst-tls14 tst-tls15 \
 	 tst-tls16 tst-tls17 tst-tls18 tst-tls19 tst-tls-dlinfo \
 	 tst-align tst-align2 $(tests-execstack-$(have-z-execstack)) \
@@ -144,10 +149,10 @@ tests += loadtest restest1 preloadtest loadfail multiload origtest resolvfail \
 	 unload3 unload4 unload5 unload6 unload7 unload8 tst-global1 order2 \
 	 tst-audit1 tst-audit2 tst-audit8 tst-audit9 \
 	 tst-stackguard1 tst-addr1 tst-thrlock \
-	 tst-unique1 tst-unique2 tst-unique3 tst-unique4 \
+	 tst-unique1 tst-unique2 \
 	 tst-initorder tst-initorder2 tst-relsort1 tst-null-argv \
-	 tst-ptrguard1
-#	 reldep9
+	 tst-ptrguard1 \
+	 reldep9
 ifeq ($(build-hardcoded-path-in-tests),yes)
 tests += tst-dlopen-aout
 endif
@@ -181,8 +186,7 @@ modules-names = testobj1 testobj2 testobj3 testobj4 testobj5 testobj6 \
 		dblloadmod1 dblloadmod2 dblloadmod3 reldepmod5 reldepmod6 \
 		reldep6mod0 reldep6mod1 reldep6mod2 reldep6mod3 reldep6mod4 \
 		reldep7mod1 reldep7mod2 \
-		tst-tlsmod1 tst-tlsmod2 tst-tlsmod3 tst-tlsmod4 \
-		tst-tlsmod5 tst-tlsmod6 tst-tlsmod7 tst-tlsmod8 \
+		tst-tlsmod7 tst-tlsmod8 \
 		tst-tlsmod9 tst-tlsmod10 tst-tlsmod11 tst-tlsmod12 \
 		tst-tlsmod13 tst-tlsmod13a tst-tlsmod14a tst-tlsmod14b \
 		tst-tlsmod15a tst-tlsmod15b tst-tlsmod16a tst-tlsmod16b \
@@ -205,8 +209,6 @@ modules-names = testobj1 testobj2 testobj3 testobj4 testobj5 testobj6 \
 		tst-unique1mod1 tst-unique1mod2 \
 		tst-unique2mod1 tst-unique2mod2 \
 		tst-auditmod9a tst-auditmod9b \
-		tst-unique3lib tst-unique3lib2 \
-		tst-unique4lib \
 		tst-initordera1 tst-initorderb1 \
 		tst-initordera2 tst-initorderb2 \
 		tst-initordera3 tst-initordera4 \
@@ -219,6 +221,18 @@ modules-names += tst-piemod1
 tests += tst-pie1 tst-pie2
 tests-pie += tst-pie1 tst-pie2
 endif
+CFLAGS-dblloadmod1.c += -O0
+CFLAGS-dblloadmod2.c += -O0
+CFLAGS-dblloadmod3.c += -O0
+CFLAGS-circlemod1.c += -O0
+CFLAGS-circlemod1a.c += -O0
+CFLAGS-circlemod2.c += -O0
+CFLAGS-circlemod2a.c += -O0
+CFLAGS-circlemod3.c += -O0
+CFLAGS-circlemod3a.c += -O0
+CFLAGS-constload2.c += -O0
+CFLAGS-constload3.c += -O0
+
 modules-execstack-yes = tst-execstack-mod
 extra-test-objs += $(addsuffix .os,$(strip $(modules-names)))
 # We need this variable to be sure the test modules get the right CPPFLAGS.
@@ -439,7 +453,7 @@ CFLAGS-ldconfig.c = $(SYSCONF-FLAGS) -D'LIBDIR="$(libdir)"' \
 		    -D'SLIBDIR="$(slibdir)"'
 libof-ldconfig = ldconfig
 CFLAGS-dl-cache.c = $(SYSCONF-FLAGS)
-CFLAGS-cache.c = $(SYSCONF-FLAGS)
+CFLAGS-cache.c = $(SYSCONF-FLAGS) -O0
 CFLAGS-rtld.c = $(SYSCONF-FLAGS)
 
 cpp-srcs-left := $(all-rtld-routines:=.os)
@@ -482,14 +496,14 @@ $(objpfx)reldep6mod1.so: $(objpfx)reldep6mod0.so
 $(objpfx)reldep6mod2.so: $(objpfx)reldep6mod1.so
 $(objpfx)reldep6mod3.so: $(objpfx)reldep6mod2.so
 $(objpfx)reldep6mod4.so: $(objpfx)reldep6mod1.so
-$(objpfx)tst-tlsmod3.so: $(objpfx)tst-tlsmod2.so
+#$(objpfx)tst-tlsmod3.so: $(objpfx)tst-tlsmod2.so
 $(objpfx)tst-tlsmod8.so: $(objpfx)tst-tlsmod7.so
 $(objpfx)tst-tlsmod10.so: $(objpfx)tst-tlsmod9.so
 $(objpfx)tst-tlsmod12.so: $(objpfx)tst-tlsmod11.so
 $(objpfx)tst-tlsmod13a.so: $(objpfx)tst-tlsmod13.so
 # For tst-tls9-static, make sure the modules it dlopens have libc.so in DT_NEEDED
-$(objpfx)tst-tlsmod5.so: $(common-objpfx)libc.so
-$(objpfx)tst-tlsmod6.so: $(common-objpfx)libc.so
+#$(objpfx)tst-tlsmod5.so: $(common-objpfx)libc.so
+#$(objpfx)tst-tlsmod6.so: $(common-objpfx)libc.so
 $(objpfx)tst-tls19mod1.so: $(objpfx)tst-tls19mod2.so $(objpfx)tst-tls19mod3.so
 $(objpfx)tst-tls19mod3.so: $(objpfx)ld.so
 $(objpfx)reldep8mod3.so: $(objpfx)reldep8mod1.so $(objpfx)reldep8mod2.so
@@ -615,7 +629,7 @@ $(objpfx)preloadtest: $(objpfx)testobj6.so
 LDFLAGS-preloadtest = -rdynamic
 $(objpfx)preloadtest.out: $(preloadtest-preloads:%=$(objpfx)%.so)
 preloadtest-ENV = \
-  LD_PRELOAD=$(subst $(empty) ,:,$(strip $(preloadtest-preloads:=.so)))
+  VE_LD_PRELOAD=$(subst $(empty) ,:,$(strip $(preloadtest-preloads:=.so)))
 
 $(objpfx)loadfail: $(libdl)
 LDFLAGS-loadfail = -rdynamic
@@ -658,7 +672,7 @@ $(objpfx)order-cmp.out: $(objpfx)order.out
 
 $(objpfx)vismain: $(addprefix $(objpfx),vismod1.so vismod2.so)
 $(objpfx)vismain.out: $(addprefix $(objpfx),vismod3.so)
-vismain-ENV = LD_PRELOAD=$(addprefix $(objpfx),vismod3.so)
+vismain-ENV = VE_LD_PRELOAD=$(addprefix $(objpfx),vismod3.so)
 
 $(objpfx)noload: $(objpfx)testobj1.so $(libdl)
 LDFLAGS-noload = -rdynamic $(no-as-needed)
@@ -667,7 +681,7 @@ $(objpfx)noload.out: $(objpfx)testobj5.so
 $(objpfx)noload-mem.out: $(objpfx)noload.out
 	$(common-objpfx)malloc/mtrace $(objpfx)noload.mtrace > $@; \
 	$(evaluate-test)
-noload-ENV = MALLOC_TRACE=$(objpfx)noload.mtrace
+noload-ENV = VE_MALLOC_TRACE=$(objpfx)noload.mtrace
 
 LDFLAGS-nodelete = -rdynamic
 LDFLAGS-nodelmod1.so = -Wl,--enable-new-dtags,-z,nodelete
@@ -760,22 +774,22 @@ $(objpfx)reldep9.out: $(objpfx)reldep9mod3.so
 $(objpfx)tst-tls3: $(objpfx)tst-tlsmod1.so
 
 $(objpfx)tst-tls4: $(libdl)
-$(objpfx)tst-tls4.out: $(objpfx)tst-tlsmod2.so
+#$(objpfx)tst-tls4.out: $(objpfx)tst-tlsmod2.so
 
 $(objpfx)tst-tls5: $(libdl)
-$(objpfx)tst-tls5.out: $(objpfx)tst-tlsmod2.so
+#$(objpfx)tst-tls5.out: $(objpfx)tst-tlsmod2.so
 
 $(objpfx)tst-tls6: $(libdl)
-$(objpfx)tst-tls6.out: $(objpfx)tst-tlsmod2.so
+#$(objpfx)tst-tls6.out: $(objpfx)tst-tlsmod2.so
 
 $(objpfx)tst-tls7: $(libdl)
-$(objpfx)tst-tls7.out: $(objpfx)tst-tlsmod3.so
+#$(objpfx)tst-tls7.out: $(objpfx)tst-tlsmod3.so
 
 $(objpfx)tst-tls8: $(libdl)
-$(objpfx)tst-tls8.out: $(objpfx)tst-tlsmod3.so $(objpfx)tst-tlsmod4.so
+#$(objpfx)tst-tls8.out: $(objpfx)tst-tlsmod3.so $(objpfx)tst-tlsmod4.so
 
 $(objpfx)tst-tls9: $(libdl)
-$(objpfx)tst-tls9.out: $(objpfx)tst-tlsmod5.so $(objpfx)tst-tlsmod6.so
+#$(objpfx)tst-tls9.out: $(objpfx)tst-tlsmod5.so $(objpfx)tst-tlsmod6.so
 
 $(objpfx)tst-tls10: $(objpfx)tst-tlsmod8.so $(objpfx)tst-tlsmod7.so
 
@@ -793,7 +807,7 @@ $(objpfx)tst-tls15: $(libdl)
 $(objpfx)tst-tls15.out: $(objpfx)tst-tlsmod15a.so $(objpfx)tst-tlsmod15b.so
 
 $(objpfx)tst-tls-dlinfo: $(libdl)
-$(objpfx)tst-tls-dlinfo.out: $(objpfx)tst-tlsmod2.so
+#$(objpfx)tst-tls-dlinfo.out: $(objpfx)tst-tlsmod2.so
 
 
 
@@ -841,14 +855,14 @@ $(objpfx)unload6.out: $(objpfx)unload6mod1.so $(objpfx)unload6mod2.so \
 
 $(objpfx)unload7: $(libdl)
 $(objpfx)unload7.out: $(objpfx)unload7mod1.so $(objpfx)unload7mod2.so
-unload7-ENV = MALLOC_PERTURB_=85
+unload7-ENV = VE_MALLOC_PERTURB_=85
 
 $(objpfx)unload8: $(libdl)
 $(objpfx)unload8.out: $(objpfx)unload8mod1.so $(objpfx)unload8mod1x.so
 
 ifdef libdl
 $(objpfx)tst-tls9-static: $(common-objpfx)dlfcn/libdl.a
-$(objpfx)tst-tls9-static.out: $(objpfx)tst-tlsmod5.so $(objpfx)tst-tlsmod6.so
+#$(objpfx)tst-tls9-static.out: $(objpfx)tst-tlsmod5.so $(objpfx)tst-tlsmod6.so
 endif
 
 ifeq ($(have-z-execstack),yes)
@@ -994,6 +1008,18 @@ $(objpfx)tst-dlopenrpathmod.so: $(libdl)
 $(objpfx)tst-dlopenrpath: $(objpfx)tst-dlopenrpathmod.so $(libdl)
 CFLAGS-tst-dlopenrpath.c += -DPFX=\"$(objpfx)\"
 LDFLAGS-tst-dlopenrpathmod.so += -Wl,-rpath,\$$ORIGIN/test-subdir
+CFLAGS-ltglobmod2.c += -O0
+CFLAGS-testobj1.c += -O0
+CFLAGS-reldep6mod1.c += -O0
+CFLAGS-reldep6mod0.c += -O0
+CFLAGS-reldep6mod4.c += -O0
+CFLAGS-reldep6.c += -O0
+CFLAGS-tst-execstack-mod.c += -O0
+CFLAGS-tst-auditmod1.c += -O0
+CFLAGS-tst-global1.c += -O0
+CFLAGS-testobj2.c += -O0
+CFLAGS-testobj6.c += -O0
+
 $(objpfx)tst-dlopenrpath.out: $(objpfx)firstobj.so
 
 $(objpfx)tst-deep1mod2.so: $(objpfx)tst-deep1mod3.so
@@ -1060,8 +1086,8 @@ $(objpfx)tst-leaks1-static-mem.out: $(objpfx)tst-leaks1-static.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-leaks1-static.mtrace > $@; \
 	$(evaluate-test)
 
-tst-leaks1-ENV = MALLOC_TRACE=$(objpfx)tst-leaks1.mtrace
-tst-leaks1-static-ENV = MALLOC_TRACE=$(objpfx)tst-leaks1-static.mtrace
+tst-leaks1-ENV = VE_MALLOC_TRACE=$(objpfx)tst-leaks1.mtrace
+tst-leaks1-static-ENV = VE_MALLOC_TRACE=$(objpfx)tst-leaks1-static.mtrace
 
 $(objpfx)tst-addr1: $(libdl)
 
@@ -1127,10 +1153,10 @@ $(objpfx)tst-unique1.out: $(objpfx)tst-unique1mod1.so \
 $(objpfx)tst-unique2: $(libdl) $(objpfx)tst-unique2mod1.so
 $(objpfx)tst-unique2.out: $(objpfx)tst-unique2mod2.so
 
-$(objpfx)tst-unique3: $(libdl) $(objpfx)tst-unique3lib.so
-$(objpfx)tst-unique3.out: $(objpfx)tst-unique3lib2.so
+#$(objpfx)tst-unique3: $(libdl) $(objpfx)tst-unique3lib.so
+#$(objpfx)tst-unique3.out: $(objpfx)tst-unique3lib2.so
 
-$(objpfx)tst-unique4: $(objpfx)tst-unique4lib.so
+#$(objpfx)tst-unique4: $(objpfx)tst-unique4lib.so
 
 $(objpfx)tst-initorder-cmp.out: tst-initorder.exp $(objpfx)tst-initorder.out
 	cmp $^ > $@; \
@@ -1165,7 +1191,7 @@ $(objpfx)tst-unused-dep.out: $(objpfx)testobj1.so
 	$(test-wrapper-env) \
 	LD_TRACE_LOADED_OBJECTS=1 \
 	LD_DEBUG=unused \
-	LD_PRELOAD= \
+	VE_LD_PRELOAD= \
 	$(rtld-prefix) \
 	  $< > $@; \
 	$(evaluate-test)

@@ -33,15 +33,21 @@ libdl-routines	+= dlopenold
 libdl-shared-only-routines := dlopenold dlfcn
 endif
 
+#Commented file bug-atexit3 and its dependency as bug-atexit3-lib.cc is
+#cpp file and it uses g++ compiler to build library bug-atexit3-lib.os
+
 ifeq (yes,$(build-shared))
 tests = glrefmain failtest tst-dladdr default errmsg1 tstcxaatexit \
 	bug-dlopen1 bug-dlsym1 tst-dlinfo bug-atexit1 bug-atexit2 \
-	bug-atexit3 tstatexit bug-dl-leaf tst-rec-dlopen
+	tstatexit bug-dl-leaf tst-rec-dlopen
+
+bug-atexit1-ENV = VE_LD_ORIGIN_PATH=$(objpfx)
+bug-atexit2-ENV = VE_LD_ORIGIN_PATH=$(objpfx)
 endif
 modules-names = glreflib1 glreflib2 glreflib3 failtestmod defaultmod1 \
 		defaultmod2 errmsg1mod modatexit modcxaatexit \
 		bug-dlsym1-lib1 bug-dlsym1-lib2 bug-atexit1-lib \
-		bug-atexit2-lib bug-atexit3-lib bug-dl-leaf-lib \
+		bug-atexit2-lib bug-dl-leaf-lib \
 		bug-dl-leaf-lib-cb moddummy1 moddummy2
 
 failtestmod.so-no-z-defs = yes
@@ -52,7 +58,7 @@ ifeq (yes,$(build-shared))
 tests += tststatic tststatic2 tststatic3 tststatic4 tststatic5
 tests-static += tststatic tststatic2 tststatic3 tststatic4 tststatic5
 modules-names += modstatic modstatic2 modstatic3 modstatic5
-tststatic-ENV = LD_LIBRARY_PATH=$(objpfx):$(common-objpfx):$(common-objpfx)elf
+tststatic-ENV = VE_LD_LIBRARY_PATH=$(objpfx):$(common-objpfx):$(common-objpfx)elf
 tststatic2-ENV = $(tststatic-ENV)
 tststatic3-ENV = $(tststatic-ENV)
 tststatic4-ENV = $(tststatic-ENV)
@@ -131,9 +137,9 @@ $(objpfx)bug-atexit1.out: $(objpfx)bug-atexit1-lib.so
 $(objpfx)bug-atexit2: $(libdl)
 $(objpfx)bug-atexit2.out: $(objpfx)bug-atexit2-lib.so
 
-LDLIBS-bug-atexit3-lib.so = -lstdc++ -lgcc_eh
-$(objpfx)bug-atexit3: $(libdl)
-$(objpfx)bug-atexit3.out: $(objpfx)bug-atexit3-lib.so
+#LDLIBS-bug-atexit3-lib.so = -lstdc++ -lgcc_eh
+#$(objpfx)bug-atexit3: $(libdl)
+#$(objpfx)bug-atexit3.out: $(objpfx)bug-atexit3-lib.so
 
 $(objpfx)bug-dl-leaf: $(objpfx)bug-dl-leaf-lib.so
 $(objpfx)bug-dl-leaf.out: $(objpfx)bug-dl-leaf-lib-cb.so

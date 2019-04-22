@@ -45,9 +45,9 @@ ifeq ($(have-thread-library),yes)
 CFLAGS-getgrgid_r.c = -fexceptions
 CFLAGS-getgrnam_r.c = -fexceptions
 CFLAGS-getgrent_r.c = -fexceptions
-CFLAGS-getgrent.c = -fexceptions
-CFLAGS-fgetgrent.c = -fexceptions
-CFLAGS-fgetgrent_r.c = -fexceptions $(libio-mtsafe)
+CFLAGS-getgrent.c =  -fexceptions
+CFLAGS-fgetgrent.c = -O0 -fexceptions
+CFLAGS-fgetgrent_r.c = -O0 -fexceptions $(libio-mtsafe)
 CFLAGS-putgrent.c = -fexceptions $(libio-mtsafe)
 CFLAGS-initgroups.c = -fexceptions
 CFLAGS-getgrgid.c = -fexceptions
@@ -58,7 +58,8 @@ ifeq ($(run-built-tests),yes)
 # tst_fgetgrent currently only works with shared libraries
 ifeq (yes,$(build-shared))
 $(objpfx)tst_fgetgrent.out: tst_fgetgrent.sh $(objpfx)tst_fgetgrent
-	$(SHELL) $< $(common-objpfx) '$(test-program-prefix)'; \
+	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
+       '$(run-program-env)'; \
 	$(evaluate-test)
 
 endif

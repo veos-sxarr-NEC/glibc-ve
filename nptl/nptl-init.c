@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <assert.h>
 #include <errno.h>
@@ -461,9 +462,10 @@ __pthread_initialize_minimal_internal (void)
 
 #ifdef SHARED
   /* Transfer the old value from the dynamic linker's internal location.  */
+#ifndef __ve__
   *__libc_dl_error_tsd () = *(*GL(dl_error_catch_tsd)) ();
   GL(dl_error_catch_tsd) = &__libc_dl_error_tsd;
-
+#endif
   /* Make __rtld_lock_{,un}lock_recursive use pthread_mutex_{,un}lock,
      keep the lock count from the ld.so implementation.  */
   GL(dl_rtld_lock_recursive) = (void *) __pthread_mutex_lock;

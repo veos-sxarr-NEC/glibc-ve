@@ -1,0 +1,29 @@
+ld {
+  GLIBC_PRIVATE {
+    _dl_var_init;
+  }
+}
+libc {
+  GLIBC_2.2.5 {
+    arch_prctl; __arch_prctl;
+
+    ioperm; iopl;
+
+    modify_ldt;
+  }
+  GLIBC_2.21 {
+    __read_hook; __pread_hook; __readv_hook; __preadv_hook;
+    __write_hook; __pwrite_hook; __writev_hook; __pwritev_hook;
+  }
+  GLIBC_PRIVATE {
+    __vdso_clock_gettime;
+  }
+}
+
+librt {
+  GLIBC_2.3.3 {
+    # Changed timer_t.
+    timer_create; timer_delete; timer_getoverrun; timer_gettime;
+    timer_settime;
+  }
+}

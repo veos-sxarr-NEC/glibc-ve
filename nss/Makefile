@@ -79,6 +79,9 @@ tests			+= $(tests-static)
 endif
 
 include ../Rules
+CFLAGS-nsswitch.c += -O0
+CFLAGS-getnssent.c += -O0
+CFLAGS-getnssent_r.c += -O0
 
 ifeq (yes,$(have-selinux))
 LDLIBS-makedb		:= -lselinux

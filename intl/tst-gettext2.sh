@@ -22,7 +22,7 @@ set -e
 common_objpfx=$1
 test_program_prefix_before_env=$2
 run_program_env=$3
-test_program_prefix_after_env=$4
+test_program_prefix_after_env=
 objpfx=$5
 
 # Generate the test data.
@@ -59,7 +59,7 @@ msgfmt -o ${objpfx}domaindir/lang2/LC_MESSAGES/tstlang.mo \
 # Now run the test.
 ${test_program_prefix_before_env} \
 ${run_program_env} \
-LOCPATH=${objpfx}domaindir \
+VE_LOCPATH=${objpfx}domaindir \
 ${test_program_prefix_after_env} \
 ${objpfx}tst-gettext2 > ${objpfx}tst-gettext2.out ${objpfx}domaindir &&
 cmp ${objpfx}tst-gettext2.out - <<EOF

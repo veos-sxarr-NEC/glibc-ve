@@ -251,7 +251,11 @@ setlocale (int category, const char *locale)
   locale_path = NULL;
   locale_path_len = 0;
 
+#ifdef __ve__
+  locpath_var = getenv ("VE_LOCPATH");
+#else
   locpath_var = getenv ("LOCPATH");
+#endif
   if (locpath_var != NULL && locpath_var[0] != '\0')
     {
       if (__argz_create_sep (locpath_var, ':',

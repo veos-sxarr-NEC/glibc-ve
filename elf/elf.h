@@ -254,7 +254,8 @@ typedef struct
 #define EM_TILEPRO	188		/* Tilera TILEPro */
 #define EM_MICROBLAZE	189		/* Xilinx MicroBlaze */
 #define EM_TILEGX	191		/* Tilera TILE-Gx */
-#define EM_NUM		192
+#define EM_VE		251
+#define EM_NUM		193
 
 /* If it is necessary to assign new unofficial EM_* values, please
    pick large random numbers (0x8523, 0xa7f2, etc.) to minimize the
@@ -3520,6 +3521,33 @@ enum
 #define R_TILEGX_GNU_VTENTRY	129	/* GNU C++ vtable member usage */
 
 #define R_TILEGX_NUM		130
+
+/* VE relocation*/
+#define R_VE_NONE           0
+#define R_VE_REFLONG        1
+#define R_VE_REFQUAD        2
+#define R_VE_SREL32         3
+#define R_VE_HI32           4
+#define R_VE_LO32           5
+#define R_VE_PC_HI32        6
+#define R_VE_PC_LO32        7
+#define R_VE_GOT32          8
+#define R_VE_GOT_HI32       9
+#define R_VE_GOT_LO32       10
+#define R_VE_GOTOFF32       11
+#define R_VE_GOTOFF_HI32    12
+#define R_VE_GOTOFF_LO32    13
+#define R_VE_PLT32          14
+#define R_VE_PLT_HI32       15
+#define R_VE_PLT_LO32       16
+#define R_VE_RELATIVE       17
+#define R_VE_GLOB_DAT       18
+#define R_VE_JUMP_SLOT      19
+#define R_VE_COPY           20
+#define R_VE_DTPMOD64       22
+#define R_VE_DTPOFF64       23
+#define R_VE_TPOFF64        24
+
 
 
 __END_DECLS

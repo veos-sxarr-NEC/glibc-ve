@@ -108,6 +108,6 @@ tst-statvfs-ARGS = $(objpfx)tst-statvfs tst-statvfs.c /tmp
 
 ifeq ($(run-built-tests),yes)
 $(objpfx)ftwtest.out: ftwtest-sh $(objpfx)ftwtest
-	$(SHELL) $< $(common-objpfx) '$(test-program-cmd)' > $@; \
+	$(SHELL) $< $(common-objpfx) $(objpfx)ftwtest; \
 	$(evaluate-test)
 endif

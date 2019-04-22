@@ -15,6 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #ifndef _LDCONFIG_H
 #define _LDCONFIG_H
@@ -44,7 +45,11 @@
 #define FLAG_MIPS64_LIBN64_NAN2008	0x0e00
 
 /* Name of auxiliary cache.  */
+#ifdef __ve__
+#define _PATH_LDCONFIG_AUX_CACHE "/var/opt/nec/ve/cache/ldconfig/aux-cache"
+#else
 #define _PATH_LDCONFIG_AUX_CACHE "/var/cache/ldconfig/aux-cache"
+#endif
 
 /* Declared in cache.c.  */
 extern void print_cache (const char *cache_name);

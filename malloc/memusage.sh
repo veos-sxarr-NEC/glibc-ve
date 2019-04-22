@@ -215,7 +215,7 @@ if test $# -eq 0; then
 fi
 
 # This will be in the environment.
-add_env="LD_PRELOAD=$memusageso"
+add_env="VE_LD_PRELOAD=$memusageso"
 
 # Generate data file name.
 datafile=
@@ -226,27 +226,27 @@ elif test -n "$png"; then
   trap 'rm -f "$datafile"; exit 1' HUP INT QUIT TERM PIPE
 fi
 if test -n "$datafile"; then
-  add_env="$add_env MEMUSAGE_OUTPUT=$datafile"
+  add_env="$add_env VE_MEMUSAGE_OUTPUT=$datafile"
 fi
 
 # Set program name.
 if test -n "$progname"; then
-  add_env="$add_env MEMUSAGE_PROG_NAME=$progname"
+  add_env="$add_env VE_MEMUSAGE_PROG_NAME=$progname"
 fi
 
 # Set buffer size.
 if test -n "$buffer"; then
-  add_env="$add_env MEMUSAGE_BUFFER_SIZE=$buffer"
+  add_env="$add_env VE_MEMUSAGE_BUFFER_SIZE=$buffer"
 fi
 
 # Disable timers.
 if test -n "$notimer"; then
-  add_env="$add_env MEMUSAGE_NO_TIMER=yes"
+  add_env="$add_env VE_MEMUSAGE_NO_TIMER=yes"
 fi
 
 # Trace mmap.
 if test -n "$tracemmap"; then
-  add_env="$add_env MEMUSAGE_TRACE_MMAP=yes"
+  add_env="$add_env VE_MEMUSAGE_TRACE_MMAP=yes"
 fi
 
 # Execute the program itself.

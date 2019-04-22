@@ -159,7 +159,8 @@ $(objpfx)config-name.h: $(..)scripts/config-uname.sh $(common-objpfx)config.make
 	   '$(config-machine)-$(config-vendor)' > $@.new
 	mv -f $@.new $@
 
-CFLAGS-regex.c = -Wno-strict-prototypes
+CFLAGS-regex.c = -Wno-strict-prototypes -O0
+CFLAGS-sched_setaffinity.c = -O0
 CFLAGS-getaddrinfo.c = -DRESOLVER -fexceptions
 CFLAGS-pause.c = -fexceptions -fasynchronous-unwind-tables
 CFLAGS-pread.c = -fexceptions -fasynchronous-unwind-tables
@@ -230,43 +231,43 @@ annexc-CFLAGS = -O
 $(objpfx)annexc: annexc.c
 	$(native-compile)
 
-tst-fnmatch-ENV += MALLOC_TRACE=$(objpfx)tst-fnmatch.mtrace
+tst-fnmatch-ENV += VE_MALLOC_TRACE=$(objpfx)tst-fnmatch.mtrace
 
 $(objpfx)tst-fnmatch-mem.out: $(objpfx)tst-fnmatch.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-fnmatch.mtrace > $@; \
 	$(evaluate-test)
 
-bug-regex2-ENV = MALLOC_TRACE=$(objpfx)bug-regex2.mtrace
+bug-regex2-ENV = VE_MALLOC_TRACE=$(objpfx)bug-regex2.mtrace
 
 $(objpfx)bug-regex2-mem.out: $(objpfx)bug-regex2.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-regex2.mtrace > $@; \
 	$(evaluate-test)
 
-bug-regex14-ENV = MALLOC_TRACE=$(objpfx)bug-regex14.mtrace
+bug-regex14-ENV = VE_MALLOC_TRACE=$(objpfx)bug-regex14.mtrace
 
 $(objpfx)bug-regex14-mem.out: $(objpfx)bug-regex14.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-regex14.mtrace > $@; \
 	$(evaluate-test)
 
-bug-regex21-ENV = MALLOC_TRACE=$(objpfx)bug-regex21.mtrace
+bug-regex21-ENV = VE_MALLOC_TRACE=$(objpfx)bug-regex21.mtrace
 
 $(objpfx)bug-regex21-mem.out: $(objpfx)bug-regex21.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-regex21.mtrace > $@; \
 	$(evaluate-test)
 
-bug-regex31-ENV = MALLOC_TRACE=$(objpfx)bug-regex31.mtrace
+bug-regex31-ENV = VE_MALLOC_TRACE=$(objpfx)bug-regex31.mtrace
 
 $(objpfx)bug-regex31-mem.out: $(objpfx)bug-regex31.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-regex31.mtrace > $@; \
 	$(evaluate-test)
 
-bug-regex36-ENV = MALLOC_TRACE=$(objpfx)bug-regex36.mtrace
+bug-regex36-ENV = VE_MALLOC_TRACE=$(objpfx)bug-regex36.mtrace
 
 $(objpfx)bug-regex36-mem.out: $(objpfx)bug-regex36.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-regex36.mtrace > $@; \
 	$(evaluate-test)
 
-tst-vfork3-ENV = MALLOC_TRACE=$(objpfx)tst-vfork3.mtrace
+tst-vfork3-ENV = VE_MALLOC_TRACE=$(objpfx)tst-vfork3.mtrace
 
 $(objpfx)tst-vfork3-mem.out: $(objpfx)tst-vfork3.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-vfork3.mtrace > $@; \
@@ -275,33 +276,33 @@ $(objpfx)tst-vfork3-mem.out: $(objpfx)tst-vfork3.out
 # tst-rxspencer.mtrace is not generated, only
 # tst-rxspencer-no-utf8.mtrace, since otherwise the file has almost
 # 100M and takes very long time to process.
-tst-rxspencer-no-utf8-ENV += MALLOC_TRACE=$(objpfx)tst-rxspencer-no-utf8.mtrace
+tst-rxspencer-no-utf8-ENV += VE_MALLOC_TRACE=$(objpfx)tst-rxspencer-no-utf8.mtrace
 $(objpfx)tst-rxspencer-no-utf8-mem.out: $(objpfx)tst-rxspencer-no-utf8.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-rxspencer-no-utf8.mtrace \
 				      > $@; \
 	$(evaluate-test)
 
-tst-pcre-ENV = MALLOC_TRACE=$(objpfx)tst-pcre.mtrace
+tst-pcre-ENV = VE_MALLOC_TRACE=$(objpfx)tst-pcre.mtrace
 $(objpfx)tst-pcre-mem.out: $(objpfx)tst-pcre.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-pcre.mtrace > $@; \
 	$(evaluate-test)
 
-tst-boost-ENV = MALLOC_TRACE=$(objpfx)tst-boost.mtrace
+tst-boost-ENV = VE_MALLOC_TRACE=$(objpfx)tst-boost.mtrace
 $(objpfx)tst-boost-mem.out: $(objpfx)tst-boost.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-boost.mtrace > $@; \
 	$(evaluate-test)
 
 $(objpfx)tst-getconf.out: tst-getconf.sh $(objpfx)getconf
-	$(SHELL) $< $(common-objpfx) '$(built-program-cmd)'; \
+	$(SHELL) $< $(common-objpfx) '$(built-program-cmd-before-env) $(run-program-env) $(built-program-file)'; \
 	$(evaluate-test)
 
 $(objpfx)bug-ga2-mem.out: $(objpfx)bug-ga2.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-ga2.mtrace > $@; \
 	$(evaluate-test)
 
-bug-ga2-ENV = MALLOC_TRACE=$(objpfx)bug-ga2.mtrace
+bug-ga2-ENV = VE_MALLOC_TRACE=$(objpfx)bug-ga2.mtrace
 
-bug-glob2-ENV = MALLOC_TRACE=$(objpfx)bug-glob2.mtrace
+bug-glob2-ENV = VE_MALLOC_TRACE=$(objpfx)bug-glob2.mtrace
 
 $(objpfx)bug-glob2-mem.out: $(objpfx)bug-glob2.out
 	$(common-objpfx)malloc/mtrace $(objpfx)bug-glob2.mtrace > $@; \

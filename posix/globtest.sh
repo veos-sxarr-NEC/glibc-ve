@@ -20,8 +20,8 @@
 set -e
 
 common_objpfx=$1; shift
-test_via_rtld_prefix=$1; shift
-test_program_prefix=$1; shift
+test_via_rtld_prefix= ; shift
+test_program_prefix= ; shift
 test_wrapper_env=$1; shift
 logfile=$common_objpfx/posix/globtest.out
 

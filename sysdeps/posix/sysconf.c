@@ -1210,7 +1210,11 @@ __sysconf_check_spec (const char *spec)
 {
   int save_errno = errno;
 
+#ifdef __ve__
+  const char *getconf_dir = __libc_secure_getenv ("VE_GETCONF_DIR") ?: GETCONF_DIR;
+#else
   const char *getconf_dir = __libc_secure_getenv ("GETCONF_DIR") ?: GETCONF_DIR;
+#endif
   size_t getconf_dirlen = strlen (getconf_dir);
   size_t speclen = strlen (spec);
 

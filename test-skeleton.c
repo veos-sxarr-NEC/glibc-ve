@@ -237,7 +237,9 @@ main (int argc, char *argv[])
   pid_t termpid;
 
   /* Make uses of freed and uninitialized memory known.  */
+#if 0
   mallopt (M_PERTURB, 42);
+#endif
 
 #ifdef STDOUT_UNBUFFERED
   setbuf (stdout, NULL);
@@ -318,6 +320,7 @@ main (int argc, char *argv[])
   pid = fork ();
   if (pid == 0)
     {
+#if 0
       /* This is the child.  */
 #ifdef RLIMIT_CORE
       /* Try to avoid dumping core.  */
@@ -343,7 +346,7 @@ main (int argc, char *argv[])
       else
 	printf ("getrlimit: RLIMIT_DATA: %m\n");
 #endif
-
+#endif
       /* We put the test process in its own pgrp so that if it bogusly
 	 generates any job control signals, they won't hit the whole build.  */
       if (setpgid (0, 0) != 0)

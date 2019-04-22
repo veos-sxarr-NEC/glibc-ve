@@ -39,6 +39,7 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking installed Linux kernel header files" >&5
 $as_echo_n "checking installed Linux kernel header files... " >&6; }
+
 if ${libc_cv_linux2632+:} false; then :
   $as_echo_n "(cached) " >&6
 else

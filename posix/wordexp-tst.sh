@@ -26,7 +26,7 @@ set -e
 common_objpfx=$1; shift
 test_program_prefix_before_env=$1; shift
 run_program_env=$1; shift
-test_program_prefix_after_env=$1; shift
+test_program_prefix_after_env= ; shift
 logfile=${common_objpfx}posix/wordexp-tst.out
 testout=${common_objpfx}posix/wordexp-test-result
 

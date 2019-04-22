@@ -27,7 +27,7 @@ routines := gmon mcount profil sprofil bb_init_func bb_exit_func prof-freq
 
 elide-routines.os = bb_init_func bb_exit_func
 
-tests	= tst-sprofil
+tests	= #tst-sprofil
 ifeq ($(build-profile),yes)
 tests	+= tst-profile-static
 tests-static	+= tst-profile-static
@@ -37,6 +37,7 @@ endif
 
 # The mcount code won't work without a frame pointer.
 CFLAGS-mcount.c := -fno-omit-frame-pointer
+CFLAGS-gmon.c += -O0
 
 include ../Rules
 

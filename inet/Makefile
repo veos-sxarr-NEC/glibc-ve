@@ -85,6 +85,7 @@ CFLAGS-either_ntoh.c = -fexceptions
 CFLAGS-either_hton.c = -fexceptions
 CFLAGS-getnetgrent.c = -fexceptions
 CFLAGS-getnetgrent_r.c = -fexceptions
+CFLAGS-ether_line.c += -O0
 
 endif
 

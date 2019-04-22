@@ -30,8 +30,10 @@ generate_locale ()
   charmap=$1
   input=$2
   out=$3
-  if ${localedef_before_env} ${run_program_env} I18NPATH=. \
-     ${localedef_after_env} --quiet -c -f $charmap -i $input \
+  localedefs="$(cut -d' ' -f4 <<< $localedef_after_env)"
+
+  if ${localedef_before_env} ${run_program_env} VE_I18NPATH=. \
+     ${localedefs} --quiet -c -f $charmap -i $input \
 			    ${common_objpfx}localedata/$out
   then
     # The makefile checks the timestamp of the LC_CTYPE file,

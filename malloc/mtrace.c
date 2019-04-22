@@ -44,7 +44,12 @@
 #define TRACE_BUFFER_SIZE 512
 
 static FILE *mallstream;
+#ifdef __ve__
+static const char mallenv[] = "VE_MALLOC_TRACE";
+#else
 static const char mallenv[] = "MALLOC_TRACE";
+#endif
+
 static char *malloc_trace_buffer;
 
 __libc_lock_define_initialized (static, lock);

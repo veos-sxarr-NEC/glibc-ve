@@ -31,9 +31,9 @@ tests = tst-shadow
 
 CFLAGS-getspent_r.c = -fexceptions
 CFLAGS-getspent.c = -fexceptions
-CFLAGS-fgetspent.c = -fexceptions
-CFLAGS-fgetspent_r.c = -fexceptions $(libio-mtsafe)
-CFLAGS-putspent.c = -fexceptions $(libio-mtsafe)
+CFLAGS-fgetspent.c = -fexceptions -O0
+CFLAGS-fgetspent_r.c = -fexceptions $(libio-mtsafe) -O0
+CFLAGS-putspent.c = -fexceptions $(libio-mtsafe) -O0
 CFLAGS-getspnam.c = -fexceptions
 CFLAGS-getspnam_r.c = -fexceptions
 

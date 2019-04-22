@@ -23,7 +23,6 @@ common_objpfx=$1; shift
 test_program_prefix=$1; shift
 
 status=0
-
 ${test_program_prefix} \
   ${common_objpfx}stdio-common/tst-unbputc \
     2> ${common_objpfx}stdio-common/tst-unbputc.out || status=1

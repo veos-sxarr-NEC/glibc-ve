@@ -85,7 +85,7 @@ CPPFLAGS += -Dgethostbyname=res_gethostbyname \
 ifeq (yes,$(have-ssp))
 CFLAGS-libresolv += -fstack-protector
 endif
-CFLAGS-res_hconf.c = -fexceptions
+CFLAGS-res_hconf.c = -fexceptions -O0
 
 # The BIND code elicits some harmless warnings.
 +cflags += -Wno-strict-prototypes -Wno-write-strings
@@ -99,12 +99,12 @@ $(objpfx)libanl.so: $(shared-thread-library)
 $(objpfx)ga_test: $(objpfx)libanl.so $(shared-thread-library)
 
 $(objpfx)tst-leaks: $(objpfx)libresolv.so
-tst-leaks-ENV = MALLOC_TRACE=$(objpfx)tst-leaks.mtrace
+tst-leaks-ENV = VE_MALLOC_TRACE=$(objpfx)tst-leaks.mtrace
 $(objpfx)mtrace-tst-leaks.out: $(objpfx)tst-leaks.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-leaks.mtrace > $@; \
 	$(evaluate-test)
 
-tst-leaks2-ENV = MALLOC_TRACE=$(objpfx)tst-leaks2.mtrace
+tst-leaks2-ENV = VE_MALLOC_TRACE=$(objpfx)tst-leaks2.mtrace
 $(objpfx)mtrace-tst-leaks2.out: $(objpfx)tst-leaks2.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-leaks2.mtrace > $@; \
 	$(evaluate-test)

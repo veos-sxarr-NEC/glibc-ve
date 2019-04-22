@@ -22,8 +22,8 @@
 int
 feenableexcept (int excepts)
 {
-  unsigned short int new_exc, old_exc;
-  unsigned int new;
+  unsigned short int new_exc = 0, old_exc = 0;
+  unsigned int new = 0;
 
   excepts &= FE_ALL_EXCEPT;
 

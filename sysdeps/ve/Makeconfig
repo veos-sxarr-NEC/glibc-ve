@@ -1,0 +1,13 @@
++math-flags =
+
++merge-constants =
+
++gccwarn +=
+
++gccwarn-c +=
+
+static-gnulib = -lgcc $(static-gnulib-arch)
+
+# VE does not provide crtbeginT.o, so use crtbegin.o.
++prectorT =
++postctorT =

@@ -159,8 +159,10 @@ cross-rpcgen-objs := $(addprefix $(objpfx)cross-,$(rpcgen-objs))
 # When generic makefile support for build system programs is
 # available, it should replace this code.  See
 # <http://sourceware.org/bugzilla/show_bug.cgi?id=14087>.
+# GCC-WORKAROUND: Added "-I/usr/include" as vegcc doesn't include this path
+# in its standard directory search path.
 $(cross-rpcgen-objs): $(objpfx)cross-%.o: %.c $(before-compile)
-	$(BUILD_CC) $($(basename $(<F))-CFLAGS) $(ALL_BUILD_CFLAGS) $< \
+	$(BUILD_CC) $($(basename $(<F))-CFLAGS) -I/usr/include $(ALL_BUILD_CFLAGS) $< \
 		$(OUTPUT_OPTION) $(native-compile-mkdep-flags) -c
 
 $(objpfx)cross-rpcgen: $(cross-rpcgen-objs)
@@ -175,7 +177,7 @@ include $(patsubst %,$(..)cppflags-iterator.mk,$(cpp-srcs-left))
 # Setting CPP tells it how to run the C preprocessor correctly.  Note
 # that $(built-program-file) requires that the just-built cross-rpcgen
 # binary be the second dependency listed in each rule using rpcgen-cmd.
-rpcgen-cmd = CPP='$(CC) -E -x c-header' $(built-program-file) -Y ../scripts
+rpcgen-cmd = CPP='$(CC) -E -x c-header' rpcgen -Y ../scripts
 
 # Install the rpc data base file.
 $(inst_sysconfdir)/rpc: etc.rpc $(+force)

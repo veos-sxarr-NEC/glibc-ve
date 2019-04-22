@@ -88,9 +88,9 @@ CFLAGS-recvfrom_chk.c = -fexceptions -fasynchronous-unwind-tables
 # Need to make sure the settings here override what configure might have
 # set up for us, so keep the CFLAGS/CPPFLAGS split logical as the order is:
 # <user CFLAGS> <test CFLAGS> <user CPPFLAGS> <test CPPFLAGS>
-CFLAGS-tst-longjmp_chk.c = -fexceptions -fasynchronous-unwind-tables
+CFLAGS-tst-longjmp_chk.c = -fexceptions -fasynchronous-unwind-tables -O0
 CPPFLAGS-tst-longjmp_chk.c = -D_FORTIFY_SOURCE=1
-CFLAGS-tst-longjmp_chk2.c = -fexceptions -fasynchronous-unwind-tables
+CFLAGS-tst-longjmp_chk2.c = -fexceptions -fasynchronous-unwind-tables -O0
 CPPFLAGS-tst-longjmp_chk2.c = -D_FORTIFY_SOURCE=1
 CFLAGS-tst-longjmp_chk3.c = -fexceptions -fasynchronous-unwind-tables
 CPPFLAGS-tst-longjmp_chk3.c = -D_FORTIFY_SOURCE=1
@@ -99,24 +99,28 @@ CPPFLAGS-tst-longjmp_chk3.c = -D_FORTIFY_SOURCE=1
 # we are testing.  Disable that warning.  They also generate warnings
 # from warning attributes, which cannot be disabled via pragmas, so
 # require -Wno-error to be used.
-CFLAGS-tst-chk1.c = -Wno-format -Wno-error
-CFLAGS-tst-chk2.c = -Wno-format -Wno-error
-CFLAGS-tst-chk3.c = -Wno-format -Wno-error
-CFLAGS-tst-chk4.cc = -Wno-format -Wno-error
-CFLAGS-tst-chk5.cc = -Wno-format -Wno-error
-CFLAGS-tst-chk6.cc = -Wno-format -Wno-error
-CFLAGS-tst-lfschk1.c = -Wno-format -Wno-error
-CFLAGS-tst-lfschk2.c = -Wno-format -Wno-error
-CFLAGS-tst-lfschk3.c = -Wno-format -Wno-error
-CFLAGS-tst-lfschk4.cc = -Wno-format -Wno-error
-CFLAGS-tst-lfschk5.cc = -Wno-format -Wno-error
-CFLAGS-tst-lfschk6.cc = -Wno-format -Wno-error
-LDLIBS-tst-chk4 = -lstdc++
-LDLIBS-tst-chk5 = -lstdc++
-LDLIBS-tst-chk6 = -lstdc++
-LDLIBS-tst-lfschk4 = -lstdc++
-LDLIBS-tst-lfschk5 = -lstdc++
-LDLIBS-tst-lfschk6 = -lstdc++
+
+#We have commented below files with .cc extension as they are cpp
+#files
+CFLAGS-tst-chk1.c = -Wno-format -Wno-error -O0
+#CFLAGS-tst-chk4.cc = -Wno-format -Wno-error
+CFLAGS-tst-chk2.c = -Wno-format -Wno-error -O0
+CFLAGS-tst-chk3.c = -Wno-format -Wno-error -O0
+#CFLAGS-tst-chk4.cc = -Wno-format -Wno-error
+#CFLAGS-tst-chk5.cc = -Wno-format -Wno-error
+#CFLAGS-tst-chk6.cc = -Wno-format -Wno-error
+CFLAGS-tst-lfschk1.c = -Wno-format -Wno-error -O0
+CFLAGS-tst-lfschk2.c = -Wno-format -Wno-error -O0
+CFLAGS-tst-lfschk3.c = -Wno-format -Wno-error -O0
+#CFLAGS-tst-lfschk4.cc = -Wno-format -Wno-error
+#CFLAGS-tst-lfschk5.cc = -Wno-format -Wno-error
+#CFLAGS-tst-lfschk6.cc = -Wno-format -Wno-error
+#LDLIBS-tst-chk4 = -lstdc++
+#LDLIBS-tst-chk5 = -lstdc++
+#LDLIBS-tst-chk6 = -lstdc++
+#LDLIBS-tst-lfschk4 = -lstdc++
+#LDLIBS-tst-lfschk5 = -lstdc++
+#LDLIBS-tst-lfschk6 = -lstdc++
 
 # backtrace_symbols only works if we link with -rdynamic.  backtrace
 # requires unwind tables on most architectures.
@@ -133,7 +137,6 @@ LDFLAGS-tst-backtrace6 = -rdynamic
 
 tests = backtrace-tst tst-longjmp_chk tst-chk1 tst-chk2 tst-chk3 \
 	tst-lfschk1 tst-lfschk2 tst-lfschk3 test-strcpy_chk test-stpcpy_chk \
-	tst-chk4 tst-chk5 tst-chk6 tst-lfschk4 tst-lfschk5 tst-lfschk6 \
 	tst-longjmp_chk2 tst-backtrace2 tst-backtrace3 tst-backtrace4 \
 	tst-backtrace5 tst-backtrace6
 

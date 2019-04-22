@@ -17,6 +17,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
    not, see <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 /*
   This is a version (aka ptmalloc2) of malloc/free/realloc written by
@@ -911,7 +912,11 @@ int      __posix_memalign(void **, size_t, size_t);
 # if __WORDSIZE == 32
 #  define DEFAULT_MMAP_THRESHOLD_MAX (512 * 1024)
 # else
+#ifdef __ve__
+#  define DEFAULT_MMAP_THRESHOLD_MAX (1LL << 30) /*1 GB*/
+#else
 #  define DEFAULT_MMAP_THRESHOLD_MAX (4 * 1024 * 1024 * sizeof(long))
+#endif
 # endif
 #endif
 
@@ -1010,7 +1015,11 @@ int      __posix_memalign(void **, size_t, size_t);
 #define M_MMAP_THRESHOLD      -3
 
 #ifndef DEFAULT_MMAP_THRESHOLD
+#ifdef __ve__
+#define DEFAULT_MMAP_THRESHOLD DEFAULT_MMAP_THRESHOLD_MAX
+#else
 #define DEFAULT_MMAP_THRESHOLD DEFAULT_MMAP_THRESHOLD_MIN
+#endif
 #endif
 
 /*
@@ -1028,6 +1037,12 @@ int      __posix_memalign(void **, size_t, size_t);
 
 #ifndef DEFAULT_MMAP_MAX
 #define DEFAULT_MMAP_MAX       (65536)
+#endif
+
+#ifdef __ve__
+#ifndef DEFAULT_ARENA_MAX
+#define DEFAULT_ARENA_MAX (1)
+#endif
 #endif
 
 #include <malloc.h>
@@ -1753,6 +1768,9 @@ static struct malloc_par mp_ =
   .n_mmaps_max = DEFAULT_MMAP_MAX,
   .mmap_threshold = DEFAULT_MMAP_THRESHOLD,
   .trim_threshold = DEFAULT_TRIM_THRESHOLD,
+#ifdef __ve__
+  .arena_max = DEFAULT_ARENA_MAX,
+#endif
 #define NARENAS_FROM_NCORES(n) ((n) * (sizeof (long) == 4 ? 2 : 8))
   .arena_test = NARENAS_FROM_NCORES (1)
 };
@@ -2884,7 +2902,6 @@ __libc_malloc (size_t bytes)
     return (*hook)(bytes, RETURN_ADDRESS (0));
 
   arena_lookup (ar_ptr);
-
   arena_lock (ar_ptr, bytes);
   if (!ar_ptr)
     return 0;
