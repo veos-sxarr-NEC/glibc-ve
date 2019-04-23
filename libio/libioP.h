@@ -24,6 +24,8 @@
    This exception applies to code released by its copyright holders
    in files containing the exception.  */
 
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
+
 /* NOTE: libio is now exclusively used only by glibc since libstdc++ has its
    own implementation.  As a result, functions that were implemented for C++
    (like *sputn) may no longer have C++ semantics.  This is of course only
@@ -737,7 +739,8 @@ extern _IO_off64_t _IO_seekpos_unlocked (_IO_FILE *, _IO_off64_t, int)
 
 #endif /* _G_HAVE_MMAP */
 
-#if _G_HAVE_MMAP
+#if 0 /* Not to use mmap() to allcate memory from heep which consists
+	 of 64MB pages */
 
 # ifdef _LIBC
 /* When using this code in the GNU libc we must not pollute the name space.  */
