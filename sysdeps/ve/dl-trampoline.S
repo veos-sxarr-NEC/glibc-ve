@@ -30,22 +30,74 @@
 	.type _dl_runtime_resolve, @function
 	.balign 16
 _dl_runtime_resolve:
-	/* Reserve the space on stack(%s11) for 7 register */
-        lea    %s11, -72(,%s11)
-	st     %lr, 0x0(0,%sp)
-	st     %s0, 0x8(0,%sp)
-	st     %s1, 0x10(0,%sp)
-	st     %s2, 0x18(0,%sp)
-	st     %s3, 0x20(0,%sp)
-	st     %s4, 0x28(0,%sp)
-	st     %s5, 0x30(0,%sp)
-	st     %s6, 0x38(0,%sp)
-	st     %s7, 0x40(0,%sp)
+	/* Increment the space on stack for all scaler register */
+	/* 176: Callee save register
+	   80: Caller argument with buffer
+	   72: %s0 - %s7, %s10
+	   240: %s34 - %s63 (30 registers) */
 
-	/* Stack reserved for %s0 to %s7, %s8-%s11, plt(%s16),
-	got(%s15) and %s18-%s33  and some extra buffer */
+	st     %lr, 0x8(0,%sp)
+        lea    %s11, -176-80-72-248(,%s11)
+	brge.l.t	%s11, %s8, 0x48
+	ld      %s10, 0x18(0,%s14)
+	lea     %s12, 0x13b
+	shm.l   %s12, 0x0(%s10)
+	shm.l   %s8, 0x8(%s10)
+	shm.l   %s11, 0x10(%s10)
+	or      %s12, 0, %s0
+	monc
+	or      %s0, 0, %s12
+	/* Stack reserved for %s0 to %s7, %s10-%s11, plt(%s16),
+           got(%s15), %s18-%s33  , %s34-%s63 and some extra buffer */
+	st     %s0, 0x108(0,%sp)
+	st     %s1, 0x110(0,%sp)
+	st     %s2, 0x118(0,%sp)
+	st     %s3, 0x120(0,%sp)
+	st     %s4, 0x128(0,%sp)
+	st     %s5, 0x130(0,%sp)
+	st     %s6, 0x138(0,%sp)
+	st     %s7, 0x140(0,%sp)
 
-	lea     %s11, -176-80(,%s11)
+	/* Saving temporary register %s34-%s63 */
+	st     %s34, 0x148(0,%sp)
+	st     %s35, 0x150(0,%sp)
+	st     %s36, 0x158(0,%sp)
+	st     %s37, 0x160(0,%sp)
+	st     %s38, 0x168(0,%sp)
+	st     %s39, 0x170(0,%sp)
+	st     %s40, 0x178(0,%sp)
+	st     %s41, 0x180(0,%sp)
+	st     %s42, 0x188(0,%sp)
+	st     %s43, 0x190(0,%sp)
+	st     %s44, 0x198(0,%sp)
+	st     %s45, 0x1a0(0,%sp)
+	st     %s46, 0x1a8(0,%sp)
+	st     %s47, 0x1b0(0,%sp)
+	st     %s48, 0x1b8(0,%sp)
+	st     %s49, 0x1c0(0,%sp)
+	st     %s50, 0x1c8(0,%sp)
+	st     %s51, 0x1d0(0,%sp)
+	st     %s52, 0x1d8(0,%sp)
+	st     %s53, 0x1e0(0,%sp)
+	st     %s54, 0x1e8(0,%sp)
+	st     %s55, 0x1f0(0,%sp)
+	st     %s56, 0x1f8(0,%sp)
+	st     %s57, 0x200(0,%sp)
+	st     %s58, 0x208(0,%sp)
+	st     %s59, 0x210(0,%sp)
+	st     %s60, 0x218(0,%sp)
+	st     %s61, 0x220(0,%sp)
+	st     %s62, 0x228(0,%sp)
+	st     %s63, 0x230(0,%sp)
+	/* #1583 trac */
+	spm    %s63
+	sfr    %s61
+	st     %s63, 0x238(0,%sp)      /* Store the content in stack */
+	st     %s61, 0x240(0,%sp)      /* Store the content in stack */
+	lfr    0		       /* load the psw[58..63] with 0 */
+	lea    %s61, 0x800
+	lpm    %s61		       /* load the psw[50..57] with 0 */
+
         /* #1346 ABI change */
 	ld	%s0, 0x10(, %s62)	/* addr of link_map object, got[2]*/
 	or	%s1, 0, %s13		/* Index of PLT in bin/lib, the symbol which we are trying to resolve */
@@ -56,21 +108,60 @@ _dl_runtime_resolve:
         lea.sl  %s12, _dl_fixup@PC_HI(%s12,%s62)
         bsic    %lr, (%s12)		/* Fetch the address of dl_fixup() and invoke. */
 	
-	or	%s63, %s0, (0)1		# Save the function addr in %s63 */
-	lea     %s11, 176+80(,%s11)
-	# Get the saved register content back.
-	ld     %lr, 0x0(0,%sp)
-	ld     %s0, 0x8(0,%sp)
-        ld     %s1, 0x10(0,%sp)
-        ld     %s2, 0x18(0,%sp)
-        ld     %s3, 0x20(0,%sp)
-        ld     %s4, 0x28(0,%sp)
-	ld     %s5, 0x30(0,%sp)
-	ld     %s6, 0x38(0,%sp)
-	ld     %s7, 0x40(0,%sp)
-        lea    %s11, 72(,%s11)
+	or	%s12, %s0, (0)1		# Save the function addr in %s12 */
 
-	b.l     (,%s63)  /* Finally jumping to actual function */
+	/* #1583 trac */
+	ld     %s63, 0x238(0,%sp)
+	ld     %s61, 0x240(0,%sp)
+        lpm    %s63                    #load the psw[50..57] with s63[50..57]
+        lfr    %s61                    #load the psw[58..63] with s61[58..63]
+
+	# Get the saved register content back.
+	ld	%s0, 0x108(0,%sp)
+        ld	%s1, 0x110(0,%sp)
+        ld	%s2, 0x118(0,%sp)
+        ld	%s3, 0x120(0,%sp)
+        ld	%s4, 0x128(0,%sp)
+	ld	%s5, 0x130(0,%sp)
+	ld	%s6, 0x138(0,%sp)
+	ld	%s7, 0x140(0,%sp)
+
+	ld     %s34, 0x148(0,%sp)
+        ld     %s35, 0x150(0,%sp)
+        ld     %s36, 0x158(0,%sp)
+        ld     %s37, 0x160(0,%sp)
+        ld     %s38, 0x168(0,%sp)
+        ld     %s39, 0x170(0,%sp)
+        ld     %s40, 0x178(0,%sp)
+        ld     %s41, 0x180(0,%sp)
+        ld     %s42, 0x188(0,%sp)
+        ld     %s43, 0x190(0,%sp)
+        ld     %s44, 0x198(0,%sp)
+        ld     %s45, 0x1a0(0,%sp)
+        ld     %s46, 0x1a8(0,%sp)
+        ld     %s47, 0x1b0(0,%sp)
+        ld     %s48, 0x1b8(0,%sp)
+        ld     %s49, 0x1c0(0,%sp)
+        ld     %s50, 0x1c8(0,%sp)
+        ld     %s51, 0x1d0(0,%sp)
+        ld     %s52, 0x1d8(0,%sp)
+        ld     %s53, 0x1e0(0,%sp)
+        ld     %s54, 0x1e8(0,%sp)
+        ld     %s55, 0x1f0(0,%sp)
+        ld     %s56, 0x1f8(0,%sp)
+        ld     %s57, 0x200(0,%sp)
+        ld     %s58, 0x208(0,%sp)
+        ld     %s59, 0x210(0,%sp)
+        ld     %s60, 0x218(0,%sp)
+        ld     %s61, 0x220(0,%sp)
+        ld     %s62, 0x228(0,%sp)
+        ld     %s63, 0x230(0,%sp)
+
+	/* Do stack unwinding */
+        lea	%s11, 176+80+72+248(,%s11)
+	ld      %lr, 0x8(0,%sp)
+
+	b.l     (,%s12)  /* Finally jumping to actual function */
 	/* We are done with the function calling, lets wind up */
 	.size _dl_runtime_resolve, .-_dl_runtime_resolve /* End of function */
 

@@ -337,12 +337,12 @@ BUILD_CC = $(CC)
 endif
 
 # Default flags to pass the C compiler.
-# GCC-WORKAROUND: Removed "-g" compiler option as vegcc doesn't support this completely.
+# GCC-WORKAROUND REVERT : Added back "-g" compiler option as per #1010 -> #1577
 ifndef default_cflags
 ifeq ($(release),stable)
-default_cflags := -O2
+default_cflags := -g -O2
 else
-default_cflags := -O
+default_cflags := -g -O
 endif
 endif
 
@@ -897,7 +897,7 @@ PIC-ccflag = -fPIC
 endif
 # GCC-WORKAROUND: Removed "-fpie" compiler option as vegcc doesn't support this.
 # This can be changed by a sysdep makefile
-pie-ccflag = 
+pie-ccflag =
 # This one should always stay like this unless there is a very good reason.
 PIE-ccflag = -fPIE
 ifeq (yes,$(build-profile))

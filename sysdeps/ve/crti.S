@@ -142,10 +142,11 @@ _fini:
         lea     %sp, -0xE0(,%sp)
         brge.l.t        %sp,%sl,.L5.EoP
         or      %s62,0,%s0
+	ld      %s61,0x18(,%tp)
         lea     %s63,0x13b
-        shm.w   %s63,0x0()
-        shm.w   %sl,0x8()
-        shm.w   %sp,0x10()
+        shm.w   %s63,0x0(%s61)
+        shm.w   %sl,0x8(%s61)
+        shm.w   %sp,0x10(%s61)
         monc
         or      %s0,0,%s62
 .L5.EoP:

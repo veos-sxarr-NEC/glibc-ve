@@ -82,3 +82,29 @@ endif
 ifeq ($(subdir),csu)
 gen-as-const-headers += tlsdesc.sym
 endif
+
+ifeq ($(subdir),elf)
+ldd-rewrite = -e 's%@RTLD@%$(rtlddir)/$(rtld-installed-name)%g' \
+              -e 's%@VERSION@%$(version)%g' \
+              -e 's|@PKGVERSION@|$(PKGVERSION)|g' \
+              -e 's|@REPORT_BUGS_TO@|$(REPORT_BUGS_TO)|g' \
+              -e 's%@BASH@%$(BASH)%g' \
+              -e 's%@TEXTDOMAINDIR@%$(msgcatdir)%g'
+
+ifeq ($(ldd-rewrite-script),no)
+define gen-ldd
+LC_ALL=C sed $(ldd-rewrite) < $< > $@.new
+endef
+else
+define gen-ldd
+LC_ALL=C sed $(ldd-rewrite) < $< \
+| LC_ALL=C sed -f $(patsubst $(..)/%,/%,$(..)$(ldd-rewrite-script)) > $@.new
+endef
+endif
+
+$(objpfx)ldd: ../sysdeps/ve/ldd.bash.in $(common-objpfx)soversions.mk \
+	$(common-objpfx)config.make
+	$(gen-ldd)
+	chmod 555 $@.new
+	mv -f $@.new $@
+endif

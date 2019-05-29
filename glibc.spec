@@ -1,21 +1,18 @@
-# Debug package giving build-id errors so
-# currently removed
-%define debug_package %{nil}
-%define _unpackaged_files_terminate_build 0
 Name:		glibc-ve
 Version:	2.21
-Release:	3%{?dist}
+Release:	4%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
-#Group:
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
-#URL:
 Source0:	glibc-ve-2.21.tar.gz
 Vendor:		NEC Corporation
+AutoReq:	no
 
 %description
 Standard glibc build and install with this spec file for VE arch.
 
+#added debuginfo support #1577
+%global __debug_package 1
 %define	GCC /opt/nec/ve/bin/gcc
 %define _prefix /opt/nec/ve/
 %define __strip /opt/nec/ve/bin/nstrip
@@ -49,7 +46,7 @@ Binary files for %name
 %build
 mkdir ../glibc_build
 pushd ../glibc_build
-../%{_glibc_src_name}/configure --exec-prefix=%{_prefix} --prefix=%{_prefix} --host=ve-unknown-linux-gnu --with-headers=%{_prefix}/include --enable-obsolete-rpc
+../%{_glibc_src_name}/configure --exec-prefix=%{_prefix} --prefix=%{_prefix} --host=ve-unknown-linux-gnu --with-headers=%{_prefix}/include --enable-obsolete-rpc CFLAGS='-O2 -g'  LDFLAGS="-Wl,--build-id"
 make -j 4
 popd
 
@@ -71,6 +68,9 @@ mkdir -p $RPM_BUILD_ROOT/etc/%{_prefix}/ld.so.conf.d
 
 #remove libthread_db
 rm -f $RPM_BUILD_ROOT%{_prefix}/lib/libthread_db*
+
+#removing the debug information from startup file(crt)
+%{__strip} -g $RPM_BUILD_ROOT%{_prefix}/lib/*.o
 
 #Moving bin and sbin files
 mv $RPM_BUILD_ROOT%{_prefix}/bin $RPM_BUILD_ROOT%{_prefix}/glibc/bin
@@ -99,6 +99,8 @@ popd
 %{_glibc_etc_base}/*
 %{_glibc_var_base}/glibc/*
 %{_prefix}/glibc/sbin/ldconfig
+%{_prefix}/glibc/bin/ldd
+%exclude %{_prefix}lib/debug
 
 %files devel
 %{_prefix}/include/*
@@ -107,8 +109,8 @@ popd
 %{_prefix}/glibc/bin/*
 %{_prefix}/glibc/sbin/*
 %exclude %{_prefix}/glibc/sbin/ldconfig
-%exclude %{_prefix}/glibc/bin/ldd
 %exclude %{_prefix}/glibc/bin/pldd
+%exclude %{_prefix}/glibc/bin/ldd
 
 %clean
 rm -rf ../glibc_build

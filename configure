@@ -3341,7 +3341,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_ac_ct_READELF="readelf"
+    ac_cv_prog_ac_ct_READELF="/opt/nec/ve/bin/nreadelf"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -4473,13 +4473,13 @@ if test -n "$path_binutils"; then
     path_binutils=`(cd $path_binutils; pwd) | sed 's%/*$%/%'`
     CC="$CC -B$path_binutils"
 fi
-AS=`$CC -print-prog-name=as`
-LD=`$CC -print-prog-name=ld`
-AR=`$CC -print-prog-name=ar`
+AS=`$CC -print-prog-name=/opt/nec/ve/bin/nas`
+LD=`$CC -print-prog-name=/opt/nec/ve/bin/nld`
+AR=`$CC -print-prog-name=/opt/nec/ve/bin/nar`
 
 OBJDUMP=`$CC -print-prog-name=/opt/nec/ve/bin/nobjdump`
 
-OBJCOPY=`$CC -print-prog-name=objcopy`
+OBJCOPY=`$CC -print-prog-name=/opt/nec/ve/bin/nobjcopy`
 
 
 # Determine whether we are using GNU binutils.
@@ -5059,7 +5059,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_ac_ct_NM="nm"
+    ac_cv_prog_ac_ct_NM="/opt/nec/ve/bin/nnm"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -6545,7 +6545,6 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __thread" >&5
 $as_echo_n "checking for __thread... " >&6; }
-CFLAGS="-O2"
 if ${libc_cv_gcc___thread+:} false; then :
   $as_echo_n "(cached) " >&6
 else

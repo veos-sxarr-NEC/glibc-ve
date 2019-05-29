@@ -23,7 +23,19 @@
 #include <asm-syntax.h>
 #include <stap-probe.h>
 
+ENTRY (setjmp)
+        or	%s1, 1, %s1
+        br.l	1f
+END (setjmp)
+
+ENTRY (_setjmp)
+	xor	%s1, %s1, %s1
+        br.l	1f
+END (_setjmp)
+libc_hidden_def (_setjmp)
+
 ENTRY(__sigsetjmp)
+1:
 	st      %sl, 0x0(0, %s0)        #Save Stack Limit
 	st      %fp, 0x8(0, %s0)        #Save Frame Pointer
         st      %lr, 0x10(0, %s0)        #Save Link Register
