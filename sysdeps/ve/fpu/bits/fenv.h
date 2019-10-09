@@ -29,9 +29,6 @@ enum
     FE_INVALID =
 #define FE_INVALID	0x2
       FE_INVALID,
-    __FE_DENORM =
-#define __FE_DENORM     0x4
-      __FE_DENORM ,
     FE_UNDERFLOW =
 #define FE_UNDERFLOW	0x8
       FE_UNDERFLOW,

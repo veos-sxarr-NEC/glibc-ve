@@ -124,7 +124,7 @@ _init:
 	.type   __ve_hw_specific01,@object
 	.hidden __ve_hw_specific01
 __ve_hw_specific01:
-	.zero   256
+	.zero   1024
 
 
 /* Not much to do in this function, so as placeholder */

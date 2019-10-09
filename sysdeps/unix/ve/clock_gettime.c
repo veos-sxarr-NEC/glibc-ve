@@ -178,7 +178,7 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 
         lll_lock (lock, LLL_PRIVATE);
 
-        if (tp->tv_sec - prev_tspec.tv_sec > 3600)
+        if (tp->tv_sec - base_tspec.tv_sec > 3600)
           {
 
             retval = SYSCALL_GETTIME (clock_id, tp);

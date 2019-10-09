@@ -1,12 +1,13 @@
 Name:		glibc-ve
 Version:	2.21
-Release:	4%{?dist}
+Release:	6%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
 Source0:	glibc-ve-2.21.tar.gz
 Vendor:		NEC Corporation
 AutoReq:	no
+BuildRequires:	kheaders-ve
 
 %description
 Standard glibc build and install with this spec file for VE arch.
@@ -25,6 +26,7 @@ Standard glibc build and install with this spec file for VE arch.
 Summary: Development files for glibc
 Group: Development/C
 Requires: %name = %version-%release
+Requires: kheaders-ve
 Provides: %{_prefix}include/*
 
 %description devel
@@ -91,6 +93,14 @@ rm libpthread.a
 %{_prefix}/bin/nar rcs libpthread.a libpthread.o
 rm libpthread.o
 popd
+
+#1682, setlocale issue
+%post
+ln -s /usr/lib/locale %{_prefix}/lib/locale
+
+#1682, setlocale issue link remove
+%postun
+unlink %{_prefix}/lib/locale
 
 %files
 %{_prefix}/lib/*

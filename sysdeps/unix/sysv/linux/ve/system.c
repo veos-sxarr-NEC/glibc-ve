@@ -28,6 +28,7 @@
 
 
 #define VE_SYSVE_SYSTEM 101
+#define VE_SYSVE_SYSTEM2 102
 
 #ifdef _LIBC_REENTRANT
 static struct sigaction intr, quit;
@@ -56,7 +57,7 @@ do_system (const char *line)
   pid_t pid;
   struct sigaction sa;
 #ifndef _LIBC_REENTRANT
-  struct sigaction intr, quit;
+  struct sigaction intr = { { 0 } }, quit = { { 0 } };
 #endif
   sigset_t omask;
 
@@ -110,16 +111,14 @@ do_system (const char *line)
 #ifdef CLEANUP_HANDLER
   CLEANUP_HANDLER;
 #endif
-
   len = strlen(line);
   INTERNAL_SYSCALL_DECL(err);
-  status = INTERNAL_SYSCALL (sysve, err, 3, VE_SYSVE_SYSTEM,
-		  (uint64_t)line, len);
+  status = INTERNAL_SYSCALL (sysve, err, 4, VE_SYSVE_SYSTEM2,
+		  (uint64_t)line, len, *((uint64_t*)&omask));
   if (__glibc_unlikely(INTERNAL_SYSCALL_ERROR_P(status, err))) {
 	  __set_errno(INTERNAL_SYSCALL_ERRNO(status, err));
 	  status = -1;
   }
-
 #ifdef CLEANUP_HANDLER
   CLEANUP_RESET;
 #endif

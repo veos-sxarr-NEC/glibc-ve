@@ -26,6 +26,7 @@
 static uint64_t base_clock; /* MHz */
 static struct timeval base_tv = {0};
 static struct timeval prev_tv = {0};
+static struct timezone base_tz = {0};
 static uint64_t base_stm = 0ULL;
 static volatile int lock = LLL_LOCK_INITIALIZER;
 
@@ -48,20 +49,36 @@ int
 __gettimeofday (struct timeval *tv, struct timezone *tz)
 {
   int ret = 0;
-  struct timespec ts;
   uint64_t e_time = 0, e_time_tmp = 0, cur_stm = 0;
   void *vehva = (void *)0x000000001000;
   char base_clk[10] = {0};
+  struct timezone tz_tmp = {0};
+  struct timeval tv_tmp = {0};
+  char tv_is_null_flag = 0;
+  char tz_is_null_flag = 0;
 
+
+  if(tv == NULL && tz == NULL) /* If both tv and tz are NULL then return 0 without System call */
+  {
+    return ret;
+  }
   /*
-   * If tz is not NULL, Ve-lib handles to give users the precise time.
+   * If tv or tz is NULL, Ve-lib still invokes system call with these arguments
+   * for very 1st time and retains value to provide quick call implementation.
   */
 
-  if (tz != NULL)
-    {
-      ret = INLINE_SYSCALL (gettimeofday, 2, tv, tz);
-      return ret;
-    }
+  if(tv == NULL)
+  {
+    tv_is_null_flag = 1;
+    tv = &tv_tmp;
+  }
+  if(tz == NULL)
+  {
+    tz_is_null_flag = 1;
+    tz = &tz_tmp;
+  }
+
+
 
   if (!base_tv.tv_sec)
     {
@@ -87,6 +104,8 @@ __gettimeofday (struct timeval *tv, struct timezone *tz)
             }
           base_tv.tv_sec = tv->tv_sec;
           base_tv.tv_usec = tv->tv_usec;
+          base_tz.tz_minuteswest = tz->tz_minuteswest; /* Save the timezone even if user does not need now */
+          base_tz.tz_dsttime = tz->tz_dsttime;
           GET_STM(base_stm, vehva);
           prev_tv.tv_sec = tv->tv_sec;
           prev_tv.tv_usec = tv->tv_usec;
@@ -101,18 +120,22 @@ __gettimeofday (struct timeval *tv, struct timezone *tz)
   tv->tv_usec = e_time_tmp % 1000000;
 
   timeradd(&base_tv, tv, tv);
+  tz->tz_minuteswest = base_tz.tz_minuteswest; /* Return the saved timezone */
+  tz->tz_dsttime = base_tz.tz_dsttime;
 
   lll_lock (lock, LLL_PRIVATE);
 
-  if (tv->tv_sec - prev_tv.tv_sec > 3600)
+  if (tv->tv_sec - base_tv.tv_sec > 3600)
     {
       ret = INLINE_SYSCALL (gettimeofday, 2, tv, tz);
       if(ret < 0)
         {
           goto set_return_status;
         }
-      base_tv.tv_sec = tv->tv_sec = ts.tv_sec;
-      base_tv.tv_usec = tv->tv_usec = (int)ts.tv_nsec / 1000;
+      base_tv.tv_sec = tv->tv_sec;
+      base_tv.tv_usec = tv->tv_usec;
+      base_tz.tz_minuteswest = tz->tz_minuteswest;
+      base_tz.tz_dsttime = tz->tz_dsttime;
       base_stm = cur_stm;
     }
 
@@ -134,6 +157,10 @@ __gettimeofday (struct timeval *tv, struct timezone *tz)
   prev_tv.tv_usec = tv->tv_usec;
 
   set_return_status:
+    if(tv_is_null_flag == 1)
+      tv = NULL;
+    if(tz_is_null_flag == 1)
+      tz = NULL;
     lll_unlock (lock, LLL_PRIVATE);
     return ret;
 }

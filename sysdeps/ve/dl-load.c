@@ -56,7 +56,13 @@
 #endif
 
 #define STRING(x) __STRING (x)
-
+/* #1410 */
+typedef unsigned long long offset_t;
+/* Used to compare with size(1024B) and flags */
+#define DIFF_SECT 0x400
+#define VE_AX 0x6
+#define VE_WA 0x3
+#define VE_WAT 0x403
 
 int __stack_prot attribute_hidden attribute_relro
 #if _STACK_GROWS_DOWN && defined PROT_GROWSDOWN
@@ -854,7 +860,61 @@ lose (int code, int fd, const char *name, char *realname, struct link_map *l,
 
   _dl_signal_error (code, name, NULL, msg);
 }
+/* @brief To Validate the gap between data and text section.  */
+/* Return error if gap is less than 1024B and proceed further */
+/* in case of success.					      */
+static int ve_validate_gap(const ElfW(Ehdr) *ehdr, int fd)
+{
+  size_t size = 0;
+  int ret = 0;
+  int i = 0;
+  char *start_section = NULL;
+  Elf64_Shdr *shdr = NULL;
+  offset_t diff_offset = 0;
+  Elf64_Addr sh_addr_ax = NULL;
+  Elf64_Addr sh_addr_wa = NULL;
 
+  if (0 > (__lseek(fd, ehdr->e_shoff, SEEK_SET))) {
+    ret = 1;
+    goto err_ret;
+  }
+
+  size = ((ehdr->e_shentsize) * (ehdr->e_shnum));
+  start_section = (char *)calloc(1, size);
+  if(!start_section) {
+    ret = 1;
+    goto err_ret;
+  }
+  if (0 > ( (size_t) __libc_read (fd, start_section, size))) {
+    ret = 1;
+    free(start_section);
+    goto err_ret;
+  }
+
+  shdr = (Elf64_Shdr *)start_section;
+  for (i = 0; i < ehdr->e_shnum; i++) {
+    if ((shdr->sh_flags == VE_AX)) {
+      /* Get the offset for end of text segment */
+       sh_addr_ax = shdr->sh_addr;
+
+    }
+    if ((shdr->sh_flags == VE_WA)|| (shdr->sh_flags == VE_WAT)) {
+      /* Get the offset for start of data segment */
+      sh_addr_wa = shdr->sh_addr;
+      break;
+    }
+    shdr++;
+  }
+  /* To check binary/ld.so, gap is less than 1024 byte or not */
+  diff_offset = sh_addr_wa - sh_addr_ax;
+  if(diff_offset < DIFF_SECT) {
+       ret = 1;
+  }
+  /* Free the calloc block for storing section table */
+  free(start_section);
+err_ret:
+  return ret;
+}
 
 /* Map in the shared object NAME, actually located in REALNAME, and already
    opened on FD.  */
@@ -1010,6 +1070,13 @@ _dl_map_object_from_fd (const char *name, int fd, struct filebuf *fbp,
 #endif
       errstring = N_("cannot create shared object descriptor");
       goto call_lose_errno;
+    }
+  /* #1410 */
+  int ret = ve_validate_gap(header, fd);
+  if (__glibc_unlikely (ret != 0))
+    {
+	errstring = N_("Failed to validate the gap between text/data");
+        goto call_lose_errno;
     }
 
   /* Extract the remaining details we need from the ELF header

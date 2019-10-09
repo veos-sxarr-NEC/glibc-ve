@@ -25,7 +25,10 @@
    between them small enough that it's preferable to reserve all whole
    pages inside the gaps with PROT_NONE mappings rather than permitting
    other use of those parts of the address space).  */
-#define PAGE_SIZE_2MB       0x200000
+#define PAGE_SIZE_2MB	0x200000
+#define MAP_ADDR_64GB_SPACE	((uint64_t)1<<35)
+#define MAP_ADDR_64GB_FIXED	((uint64_t)1<<36)
+
 /* p_align is local to this module */
 static size_t p_align;
 static __always_inline const char *
@@ -35,7 +38,9 @@ _dl_map_segments (struct link_map *l, int fd,
                   const size_t maplength, bool has_holes,
                   struct link_map *loader)
 {
-  const uint64_t  flag = (p_align == PAGE_SIZE_2MB) ? MAP_2MB : MAP_64MB;
+  /* #1410 */
+  const uint64_t  flag = (((p_align == PAGE_SIZE_2MB) ? MAP_2MB : MAP_64MB)
+						| MAP_ADDR_64GB_SPACE);
   const struct loadcmd *c = loadcmds;
 
   if (__glibc_likely (type == ET_DYN))
@@ -63,7 +68,6 @@ _dl_map_segments (struct link_map *l, int fd,
                                             fd, c->mapoff);
       if (__glibc_unlikely ((void *) l->l_map_start == MAP_FAILED))
         return DL_MAP_SEGMENTS_ERROR_MAP_SEGMENT;
-
       l->l_map_end = l->l_map_start + maplength;
       l->l_addr = l->l_map_start - c->mapstart;
 
@@ -93,7 +97,7 @@ _dl_map_segments (struct link_map *l, int fd,
           /* Map the segment contents from the file.  */
           && (__mmap ((void *) (l->l_addr + c->mapstart),
                       c->mapend - c->mapstart, c->prot,
-                      flag|MAP_FIXED|MAP_COPY|MAP_FILE,
+                      flag|MAP_COPY|MAP_FILE|MAP_ADDR_64GB_FIXED,
                       fd, c->mapoff)
               == MAP_FAILED))
         return DL_MAP_SEGMENTS_ERROR_MAP_SEGMENT;
@@ -139,8 +143,8 @@ _dl_map_segments (struct link_map *l, int fd,
               /* Map the remaining zero pages in from the zero fill FD.  */
               caddr_t mapat;
               mapat = __mmap ((caddr_t) zeropage, zeroend - zeropage,
-                              c->prot,flag|MAP_ANON|MAP_PRIVATE|MAP_FIXED,
-                              -1, 0);
+                              c->prot,flag|MAP_ANON|MAP_PRIVATE|
+                              MAP_ADDR_64GB_FIXED, -1, 0);
               if (__glibc_unlikely (mapat == MAP_FAILED))
                 return DL_MAP_SEGMENTS_ERROR_MAP_ZERO_FILL;
             }
