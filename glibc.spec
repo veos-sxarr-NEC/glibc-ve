@@ -1,6 +1,6 @@
 Name:		glibc-ve
 Version:	2.21
-Release:	6%{?dist}
+Release:	7%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
@@ -96,11 +96,18 @@ popd
 
 #1682, setlocale issue
 %post
-ln -s /usr/lib/locale %{_prefix}/lib/locale
+if [ ! -L %{_prefix}/lib/locale ] ; then #1820 - If Link exists then do not create link again.
+  ln -s /usr/lib/locale %{_prefix}/lib/locale
+fi
+
 
 #1682, setlocale issue link remove
 %postun
-unlink %{_prefix}/lib/locale
+if [ $1 -le 0 ]; then # rpm -e option
+  if [ -L %{_prefix}/lib/locale ] ; then #1820 - If link exists then only unlink.
+    unlink %{_prefix}/lib/locale
+  fi
+fi
 
 %files
 %{_prefix}/lib/*
