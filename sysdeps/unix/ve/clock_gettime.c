@@ -24,12 +24,16 @@
 #include <libc-internal.h>
 #include <ldsodefs.h>
 
-static volatile int lock = LLL_LOCK_INITIALIZER;
+/* For all clock ids */
+#define  MAX_CLOCKS  16
 
-static uint64_t base_clock = 0ULL; /* MHz */
-static struct timespec base_tspec = {0};
-static struct timespec prev_tspec = {0};
-static uint64_t base_stm = 0ULL;
+/* Declare locks for all clockids */
+static volatile int lock[MAX_CLOCKS] = {LLL_LOCK_INITIALIZER};
+static volatile int lock_freq = LLL_LOCK_INITIALIZER;
+
+static struct timespec base_tspec[MAX_CLOCKS] = {0};
+static struct timespec prev_tspec[MAX_CLOCKS] = {0};
+static uint64_t base_stm[MAX_CLOCKS] = {0ULL};
 
 #if HP_TIMING_AVAIL
 /* Clock frequency of the processor.  We make it a 64-bit variable
@@ -47,7 +51,9 @@ static int
 hp_timing_gettime (clockid_t clock_id, struct timespec *tp)
 {
   hp_timing_t tsc;
+  hp_timing_t base_clock;
 
+  lll_lock (lock_freq, LLL_PRIVATE);
   if (__glibc_unlikely (freq == 0))
     {
       /* This can only happen if we haven't initialized the `freq'
@@ -59,10 +65,13 @@ hp_timing_gettime (clockid_t clock_id, struct timespec *tp)
        /* Something went wrong.  */
        return -1;
     }
+    base_clock = freq* UINT64_C(1000000); /* Convert frequency from MHzto Hz */
+
+  lll_unlock (lock_freq, LLL_PRIVATE);
 
   if (clock_id != CLOCK_PROCESS_CPUTIME_ID
       && __pthread_clock_gettime != NULL)
-    return __pthread_clock_gettime (clock_id, freq, tp);
+    return __pthread_clock_gettime (clock_id, base_clock, tp);
 
   /* Get the current counter.  */
   HP_TIMING_NOW (tsc);
@@ -70,11 +79,11 @@ hp_timing_gettime (clockid_t clock_id, struct timespec *tp)
   tsc -= GL(dl_cpuclock_offset);
 
   /* Compute the seconds.  */
-  tp->tv_sec = tsc / freq;
+  tp->tv_sec = tsc / base_clock;
 
   /* And the nanoseconds.  This computation should be stable until
      we get machines with about 16GHz frequency.  */
-  tp->tv_nsec = ((tsc % freq) * UINT64_C (1000000000)) / freq;
+  tp->tv_nsec = ((tsc % base_clock) * UINT64_C (1000000000)) / base_clock;
 
   return 0;
 }
@@ -103,136 +112,160 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
   struct timeval prev_tspec_tmp = {0};
   struct timeval diff;
   uint64_t e_time = 0, e_time_tmp = 0, cur_stm = 0;
-  char base_clk[10] = {0};
   void *vehva = (void *)0x000000001000;
+  uint64_t base_clock = 0ULL; /* MHz */
+  pid_t pid = -1;
 
-  switch (clock_id)
+  pid = CPUCLOCK_PID(clock_id);
+
+  if(pid < -1 || pid == 1)
+  {
+      retval = -1;
+	__set_errno (EINVAL);
+  }
+  else if( pid > 1)
+  {
+    if(CPUCLOCK_WHICH(clock_id) >= CPUCLOCK_MAX)
     {
-#ifdef SYSDEP_GETTIME
-      SYSDEP_GETTIME;
-#endif
-
-#ifndef HANDLED_REALTIME
-    case CLOCK_REALTIME:
+      retval = -1;
+	__set_errno (EINVAL);
+    }
+    else
+    {
+    retval = SYSCALL_GETTIME (clock_id, tp);
+    }
+  }
+  else
+  {
+    switch (clock_id)
+    {
+      /* process here for the following clockids */
+      case CLOCK_MONOTONIC:
+      case CLOCK_MONOTONIC_COARSE:
+      case CLOCK_MONOTONIC_RAW:
+      case CLOCK_REALTIME:
+      case CLOCK_REALTIME_COARSE:
+      case CLOCK_BOOTTIME:
       {
-       struct timeval tv;
-       retval = gettimeofday (&tv, NULL);
-       if (retval == 0)
-         TIMEVAL_TO_TIMESPEC (&tv, tp);
-      }
-      break;
-#endif
-/* Quick call implementation for clock_gettime CLOCK_MONOTONIC only */
-    case CLOCK_MONOTONIC:
-      {
-        retval = 0;
-        if (!base_tspec.tv_sec)
-          {
-            lll_lock (lock, LLL_PRIVATE);
+	retval = 0;
+	lll_lock (lock_freq, LLL_PRIVATE);
+	/* check if frequency is already calculated */
+	if (__glibc_unlikely (freq == 0))
+	{
+	  /* find frequency which will be common for all clockids */
+	  freq = __get_clockfreq ();
+	  if (__glibc_unlikely (freq == 0))
+	  /* something went wrong.  */
+	  return -1;
+	}
+	base_clock = freq;
+	lll_unlock (lock_freq, LLL_PRIVATE);
+	if (!base_tspec[clock_id].tv_sec)
+	{
+	  lll_lock (lock[clock_id], LLL_PRIVATE);
+	  if (!base_tspec[clock_id].tv_sec)
+	  {
+	    /* Invoke a fresh system call */
+	    errno = 0;
+	    retval = SYSCALL_GETTIME (clock_id, tp);
+	    if(retval < 0)
+	    {
+	      goto set_return_status;
+	    }
+	    base_tspec[clock_id].tv_sec = tp->tv_sec;
+	    base_tspec[clock_id].tv_nsec = tp->tv_nsec;
+	    GET_STM(base_stm[clock_id], vehva);
+	    prev_tspec[clock_id].tv_sec = tp->tv_sec;
+	    prev_tspec[clock_id].tv_nsec = tp->tv_nsec;
+	    goto set_return_status;
+	  }
 
-            if (!base_tspec.tv_sec)
-              {
-                errno = 0;
-                retval = _ve_get_ve_info("clock_base", base_clk, 10);
-                if(retval < 0)
-                  goto set_return_status;
+	  lll_unlock (lock[clock_id], LLL_PRIVATE);
+	}
 
-                base_clock = strtol(base_clk, NULL, 10);
-                if (errno)
-                  {
-                    retval = -1;
-                    goto set_return_status;
-                  }
+	/* Calculate for quick call */
+	GET_STM(cur_stm, vehva);
+	lll_lock (lock[clock_id], LLL_PRIVATE);
+	e_time = ((cur_stm - base_stm[clock_id]) & ((1ULL << 56) - 1 ));
+	e_time_tmp = e_time / base_clock;
+	tvm.tv_sec = e_time_tmp / 1000000;
+	tvm.tv_usec = e_time_tmp % 1000000;
 
-                retval = SYSCALL_GETTIME (clock_id, tp);
-                if(retval < 0)
-                  {
-                    goto set_return_status;
-                  }
-                base_tspec.tv_sec = tp->tv_sec;
-                base_tspec.tv_nsec = tp->tv_nsec;
-                GET_STM(base_stm, vehva);
-                prev_tspec.tv_sec = tp->tv_sec;
-                prev_tspec.tv_nsec = tp->tv_nsec;
+	/*Storing base data from nano to micro sec structure*/
+	tmp_base_tspec.tv_sec = base_tspec[clock_id].tv_sec;
+	tmp_base_tspec.tv_usec = (int)base_tspec[clock_id].tv_nsec/1000;
+	lll_unlock (lock[clock_id], LLL_PRIVATE);
 
-                goto set_return_status;
-              }
+	timeradd(&tmp_base_tspec, &tvm, &tvm);
+	/*Storing current time data from micro to nano*/
+	tp->tv_sec = tvm.tv_sec;
+	tp->tv_nsec = (int)tvm.tv_usec*1000;
 
-            lll_unlock (lock, LLL_PRIVATE);
-          }
+	lll_lock (lock[clock_id], LLL_PRIVATE);
 
-        GET_STM(cur_stm, vehva);
-        e_time = (cur_stm - base_stm) & ((1ULL << 56) - 1 );
-        e_time_tmp = e_time / base_clock;
-        tvm.tv_sec = e_time_tmp / 1000000;
-        tvm.tv_usec = e_time_tmp % 1000000;
+	/* If system call was invoked 3600 seconds ago then invoke a fresh system call */
+	if (tp->tv_sec - base_tspec[clock_id].tv_sec > 3600)
+	{
+	  retval = SYSCALL_GETTIME (clock_id, tp);
+	  if(retval < 0)
+	  {
+	    goto set_return_status;
+	  }
 
-        /*Storing base data from nano to micro sec structure*/
-        tmp_base_tspec.tv_sec = base_tspec.tv_sec;
-        tmp_base_tspec.tv_usec = (int)base_tspec.tv_nsec/1000;
+	  base_tspec[clock_id].tv_sec = tp->tv_sec;
+	  base_tspec[clock_id].tv_nsec = tp->tv_nsec;
+	  /* Get fresh STM at this point */
+	  GET_STM(base_stm[clock_id], vehva);
+	}
 
-        timeradd(&tmp_base_tspec, &tvm, &tvm);
-        /*Storing current time data from micro to nano*/
-        tp->tv_sec = tvm.tv_sec;
-        tp->tv_nsec = (int)tvm.tv_usec*1000;
+	/*Preparing structure for timercmp in micro sec format*/
+	prev_tspec_tmp.tv_sec = prev_tspec[clock_id].tv_sec;
+	prev_tspec_tmp.tv_usec = (int)prev_tspec[clock_id].tv_nsec/1000;
 
-        lll_lock (lock, LLL_PRIVATE);
+	if (timercmp(&tvm, &prev_tspec_tmp, <))
+	{
+	  timersub(&prev_tspec_tmp, &tvm, &diff);
+	  if (diff.tv_sec < 60)
+	  {
+	    tp->tv_sec = prev_tspec[clock_id].tv_sec;
+	    tp->tv_nsec = prev_tspec[clock_id].tv_nsec;
+	    goto set_return_status;
+	  }
+	}
 
-        if (tp->tv_sec - base_tspec.tv_sec > 3600)
-          {
-
-            retval = SYSCALL_GETTIME (clock_id, tp);
-            if(retval < 0)
-              {
-                goto set_return_status;
-              }
-
-            base_tspec.tv_sec = tp->tv_sec;
-            base_tspec.tv_nsec = tp->tv_nsec;
-            base_stm = cur_stm;
-          }
-
-        /*Preparing structure for timercmp in micro sec format*/
-        prev_tspec_tmp.tv_sec = prev_tspec.tv_sec;
-        prev_tspec_tmp.tv_usec = (int)prev_tspec.tv_nsec/1000;
-
-        if (timercmp(&tvm, &prev_tspec_tmp, <))
-          {
-            timersub(&prev_tspec_tmp, &tvm, &diff);
-            if (diff.tv_sec < 60)
-              {
-                tp->tv_sec = prev_tspec.tv_sec;
-                tp->tv_nsec = prev_tspec.tv_nsec;
-                goto set_return_status;
-              }
-          }
-
-        prev_tspec.tv_sec = tp->tv_sec;
-        prev_tspec.tv_nsec = tp->tv_nsec;
+	prev_tspec[clock_id].tv_sec = tp->tv_sec;
+	prev_tspec[clock_id].tv_nsec = tp->tv_nsec;
 
 set_return_status:
-  lll_unlock (lock, LLL_PRIVATE);
+	lll_unlock (lock[clock_id], LLL_PRIVATE);
       }
       break;
-    default:
-#ifdef SYSDEP_GETTIME_CPU
-      SYSDEP_GETTIME_CPU (clock_id, tp);
-#endif
+
+      default:
+      /* Calculate here for CLOCK_THREAD_CPUTIME_ID */
 #if HP_TIMING_AVAIL
       if ((clock_id & ((1 << CLOCK_IDFIELD_SIZE) - 1))
-         == CLOCK_THREAD_CPUTIME_ID)
-       retval = hp_timing_gettime (clock_id, tp);
-      else
+	    == CLOCK_THREAD_CPUTIME_ID)
+      {
+	retval = hp_timing_gettime (clock_id, tp);
+	break;
+      }
 #endif
-       __set_errno (EINVAL);
-      break;
+			  /* Process here for remianing clockids if any */
+#ifdef SYSDEP_GETTIME_CPU
+	SYSDEP_GETTIME_CPU (clock_id, tp);
+#endif
+	__set_errno (EINVAL);
+	break;
 
 #if HP_TIMING_AVAIL && !defined HANDLED_CPUTIME
-    case CLOCK_PROCESS_CPUTIME_ID:
-      retval = hp_timing_gettime (clock_id, tp);
-      break;
+	case CLOCK_PROCESS_CPUTIME_ID:
+	  retval = hp_timing_gettime (clock_id, tp);
+	  break;
 #endif
     }
+
+  }
 
   return retval;
 }

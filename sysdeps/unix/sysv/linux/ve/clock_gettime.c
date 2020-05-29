@@ -41,15 +41,6 @@
   INTERNAL_VSYSCALL (clock_gettime, err, 2, id, tp)
 #endif
 
-/* The REALTIME and MONOTONIC clock are definitely supported in the
- *    kernel.  */
-#define SYSDEP_GETTIME \
-  SYSDEP_GETTIME_CPUTIME;                                                     \
-  case CLOCK_REALTIME:                                                        \
-    retval = SYSCALL_GETTIME (clock_id, tp);                                  \
-    break
-/* case CLOCK_MONOTONIC will be handled as VE quick call implemenation */
-
 /* We handled the REALTIME clock here.  */
 #define HANDLED_REALTIME        1
 #define HANDLED_CPUTIME 1
@@ -57,7 +48,6 @@
 #define SYSDEP_GETTIME_CPU(clock_id, tp) \
   retval = SYSCALL_GETTIME (clock_id, tp); \
   break
-#define SYSDEP_GETTIME_CPUTIME  /* Default catches them too.  */
 
 /* Include the file */
 #include <sysdeps/unix/ve/clock_gettime.c>

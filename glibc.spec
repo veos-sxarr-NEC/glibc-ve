@@ -1,6 +1,6 @@
 Name:		glibc-ve
 Version:	2.21
-Release:	7%{?dist}
+Release:	9%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+

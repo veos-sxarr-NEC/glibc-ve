@@ -77,6 +77,9 @@ __makecontext (ucontext_t *ucp, void (*func) (void), int argc, ...)
   /* Setup rbx.*/
   ucp->uc_mcontext.SR[9] = ((uintptr_t) &fp[2]);
 
+  /* Setup stack limit.*/
+  ucp->uc_mcontext.SR[8] =(uintptr_t) ucp->uc_stack.ss_sp;
+
   /* Setup stack.  */
   ucp->uc_mcontext.SR[11] = (uintptr_t) sp;
   /* Setup return address.  */
