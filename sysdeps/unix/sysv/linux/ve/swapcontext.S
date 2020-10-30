@@ -78,6 +78,7 @@ ENTRY(__swapcontext)
 	/* The syscall destroys some registers, save them.  */
 	st	%s0, -8(, %sp)
 	st	%s1, -16(, %sp)
+	lea     %sp, -16(,%sp)
 
 	/* Save the floating-point environment.  */
 	smir	%s3, %psw
@@ -446,6 +447,7 @@ ENTRY(__swapcontext)
 
 	/* Save the current signal mask and install the new one with
 	   rt_sigprocmask (SIG_BLOCK, newset, oldset,_NSIG/8).  */
+	ld      %s1, oSRG1(, %s0)
 	lea	%s0, oSIGMASK(,%s0)
 	lea	%s1, oSIGMASK(,%s1)
 	or	%s3, %s0, (0)1
@@ -470,6 +472,7 @@ ENTRY(__swapcontext)
 
 	/* Restore destroyed registers.
 	Here we need shift %s1 into %s0. */
+	lea     %sp, 16(,%sp)
 	ld	%s0, -16(, %sp)
 
 	/* Restore the floating-point context. */

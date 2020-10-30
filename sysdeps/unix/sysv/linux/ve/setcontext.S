@@ -38,6 +38,7 @@
 ENTRY(__setcontext)
 	/* Save argument since syscall will destroy it.  */
 	st	%s0, -8(, %sp)
+	lea     %sp, -8(,%sp)
 	/* Set the signal mask with
 	   rt_sigprocmask (SIG_SETMASK, mask, NULL, _NSIG/8).  */
 	lea	%s2, oSIGMASK(, %s0)
@@ -58,7 +59,8 @@ ENTRY(__setcontext)
 	cmpu.l  %s47, %s59, %s0
 	brge.l.t 0, %s47, SYSCALL_ERROR_LABEL /* Branch to error handler if error. */
 
-	ld	%s0, -8(, %sp)
+	lea    %sp, 8(,%sp)
+	ld     %s0, -8(, %sp)
 
 	/* Restore the floating-point context.  Not the registers, only the
 	   rest.  */
