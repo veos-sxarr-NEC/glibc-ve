@@ -39,8 +39,7 @@ static uint64_t base_stm[MAX_CLOCKS] = {0ULL};
 /* Clock frequency of the processor.  We make it a 64-bit variable
    because some jokers are already playing with processors with more
    than 4GHz.  */
-static hp_timing_t freq;
-
+static hp_timing_t base_freq, chip_freq;
 
 /* This function is defined in the thread library.  */
 extern int __pthread_clock_gettime (clockid_t clock_id, hp_timing_t freq,
@@ -54,25 +53,24 @@ hp_timing_gettime (clockid_t clock_id, struct timespec *tp)
   hp_timing_t base_clock;
 
   lll_lock (lock_freq, LLL_PRIVATE);
-  if (__glibc_unlikely (freq == 0))
+  if (__glibc_unlikely (chip_freq == 0))
     {
       /* This can only happen if we haven't initialized the `freq'
         variable yet.  Do this now. We don't have to protect this
         code against multiple execution since all of them should
         lead to the same result.  */
-      freq = __get_clockfreq ();
-      if (__glibc_unlikely (freq == 0))
+      chip_freq = __get_chip_clockfreq ();
+      if (__glibc_unlikely (chip_freq == 0))
        /* Something went wrong.  */
        return -1;
     }
-    base_clock = freq* UINT64_C(1000000); /* Convert frequency from MHzto Hz */
+    base_clock = chip_freq* UINT64_C(1000000); /* Convert frequency from MHzto Hz */
 
   lll_unlock (lock_freq, LLL_PRIVATE);
 
   if (clock_id != CLOCK_PROCESS_CPUTIME_ID
       && __pthread_clock_gettime != NULL)
     return __pthread_clock_gettime (clock_id, base_clock, tp);
-
   /* Get the current counter.  */
   HP_TIMING_NOW (tsc);
   /* Compute the offset since the start time of the process.  */
@@ -150,15 +148,15 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 	retval = 0;
 	lll_lock (lock_freq, LLL_PRIVATE);
 	/* check if frequency is already calculated */
-	if (__glibc_unlikely (freq == 0))
+	if (__glibc_unlikely (base_freq == 0))
 	{
 	  /* find frequency which will be common for all clockids */
-	  freq = __get_clockfreq ();
-	  if (__glibc_unlikely (freq == 0))
+	  base_freq = __get_clockfreq ();
+	  if (__glibc_unlikely (base_freq == 0))
 	  /* something went wrong.  */
 	  return -1;
 	}
-	base_clock = freq;
+	base_clock = base_freq;
 	lll_unlock (lock_freq, LLL_PRIVATE);
 	if (!base_tspec[clock_id].tv_sec)
 	{

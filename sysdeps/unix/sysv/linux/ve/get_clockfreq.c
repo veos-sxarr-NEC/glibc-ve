@@ -38,3 +38,23 @@ __get_clockfreq (void)
 
   return retval;
 }
+
+hp_timing_t
+__get_chip_clockfreq (void)
+{
+  char base_clk[10] = {0};
+  static hp_timing_t retval;
+  if (retval != 0)
+  return retval;
+  if( _ve_get_ve_info("clock_chip", base_clk, 10) >= 0 )
+  {
+	errno = 0;
+	retval = strtol(base_clk, NULL, 10);
+	if(errno)
+	{
+		retval = 0;
+	}
+  }
+
+  return retval;
+}

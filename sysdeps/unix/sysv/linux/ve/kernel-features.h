@@ -37,7 +37,7 @@
 # define __ASSUME_SENDMMSG_SYSCALL	1
 #endif
 
+#include_next <kernel-features.h>
+
 # undef __ASSUME_FUTEX_LOCK_PI
 # undef __ASSUME_REQUEUE_PI
-
-#include_next <kernel-features.h>
