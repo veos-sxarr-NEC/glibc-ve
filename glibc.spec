@@ -1,6 +1,6 @@
 Name:		glibc-ve
 Version:	2.21
-Release:	11%{?dist}
+Release:	13%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
@@ -20,7 +20,11 @@ Standard glibc build and install with this spec file for VE arch.
 %define _glibc_src_name %name-%version
 %define _glibc_etc_base /etc/opt/nec/ve/
 %define _glibc_var_base /var/opt/nec/ve/
+%if 0%{?rhel} == 8
+%global __debug_install_post /opt/nec/ve/libexec/find-debuginfo.sh  -o debugsourcefiles.list %{nil}
+%else
 %global __debug_install_post /opt/nec/ve/libexec/find-debuginfo.sh %{nil}
+%endif
 
 %package devel
 Summary: Development files for glibc
@@ -48,7 +52,7 @@ Binary files for %name
 %build
 mkdir ../glibc_build
 pushd ../glibc_build
-../%{_glibc_src_name}/configure --exec-prefix=%{_prefix} --prefix=%{_prefix} --host=ve-unknown-linux-gnu --with-headers=%{_prefix}/include --enable-obsolete-rpc CFLAGS='-O2 -g'  LDFLAGS="-Wl,--build-id"
+../%{_glibc_src_name}/configure --exec-prefix=%{_prefix} --prefix=%{_prefix} --host=ve-unknown-linux-gnu --with-headers=%{_prefix}/include --enable-obsolete-rpc LDFLAGS="-Wl,--build-id"
 make -j 4
 popd
 

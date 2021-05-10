@@ -16,6 +16,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <assert.h>
 #include <errno.h>
@@ -44,8 +45,9 @@ static const size_t _nl_category_num_items[] =
 
 #define NO_PAREN(arg, rest...) arg, ##rest
 
+//static const enum value_type _nl_value_type_##category[] = { NO_PAREN items };
 #define DEFINE_CATEGORY(category, category_name, items, a) \
-static const enum value_type _nl_value_type_##category[] = { NO_PAREN items };
+static const enum value_type _nl_value_type_##category[_NL_ITEM_INDEX (_NL_NUM_##category)] = { NO_PAREN items };
 #define DEFINE_ELEMENT(element, element_name, optstd, type, rest...) \
   [_NL_ITEM_INDEX (element)] = type,
 #include "categories.def"

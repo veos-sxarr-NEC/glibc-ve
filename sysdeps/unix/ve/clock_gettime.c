@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <libc-internal.h>
 #include <ldsodefs.h>
+#include "posix-timer.h"
 
 /* For all clock ids */
 #define  MAX_CLOCKS  16
@@ -105,10 +106,8 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 {
   int retval = -1;
   /* Quick call CLOCK MONOTONIC variables */
-  struct timeval tvm = {0};
-  struct timeval tmp_base_tspec = {0};
-  struct timeval prev_tspec_tmp = {0};
-  struct timeval diff;
+  struct timespec tvm = {0};
+  struct timespec diff = {0};
   uint64_t e_time = 0, e_time_tmp = 0, cur_stm = 0;
   void *vehva = (void *)0x000000001000;
   uint64_t base_clock = 0ULL; /* MHz */
@@ -187,17 +186,14 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 	e_time = ((cur_stm - base_stm[clock_id]) & ((1ULL << 56) - 1 ));
 	e_time_tmp = e_time / base_clock;
 	tvm.tv_sec = e_time_tmp / 1000000;
-	tvm.tv_usec = e_time_tmp % 1000000;
+	tvm.tv_nsec = ( e_time_tmp % 1000000 ) * 1000;
 
-	/*Storing base data from nano to micro sec structure*/
-	tmp_base_tspec.tv_sec = base_tspec[clock_id].tv_sec;
-	tmp_base_tspec.tv_usec = (int)base_tspec[clock_id].tv_nsec/1000;
 	lll_unlock (lock[clock_id], LLL_PRIVATE);
 
-	timeradd(&tmp_base_tspec, &tvm, &tvm);
+	timespec_add(&tvm, &base_tspec[clock_id], &tvm);
 	/*Storing current time data from micro to nano*/
 	tp->tv_sec = tvm.tv_sec;
-	tp->tv_nsec = (int)tvm.tv_usec*1000;
+        tp->tv_nsec = tvm.tv_nsec;
 
 	lll_lock (lock[clock_id], LLL_PRIVATE);
 
@@ -205,6 +201,7 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 	if (tp->tv_sec - base_tspec[clock_id].tv_sec > 3600)
 	{
 	  retval = SYSCALL_GETTIME (clock_id, tp);
+	  __asm volatile ("" ::: "memory");
 	  if(retval < 0)
 	  {
 	    goto set_return_status;
@@ -214,15 +211,13 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 	  base_tspec[clock_id].tv_nsec = tp->tv_nsec;
 	  /* Get fresh STM at this point */
 	  GET_STM(base_stm[clock_id], vehva);
+          tvm.tv_sec = tp->tv_sec;
+          tvm.tv_nsec = tp->tv_nsec;
 	}
 
-	/*Preparing structure for timercmp in micro sec format*/
-	prev_tspec_tmp.tv_sec = prev_tspec[clock_id].tv_sec;
-	prev_tspec_tmp.tv_usec = (int)prev_tspec[clock_id].tv_nsec/1000;
-
-	if (timercmp(&tvm, &prev_tspec_tmp, <))
+	if (timespec_compare(&tvm, &prev_tspec[clock_id]) < 0)
 	{
-	  timersub(&prev_tspec_tmp, &tvm, &diff);
+          timespec_sub(&diff, &prev_tspec[clock_id], &tvm);
 	  if (diff.tv_sec < 60)
 	  {
 	    tp->tv_sec = prev_tspec[clock_id].tv_sec;

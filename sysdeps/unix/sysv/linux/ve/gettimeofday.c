@@ -128,6 +128,7 @@ __gettimeofday (struct timeval *tv, struct timezone *tz)
   if (tv->tv_sec - base_tv.tv_sec > 3600)
     {
       ret = INLINE_SYSCALL (gettimeofday, 2, tv, tz);
+      __asm volatile ("" ::: "memory");
       if(ret < 0)
         {
           goto set_return_status;
