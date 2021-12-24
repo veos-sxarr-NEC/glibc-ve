@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
 # <http://www.gnu.org/licenses/>.
-# Changes by NEC Corporation for the VE port, 2017-2019.
 
 #
 #	Sub-makefile for NPTL portion of the library.
@@ -222,43 +221,42 @@ CFLAGS-pt-system.c = -fexceptions
 # tst-mutexpi6 tst-mutexpi7 tst-mutexpi7a tst-mutexpi9 tst-once2
 # tst-pthread-getattr tst-rwlock5 tst-sched1 tst-sem12 tst-sem2 tst-setuid3
 # tst-signal1 tst-signal3 tst-spin3 tst-stack4 tst-tls1 tst-tls2
-
 tests = tst-typesizes \
-	tst-attr1 tst-attr2 tst-attr3 \
+	tst-attr1 tst-attr2 tst-attr3  \
 	tst-mutex1 tst-mutex2 tst-mutex3 \
 	tst-mutexpi1 tst-mutexpi2 tst-mutexpi3 \
 	tst-mutexpi5a \
 	tst-spin1 tst-spin2 tst-spin4 \
-	tst-cond1 tst-cond4 tst-cond5 tst-cond6 \
-	tst-cond9 tst-cond11 tst-cond12 tst-cond13 \
-	tst-cond14 tst-cond15 tst-cond16 tst-cond17 tst-cond19 \
-	tst-cond20 tst-cond21 tst-cond22 tst-cond23 \
+	tst-cond1  tst-cond4 tst-cond5 tst-cond6 \
+	tst-cond9  tst-cond11 tst-cond12 tst-cond13 \
+	tst-cond14 tst-cond15 tst-cond16 tst-cond17  tst-cond19 \
+	tst-cond20 tst-cond21 tst-cond22 tst-cond23   \
 	tst-rwlock1 tst-rwlock2 tst-rwlock2a tst-rwlock3 tst-rwlock4 \
 	tst-rwlock6 tst-rwlock7 tst-rwlock8 tst-rwlock9 \
 	tst-rwlock10 tst-rwlock11 tst-rwlock12 tst-rwlock13 tst-rwlock14 \
 	tst-once1 \
-	tst-key2 tst-key3 \
+	tst-key2 tst-key3  \
 	tst-sem1 tst-sem3 tst-sem4 tst-sem5 tst-sem6 tst-sem7 \
 	tst-sem8 tst-sem9 tst-sem10 tst-sem13 tst-sem14 \
-	tst-barrier1 tst-barrier2 tst-barrier3 \
+	tst-barrier1 tst-barrier2 tst-barrier3  \
 	tst-align tst-align3 \
 	tst-basic1 tst-basic5 tst-basic6 \
 	tst-basic7 \
-	tst-kill2 tst-kill3 tst-kill5 \
+	tst-kill2 tst-kill3 tst-kill5  \
 	tst-raise1 \
-	tst-join1 tst-join2 tst-join3 \
+	tst-join1 tst-join2 tst-join3  \
 	tst-detach1 \
 	tst-eintr3 tst-eintr4 tst-eintr5 \
 	tst-tsd1 tst-tsd2 tst-tsd3 tst-tsd4 tst-tsd5 tst-tsd6 \
 	tst-fork2 tst-fork3 \
 	tst-atfork1 \
-	tst-cancel9 \
+	tst-cancel9  \
 	tst-cancel14 tst-cancel15 \
 	tst-cancel19 \
 	tst-cancel22 tst-cancel23 \
 	tst-cancel-self tst-cancel-self-cancelstate \
 	tst-cancel-self-canceltype tst-cancel-self-testcancel \
-	tst-cleanup0 tst-cleanup2 \
+	tst-cleanup0 tst-cleanup2  \
 	tst-flock1 tst-flock2 \
 	tst-signal2 tst-signal4 tst-signal5 \
 	tst-signal6 tst-signal7 \

@@ -338,6 +338,7 @@ GLIBC_2.2.5
  __libc_freeres F
  __libc_init_first F
  __libc_mallinfo F
+ __libc_mallinfo2 F
  __libc_malloc F
  __libc_mallopt F
  __libc_memalign F

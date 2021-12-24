@@ -14,7 +14,6 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, see <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #ifndef _TOKEN_H
 #define _TOKEN_H
@@ -187,8 +186,6 @@ enum token_t
   tok_cal_direction,
   tok_timezone,
   tok_date_fmt,
-  tok_alt_mon,
-  tok_ab_alt_mon,
   tok_lc_messages,
   tok_yesexpr,
   tok_noexpr,

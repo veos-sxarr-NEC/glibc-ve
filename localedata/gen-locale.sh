@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
 # <http://www.gnu.org/licenses/>.
-# Changes by NEC Corporation for the VE port, 2017-2019
 
 set -e
 
@@ -31,7 +30,7 @@ generate_locale ()
   charmap=$1
   input=$2
   out=$3
-  localedefs="$(echo $localedef_after_env | cut -d' ' -f4)"
+  localedefs="$(cut -d' ' -f4 <<< $localedef_after_env)"
 
   if ${localedef_before_env} ${run_program_env} VE_I18NPATH=. \
      ${localedefs} --quiet -c -f $charmap -i $input \

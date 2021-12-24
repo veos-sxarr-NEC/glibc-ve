@@ -16,7 +16,6 @@
    You should have received a copy of the GNU General Public License
    along with this program; if not, see
    <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #include <string.h>
 
@@ -149,8 +148,6 @@ first_workday,          tok_first_workday,          0
 cal_direction,          tok_cal_direction,          0
 timezone,               tok_timezone,               0
 date_fmt,               tok_date_fmt,               0
-alt_mon,                tok_alt_mon,                0
-ab_alt_mon,             tok_ab_alt_mon,             0
 LC_MESSAGES,            tok_lc_messages,            0
 yesexpr,                tok_yesexpr,                0
 noexpr,                 tok_noexpr,                 0

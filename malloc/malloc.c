@@ -660,6 +660,10 @@ libc_hidden_proto (__libc_mallopt)
   be kept as longs, the reported values may wrap around zero and
   thus be inaccurate.
 */
+
+struct mallinfo2 __libc_mallinfo2(void);
+libc_hidden_proto (__libc_mallinfo2)
+
 struct mallinfo __libc_mallinfo(void);
 
 
@@ -1729,7 +1733,7 @@ struct malloc_par
   INTERNAL_SIZE_T arena_max;
 
   /* Memory map support */
-  int n_mmaps;
+  INTERNAL_SIZE_T n_mmaps;
   int n_mmaps_max;
   int max_n_mmaps;
   /* the mmap_threshold is dynamic, until the user sets
@@ -4587,15 +4591,15 @@ __malloc_usable_size (void *m)
  */
 
 static void
-int_mallinfo (mstate av, struct mallinfo *m)
+int_mallinfo (mstate av, struct mallinfo2 *m)
 {
   size_t i;
   mbinptr b;
   mchunkptr p;
   INTERNAL_SIZE_T avail;
   INTERNAL_SIZE_T fastavail;
-  int nblocks;
-  int nfastblocks;
+  INTERNAL_SIZE_T nblocks;
+  INTERNAL_SIZE_T nfastblocks;
 
   /* Ensure initialization */
   if (av->top == 0)
@@ -4649,10 +4653,10 @@ int_mallinfo (mstate av, struct mallinfo *m)
 }
 
 
-struct mallinfo
-__libc_mallinfo ()
+struct mallinfo2
+__libc_mallinfo2 ()
 {
-  struct mallinfo m;
+  struct mallinfo2 m;
   mstate ar_ptr;
 
   if (__malloc_initialized < 0)
@@ -4672,7 +4676,27 @@ __libc_mallinfo ()
 
   return m;
 }
+libc_hidden_def (__libc_mallinfo2)
 
+struct mallinfo
+__libc_mallinfo (void)
+{
+  struct mallinfo m;
+  struct mallinfo2 m2 = __libc_mallinfo2 ();
+
+  m.arena = m2.arena;
+  m.ordblks = m2.ordblks;
+  m.smblks = m2.smblks;
+  m.hblks = m2.hblks;
+  m.hblkhd = m2.hblkhd;
+  m.usmblks = m2.usmblks;
+  m.fsmblks = m2.fsmblks;
+  m.uordblks = m2.uordblks;
+  m.fordblks = m2.fordblks;
+  m.keepcost = m2.keepcost;
+
+  return m;
+}
 /*
    ------------------------------ malloc_stats ------------------------------
  */
@@ -4691,7 +4715,7 @@ __malloc_stats (void)
   ((_IO_FILE *) stderr)->_flags2 |= _IO_FLAGS2_NOTCANCEL;
   for (i = 0, ar_ptr = &main_arena;; i++)
     {
-      struct mallinfo mi;
+      struct mallinfo2 mi;
 
       memset (&mi, 0, sizeof (mi));
       (void) mutex_lock (&ar_ptr->mutex);
@@ -5197,6 +5221,8 @@ strong_alias (__libc_valloc, __valloc) weak_alias (__libc_valloc, valloc)
 strong_alias (__libc_pvalloc, __pvalloc) weak_alias (__libc_pvalloc, pvalloc)
 strong_alias (__libc_mallinfo, __mallinfo)
 weak_alias (__libc_mallinfo, mallinfo)
+strong_alias (__libc_mallinfo2, __mallinfo2)
+weak_alias (__libc_mallinfo2, mallinfo2)
 strong_alias (__libc_mallopt, __mallopt) weak_alias (__libc_mallopt, mallopt)
 
 weak_alias (__malloc_stats, malloc_stats)

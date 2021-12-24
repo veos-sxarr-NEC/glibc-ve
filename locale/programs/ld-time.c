@@ -14,7 +14,6 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, see <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -92,12 +91,6 @@ struct locale_time_t
   const char *date_fmt;
   const uint32_t *wdate_fmt;
   int alt_digits_defined;
-  const char *alt_mon[12];
-  const uint32_t *walt_mon[12];
-  int alt_mon_defined;
-  const char *ab_alt_mon[12];
-  const uint32_t *wab_alt_mon[12];
-  int ab_alt_mon_defined;
   unsigned char week_ndays;
   uint32_t week_1stday;
   unsigned char week_1stweek;
@@ -655,23 +648,6 @@ time_output (struct localedef_t *locale, const struct charmap_t *charmap,
   add_locale_string (&file, time->date_fmt);
   add_locale_wstring (&file, time->wdate_fmt);
   add_locale_string (&file, charmap->code_set_name);
-
-  /* The alt'mons.  */
-  for (n = 0; n < 12; ++n)
-	  add_locale_string (&file, time->alt_mon[n] ?: "");
-
-  /* The wide character alt'mons.  */
-  for (n = 0; n < 12; ++n)
-	  add_locale_wstring (&file, time->walt_mon[n] ?: empty_wstr);
-
-  /* The ab'alt'mons.  */
-  for (n = 0; n < 12; ++n)
-	  add_locale_string (&file, time->ab_alt_mon[n] ?: "");
-
-  /* The wide character ab'alt'mons.  */
-  for (n = 0; n < 12; ++n)
-	  add_locale_wstring (&file, time->wab_alt_mon[n] ?: empty_wstr);
-
   write_locale_data (output_path, LC_TIME, "LC_TIME", &file);
 }
 
@@ -815,9 +791,6 @@ time_read (struct linereader *ldfile, struct localedef_t *result,
 	  STRARR_ELEM (mon, 12, 12);
 	  STRARR_ELEM (am_pm, 2, 2);
 	  STRARR_ELEM (alt_digits, 0, 100);
-  	  STRARR_ELEM (alt_mon, 12, 12);
-  	  STRARR_ELEM (ab_alt_mon, 12, 12);
-
 
 	case tok_era:
 	  /* Ignore the rest of the line if we don't need the input of
@@ -970,20 +943,6 @@ time_read (struct linereader *ldfile, struct localedef_t *result,
 	    lr_error (ldfile, _("\
 %1$s: definition does not end with `END %1$s'"), "LC_TIME");
 	  lr_ignore_rest (ldfile, now->tok == tok_lc_time);
-	  /* If alt_mon was not specified, make it a copy of mon.  */
-	  if (!ignore_content && !time->alt_mon_defined)
-	  {
-		  memcpy (time->alt_mon, time->mon, sizeof (time->mon));
-		  memcpy (time->walt_mon, time->wmon, sizeof (time->wmon));
-		  time->alt_mon_defined = 1;
-	  }
-	  /* The same for abbreviated versions.  */
-	  if (!ignore_content && !time->ab_alt_mon_defined)
-	  {
-		  memcpy (time->ab_alt_mon, time->abmon, sizeof (time->abmon));
-		  memcpy (time->wab_alt_mon, time->wabmon, sizeof (time->wabmon));
-		  time->ab_alt_mon_defined = 1;
-	  }
 	  return;
 
 	default:
