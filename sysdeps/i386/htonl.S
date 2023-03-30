@@ -1,5 +1,5 @@
-/* Change byte order in word.  For Intel 80386.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Change byte order in word.  For Intel 80x86, x >= 4.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include "asm-syntax.h"
@@ -27,9 +27,7 @@
 	.text
 ENTRY (htonl)
 	movl	4(%esp), %eax
-	rorw	$8, %ax
-	rorl	$16, %eax
-	rorw	$8, %ax
+	bswap	%eax
 	ret
 END (htonl)
 

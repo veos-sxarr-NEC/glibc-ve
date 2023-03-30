@@ -1,5 +1,5 @@
 /* Generate expected output for libm tests with MPFR and MPC.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,16 +14,25 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Compile this program as:
 
-   gcc -std=gnu99 -O2 -Wall -Wextra gen-auto-libm-tests.c -lmpc -lmpfr -lgmp \
+   gcc -std=gnu11 -O2 -Wall -Wextra gen-auto-libm-tests.c -lmpc -lmpfr -lgmp \
      -o gen-auto-libm-tests
 
    (use of current MPC and MPFR versions recommended) and run it as:
 
-   gen-auto-libm-tests auto-libm-test-in auto-libm-test-out
+   gen-auto-libm-tests auto-libm-test-in <func> auto-libm-test-out-<func>
+
+   to generate results for normal libm functions, or
+
+   gen-auto-libm-tests --narrow auto-libm-test-in <func> \
+     auto-libm-test-out-narrow-<func>
+
+   to generate results for a function rounding results to a narrower
+   type (in the case of fma and sqrt, both output files are generated
+   from the same test inputs).
 
    The input file auto-libm-test-in contains three kinds of lines:
 
@@ -98,7 +107,7 @@
    accompanied by a comment referring to an open bug in glibc
    Bugzilla.
 
-   The output file auto-libm-test-out contains the test lines from
+   The output file auto-libm-test-out-<func> contains the test lines from
    auto-libm-test-in, and, after the line for a given test, some
    number of output test lines.  An output test line is of the form "=
    function rounding-mode format input1 input2 ... : output1 output2
@@ -120,7 +129,22 @@
    missing or spurious, or because the calculation of correct results
    indicated it was optional).  Conditions "before-rounding" and
    "after-rounding" indicate tests where expectations for underflow
-   exceptions depend on how the architecture detects tininess.  */
+   exceptions depend on how the architecture detects tininess.
+
+   For functions rounding their results to a narrower type, the format
+   given on an output test line is the result format followed by
+   information about the requirements on the argument format to be
+   able to represent the argument values, in the form
+   "format:arg_fmt(MAX_EXP,NUM_ONES,MIN_EXP,MAX_PREC)".  Instead of
+   separate lines for separate argument formats, an output test line
+   relates to all argument formats that can represent the values.
+   MAX_EXP is the maximum exponent of a nonzero bit in any argument,
+   or 0 if all arguments are zero; NUM_ONES is the maximum number of
+   leading bits with value 1 in an argument with exponent MAX_EXP, or
+   0 if all arguments are zero; MIN_EXP is the minimum exponent of a
+   nonzero bit in any argument, or 0 if all arguments are zero;
+   MAX_PREC is the maximum precision required to represent all
+   arguments, or 0 if all arguments are zero.  */
 
 #define _GNU_SOURCE
 
@@ -158,9 +182,6 @@ typedef struct
 {
   /* The name of the format.  */
   const char *name;
-  /* The suffix to use on floating-point constants with this
-     format.  */
-  const char *suffix;
   /* A string for the largest normal value, or NULL for IEEE formats
      where this can be determined automatically.  */
   const char *max_string;
@@ -186,12 +207,12 @@ typedef struct
    enumeration.  */
 static fp_format_desc fp_formats[fp_num_formats] =
   {
-    { "flt-32", "f", NULL, 24, 128, -125, {}, {}, {}, {}, {} },
-    { "dbl-64", "", NULL, 53, 1024, -1021, {}, {}, {}, {}, {} },
-    { "ldbl-96-intel", "L", NULL, 64, 16384, -16381, {}, {}, {}, {}, {} },
-    { "ldbl-96-m68k", "L", NULL, 64, 16384, -16382, {}, {}, {}, {}, {} },
-    { "ldbl-128", "L", NULL, 113, 16384, -16381, {}, {}, {}, {}, {} },
-    { "ldbl-128ibm", "L", "0x1.fffffffffffff7ffffffffffff8p+1023",
+    { "binary32", NULL, 24, 128, -125, {}, {}, {}, {}, {} },
+    { "binary64", NULL, 53, 1024, -1021, {}, {}, {}, {}, {} },
+    { "intel96", NULL, 64, 16384, -16381, {}, {}, {}, {}, {} },
+    { "m68k96", NULL, 64, 16384, -16382, {}, {}, {}, {}, {} },
+    { "binary128", NULL, 113, 16384, -16381, {}, {}, {}, {}, {} },
+    { "ibm128", "0x1.fffffffffffff7ffffffffffff8p+1023",
       106, 1024, -968, {}, {}, {}, {}, {} },
   };
 
@@ -510,6 +531,7 @@ static test_function test_functions[] =
   {
     FUNC_mpfr_f_f ("acos", mpfr_acos, false),
     FUNC_mpfr_f_f ("acosh", mpfr_acosh, false),
+    FUNC_mpfr_ff_f ("add", mpfr_add, true),
     FUNC_mpfr_f_f ("asin", mpfr_asin, false),
     FUNC_mpfr_f_f ("asinh", mpfr_asinh, false),
     FUNC_mpfr_f_f ("atan", mpfr_atan, false),
@@ -539,6 +561,7 @@ static test_function test_functions[] =
     FUNC_mpc_c_c ("csqrt", mpc_sqrt, false),
     FUNC_mpc_c_c ("ctan", mpc_tan, false),
     FUNC_mpc_c_c ("ctanh", mpc_tanh, false),
+    FUNC_mpfr_ff_f ("div", mpfr_div, true),
     FUNC_mpfr_f_f ("erf", mpfr_erf, false),
     FUNC_mpfr_f_f ("erfc", mpfr_erfc, false),
     FUNC_mpfr_f_f ("exp", mpfr_exp, false),
@@ -557,11 +580,13 @@ static test_function test_functions[] =
     FUNC_mpfr_f_f ("log10", mpfr_log10, false),
     FUNC_mpfr_f_f ("log1p", mpfr_log1p, false),
     FUNC_mpfr_f_f ("log2", mpfr_log2, false),
+    FUNC_mpfr_ff_f ("mul", mpfr_mul, true),
     FUNC_mpfr_ff_f ("pow", mpfr_pow, false),
     FUNC_mpfr_f_f ("sin", mpfr_sin, false),
     FUNC ("sincos", ARGS1 (type_fp), RET2 (type_fp, type_fp), false, false,
 	  false, CALC (mpfr_f_11, mpfr_sin_cos)),
     FUNC_mpfr_f_f ("sinh", mpfr_sinh, false),
+    FUNC_mpfr_ff_f ("sub", mpfr_sub, true),
     FUNC_mpfr_f_f ("sqrt", mpfr_sqrt, true),
     FUNC_mpfr_f_f ("tan", mpfr_tan, false),
     FUNC_mpfr_f_f ("tanh", mpfr_tanh, false),
@@ -675,7 +700,7 @@ generic_value_copy (generic_value *dest, const generic_value *src)
 /* Initialize data for floating-point formats.  */
 
 static void
-init_fp_formats ()
+init_fp_formats (void)
 {
   int global_max_exp = 0, global_min_subnorm_exp = 0;
   for (fp_format f = fp_first_format; f < fp_num_formats; f++)
@@ -1273,7 +1298,7 @@ handle_input_flag (char *arg, input_flag *flag,
   char c = *ep;
   *ep = 0;
   bool found = false;
-  for (input_flag_type i = flag_first_flag; i <= num_input_flag_types; i++)
+  for (input_flag_type i = flag_first_flag; i < num_input_flag_types; i++)
     {
       if (strcmp (arg, input_flags[i]) == 0)
 	{
@@ -1643,13 +1668,12 @@ int_fits_type (mpz_t z, arg_ret_type type, int long_bits)
 }
 
 /* Print a generic value V to FP (name FILENAME), preceded by a space,
-   for type TYPE, floating-point format FORMAT, LONG_BITS bits per
-   long, printing " IGNORE" instead if IGNORE.  */
+   for type TYPE, LONG_BITS bits per long, printing " IGNORE" instead
+   if IGNORE.  */
 
 static void
 output_generic_value (FILE *fp, const char *filename, const generic_value *v,
-		      bool ignore, arg_ret_type type, fp_format format,
-		      int long_bits)
+		      bool ignore, arg_ret_type type, int long_bits)
 {
   if (ignore)
     {
@@ -1662,7 +1686,7 @@ output_generic_value (FILE *fp, const char *filename, const generic_value *v,
   switch (type)
     {
     case type_fp:
-      suffix = fp_formats[format].suffix;
+      suffix = "";
       break;
 
     case type_int:
@@ -1722,12 +1746,13 @@ output_generic_value (FILE *fp, const char *filename, const generic_value *v,
     }
 }
 
-/* Generate test output to FP (name FILENAME) for test function TF,
-   input test IT, choice of input values INPUTS.  */
+/* Generate test output to FP (name FILENAME) for test function TF
+   (rounding results to a narrower type if NARROW), input test IT,
+   choice of input values INPUTS.  */
 
 static void
 output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
-			   input_test *it, generic_value *inputs)
+			   bool narrow, input_test *it, generic_value *inputs)
 {
   bool long_bits_matters = false;
   bool fits_long32 = true;
@@ -1798,24 +1823,81 @@ output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
 	  mpfr_t res[rm_num_modes];
 	  unsigned int exc_before[rm_num_modes];
 	  unsigned int exc_after[rm_num_modes];
+	  bool have_fp_arg = false;
+	  int max_exp = 0;
+	  int num_ones = 0;
+	  int min_exp = 0;
+	  int max_prec = 0;
 	  for (size_t i = 0; i < tf->num_args; i++)
 	    {
 	      if (inputs[i].type == gtype_fp)
 		{
-		  round_real (res, exc_before, exc_after, inputs[i].value.f,
-			      f);
-		  if (!mpfr_equal_p (res[rm_tonearest], inputs[i].value.f))
-		    fits = false;
-		  for (rounding_mode m = rm_first_mode; m < rm_num_modes; m++)
-		    mpfr_clear (res[m]);
-		  if (!fits)
-		    break;
+		  if (narrow)
+		    {
+		      if (mpfr_zero_p (inputs[i].value.f))
+			continue;
+		      assert (mpfr_regular_p (inputs[i].value.f));
+		      int this_exp, this_num_ones, this_min_exp, this_prec;
+		      mpz_t tmp;
+		      mpz_init (tmp);
+		      mpfr_exp_t e = mpfr_get_z_2exp (tmp, inputs[i].value.f);
+		      if (mpz_sgn (tmp) < 0)
+			mpz_neg (tmp, tmp);
+		      size_t bits = mpz_sizeinbase (tmp, 2);
+		      mp_bitcnt_t tz = mpz_scan1 (tmp, 0);
+		      this_min_exp = e + tz;
+		      this_prec = bits - tz;
+		      assert (this_prec > 0);
+		      this_exp = this_min_exp + this_prec - 1;
+		      assert (this_exp
+			      == mpfr_get_exp (inputs[i].value.f) - 1);
+		      this_num_ones = 1;
+		      while ((size_t) this_num_ones < bits
+			     && mpz_tstbit (tmp, bits - 1 - this_num_ones))
+			this_num_ones++;
+		      mpz_clear (tmp);
+		      if (have_fp_arg)
+			{
+			  if (this_exp > max_exp
+			      || (this_exp == max_exp
+				  && this_num_ones > num_ones))
+			    {
+			      max_exp = this_exp;
+			      num_ones = this_num_ones;
+			    }
+			  if (this_min_exp < min_exp)
+			    min_exp = this_min_exp;
+			  if (this_prec > max_prec)
+			    max_prec = this_prec;
+			}
+		      else
+			{
+			  max_exp = this_exp;
+			  num_ones = this_num_ones;
+			  min_exp = this_min_exp;
+			  max_prec = this_prec;
+			}
+		      have_fp_arg = true;
+		    }
+		  else
+		    {
+		      round_real (res, exc_before, exc_after,
+				  inputs[i].value.f, f);
+		      if (!mpfr_equal_p (res[rm_tonearest], inputs[i].value.f))
+			fits = false;
+		      for (rounding_mode m = rm_first_mode;
+			   m < rm_num_modes;
+			   m++)
+			mpfr_clear (res[m]);
+		      if (!fits)
+			break;
+		    }
 		}
 	    }
 	  if (!fits)
 	    continue;
-	  /* The inputs fit this type, so compute the ideal outputs
-	     and exceptions.  */
+	  /* The inputs fit this type if required to do so, so compute
+	     the ideal outputs and exceptions.  */
 	  mpfr_t all_res[MAX_NRET][rm_num_modes];
 	  unsigned int all_exc_before[MAX_NRET][rm_num_modes];
 	  unsigned int all_exc_after[MAX_NRET][rm_num_modes];
@@ -1899,18 +1981,30 @@ output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
 		  assert ((merged_exc_before[m] & (1U << exc_underflow)) != 0);
 		}
 	      unsigned int merged_exc = merged_exc_before[m];
-	      if (fprintf (fp, "= %s %s %s%s", tf->name,
-			   rounding_modes[m].name, fp_formats[f].name,
-			   long_cond) < 0)
-		error (EXIT_FAILURE, errno, "write to '%s'", filename);
+	      if (narrow)
+		{
+		  if (fprintf (fp, "= %s %s %s%s:arg_fmt(%d,%d,%d,%d)",
+			       tf->name, rounding_modes[m].name,
+			       fp_formats[f].name, long_cond, max_exp,
+			       num_ones, min_exp, max_prec) < 0)
+		    error (EXIT_FAILURE, errno, "write to '%s'", filename);
+		}
+	      else
+		{
+		  if (fprintf (fp, "= %s %s %s%s", tf->name,
+			       rounding_modes[m].name, fp_formats[f].name,
+			       long_cond) < 0)
+		    error (EXIT_FAILURE, errno, "write to '%s'", filename);
+		}
 	      /* Print inputs.  */
 	      for (size_t i = 0; i < tf->num_args; i++)
 		output_generic_value (fp, filename, &inputs[i], false,
-				      tf->arg_types[i], f, long_bits);
+				      tf->arg_types[i], long_bits);
 	      if (fputs (" :", fp) < 0)
 		error (EXIT_FAILURE, errno, "write to '%s'", filename);
 	      /* Print outputs.  */
 	      bool must_erange = false;
+	      bool some_underflow_zero = false;
 	      for (size_t i = 0; i < tf->num_ret; i++)
 		{
 		  generic_value g;
@@ -1928,6 +2022,10 @@ output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
 			  && (all_exc_before[i][m]
 			      & (1U << exc_underflow)) != 0)
 			must_erange = true;
+		      if (mpfr_zero_p (all_res[i][rm_towardzero])
+			  && (all_exc_before[i][m]
+			      & (1U << exc_underflow)) != 0)
+			some_underflow_zero = true;
 		      mpfr_init2 (g.value.f, fp_formats[f].mant_dig);
 		      assert_exact (mpfr_set (g.value.f, all_res[i][m],
 					      MPFR_RNDN));
@@ -1942,7 +2040,7 @@ output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
 		      abort ();
 		    }
 		  output_generic_value (fp, filename, &g, ignore_output[i],
-					tf->ret_types[i], f, long_bits);
+					tf->ret_types[i], long_bits);
 		  generic_value_free (&g);
 		}
 	      if (fputs (" :", fp) < 0)
@@ -1975,6 +2073,16 @@ output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
 		  default:
 		    break;
 		  }
+	      /* For the ibm128 format, expect incorrect overflowing
+		 results in rounding modes other than to nearest;
+		 likewise incorrect results where the result may
+		 underflow to 0.  */
+	      if (f == fp_ldbl_128ibm
+		  && m != rm_tonearest
+		  && (some_underflow_zero
+		      || (merged_exc_before[m] & (1U << exc_overflow)) != 0))
+		if (fputs (" xfail:ibm128-libgcc", fp) < 0)
+		  error (EXIT_FAILURE, errno, "write to '%s'", filename);
 	      /* Print exception flags and compute errno
 		 expectations where not already computed.  */
 	      bool may_edom = false;
@@ -2147,10 +2255,12 @@ output_for_one_input_case (FILE *fp, const char *filename, test_function *tf,
     generic_value_free (&generic_outputs[i]);
 }
 
-/* Generate test output data to FILENAME.  */
+/* Generate test output data for FUNCTION to FILENAME.  The function
+   is interpreted as rounding its results to a narrower type if
+   NARROW.  */
 
 static void
-generate_output (const char *filename)
+generate_output (const char *function, bool narrow, const char *filename)
 {
   FILE *fp = fopen (filename, "w");
   if (fp == NULL)
@@ -2158,13 +2268,16 @@ generate_output (const char *filename)
   for (size_t i = 0; i < ARRAY_SIZE (test_functions); i++)
     {
       test_function *tf = &test_functions[i];
+      if (strcmp (tf->name, function) != 0)
+	continue;
       for (size_t j = 0; j < tf->num_tests; j++)
 	{
 	  input_test *it = &tf->tests[j];
 	  if (fputs (it->line, fp) < 0)
 	    error (EXIT_FAILURE, errno, "write to '%s'", filename);
 	  for (size_t k = 0; k < it->num_input_cases; k++)
-	    output_for_one_input_case (fp, filename, tf, it, it->inputs[k]);
+	    output_for_one_input_case (fp, filename, tf, narrow,
+				       it, it->inputs[k]);
 	}
     }
   if (fclose (fp) != 0)
@@ -2174,12 +2287,30 @@ generate_output (const char *filename)
 int
 main (int argc, char **argv)
 {
-  if (argc != 3)
-    error (EXIT_FAILURE, 0, "usage: gen-auto-libm-tests <input> <output>");
+  if (argc != 4
+      && !(argc == 5 && strcmp (argv[1], "--narrow") == 0))
+    error (EXIT_FAILURE, 0,
+	   "usage: gen-auto-libm-tests [--narrow] <input> <func> <output>");
+  bool narrow;
   const char *input_filename = argv[1];
-  const char *output_filename = argv[2];
+  const char *function = argv[2];
+  const char *output_filename = argv[3];
+  if (argc == 4)
+    {
+      narrow = false;
+      input_filename = argv[1];
+      function = argv[2];
+      output_filename = argv[3];
+    }
+  else
+    {
+      narrow = true;
+      input_filename = argv[2];
+      function = argv[3];
+      output_filename = argv[4];
+    }
   init_fp_formats ();
   read_input (input_filename);
-  generate_output (output_filename);
+  generate_output (function, narrow, output_filename);
   exit (EXIT_SUCCESS);
 }

@@ -26,13 +26,16 @@ static char rcsid[] = "$NetBSD: $";
  *   Special cases:
  */
 
+#include <errno.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
 long double __nextafterl(long double x, long double y)
 {
-	u_int32_t hx,hy,ix,iy;
-	u_int32_t lx,ly;
+	uint32_t hx,hy,ix,iy;
+	uint32_t lx,ly;
 	int32_t esx,esy;
 
 	GET_LDOUBLE_WORDS(esx,hx,lx,x);
@@ -85,7 +88,7 @@ long double __nextafterl(long double x, long double y)
 	    if(esy>=0||(esx>esy||((esx==esy)&&(hx>hy||((hx==hy)&&(lx>ly)))))){
 	      /* x < y, x -= ulp */
 		if(lx==0) {
-		    if (hx <= 0x80000000) {
+		    if (hx <= 0x80000000 && esx != 0xffff8000) {
 			esx -= 1;
 			hx = hx - 1;
 			if ((esx&0x7fff) > 0)
@@ -109,14 +112,16 @@ long double __nextafterl(long double x, long double y)
 	if(esy==0x7fff) {
 	    long double u = x + x;	/* overflow  */
 	    math_force_eval (u);
+	    __set_errno (ERANGE);
 	}
 	if(esy==0) {
 	    long double u = x*x;		/* underflow */
 	    math_force_eval (u);		/* raise underflow flag */
+	    __set_errno (ERANGE);
 	}
 	SET_LDOUBLE_WORDS(x,esx,hx,lx);
 	return x;
 }
-weak_alias (__nextafterl, nextafterl)
+libm_alias_ldouble (__nextafter, nextafter)
 strong_alias (__nextafterl, __nexttowardl)
 weak_alias (__nextafterl, nexttowardl)

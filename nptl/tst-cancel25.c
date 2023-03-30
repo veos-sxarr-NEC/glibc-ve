@@ -1,7 +1,8 @@
-#include <pthreadP.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <internal-signals.h>
 
 
 static pthread_barrier_t b;
@@ -167,5 +168,4 @@ do_test (void)
 }
 
 #define TEST_FUNCTION do_test ()
-#define TIMEOUT 4
 #include "../test-skeleton.c"

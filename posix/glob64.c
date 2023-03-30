@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,12 +13,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stddef.h>
 #include <sys/types.h>
 #include <glob.h>
 #include <errno.h>
+
+#ifdef GLOB_ATTRIBUTE
+# define GLOB_ATTRIBUTE
+#endif
 
 /* Do glob searching for PATTERN, placing results in PGLOB.
    The bits defined above may be set in FLAGS.
@@ -29,6 +33,7 @@
    If memory cannot be allocated for PGLOB, GLOB_NOSPACE is returned.
    Otherwise, `glob' returns zero.  */
 int
+GLOB_ATTRIBUTE
 glob64 (const char *pattern, int flags,
 	int (*errfunc) (const char *, int), glob64_t *pglob)
 {
@@ -42,11 +47,5 @@ glob64 (const char *pattern, int flags,
   return GLOB_NOSYS;
 }
 libc_hidden_def (glob64)
-
-void
-globfree64 (glob64_t *pglob)
-{
-}
-libc_hidden_def (globfree64)
 
 stub_warning (glob64)

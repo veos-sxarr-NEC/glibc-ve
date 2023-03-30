@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -29,6 +29,7 @@
 #include <tls.h>
 #include <list.h>
 #include <lowlevellock.h>
+#include <futex-internal.h>
 #include <kernel-features.h>
 #include <stack-aliasing.h>
 
@@ -123,11 +124,6 @@ static uintptr_t in_flight_stack;
    initialize this, since it's done in __pthread_initialize_minimal.  */
 list_t __stack_user __attribute__ ((nocommon));
 hidden_data_def (__stack_user)
-
-#if COLORING_INCREMENT != 0
-/* Number of threads created.  */
-static unsigned int nptl_ncreated;
-#endif
 
 
 /* Check whether the stack is still used or not.  */
@@ -244,9 +240,7 @@ get_cached_stack (size_t *sizep, void **memp)
   /* Clear the DTV.  */
   dtv_t *dtv = GET_DTV (TLS_TPADJ (result));
   for (size_t cnt = 0; cnt < dtv[-1].counter; ++cnt)
-    if (! dtv[1 + cnt].pointer.is_static
-	&& dtv[1 + cnt].pointer.val != TLS_DTV_UNALLOCATED)
-      free (dtv[1 + cnt].pointer.val);
+    free (dtv[1 + cnt].pointer.to_free);
   memset (dtv, '\0', (dtv[-1].counter + 1) * sizeof (dtv_t));
 
   /* Re-initialize the TLS.  */
@@ -257,8 +251,8 @@ get_cached_stack (size_t *sizep, void **memp)
 
 
 /* Free stacks until cache size is lower than LIMIT.  */
-void
-__free_stacks (size_t limit)
+static void
+free_stacks (size_t limit)
 {
   /* We reduce the size of the cache.  Remove the last entries until
      the size is below the limit.  */
@@ -284,7 +278,7 @@ __free_stacks (size_t limit)
 
 	  /* Remove this block.  This should never fail.  If it does
 	     something is really wrong.  */
-	  if (munmap (curr->stackblock, curr->stackblock_size) != 0)
+	  if (__munmap (curr->stackblock, curr->stackblock_size) != 0)
 	    abort ();
 
 	  /* Maybe we have freed enough.  */
@@ -294,6 +288,12 @@ __free_stacks (size_t limit)
     }
 }
 
+/* Free all the stacks on cleanup.  */
+void
+__nptl_stacks_freeres (void)
+{
+  free_stacks (0);
+}
 
 /* Add a stack frame which is not used anymore to the stack.  Must be
    called with the cache lock held.  */
@@ -308,12 +308,11 @@ queue_stack (struct pthread *stack)
 
   stack_cache_actsize += stack->stackblock_size;
   if (__glibc_unlikely (stack_cache_actsize > stack_cache_maxsize))
-    __free_stacks (stack_cache_maxsize);
+    free_stacks (stack_cache_maxsize);
 }
 
 
 static int
-internal_function
 change_stack_perm (struct pthread *pd
 #ifdef NEED_SEPARATE_REGISTER_STACK
 		   , size_t pagemask
@@ -334,12 +333,75 @@ change_stack_perm (struct pthread *pd
 #else
 # error "Define either _STACK_GROWS_DOWN or _STACK_GROWS_UP"
 #endif
-  if (mprotect (stack, len, PROT_READ | PROT_WRITE | PROT_EXEC) != 0)
+  if (__mprotect (stack, len, PROT_READ | PROT_WRITE | PROT_EXEC) != 0)
     return errno;
 
   return 0;
 }
 
+/* Return the guard page position on allocated stack.  */
+static inline char *
+__attribute ((always_inline))
+guard_position (void *mem, size_t size, size_t guardsize, struct pthread *pd,
+		size_t pagesize_m1)
+{
+#ifdef NEED_SEPARATE_REGISTER_STACK
+  return mem + (((size - guardsize) / 2) & ~pagesize_m1);
+#elif _STACK_GROWS_DOWN
+  return mem;
+#elif _STACK_GROWS_UP
+  return (char *) (((uintptr_t) pd - guardsize) & ~pagesize_m1);
+#endif
+}
+
+/* Based on stack allocated with PROT_NONE, setup the required portions with
+   'prot' flags based on the guard page position.  */
+static inline int
+setup_stack_prot (char *mem, size_t size, char *guard, size_t guardsize,
+		  const int prot)
+{
+  char *guardend = guard + guardsize;
+#if _STACK_GROWS_DOWN && !defined(NEED_SEPARATE_REGISTER_STACK)
+  /* As defined at guard_position, for architectures with downward stack
+     the guard page is always at start of the allocated area.  */
+  if (__mprotect (guardend, size - guardsize, prot) != 0)
+    return errno;
+#else
+  size_t mprots1 = (uintptr_t) guard - (uintptr_t) mem;
+  if (__mprotect (mem, mprots1, prot) != 0)
+    return errno;
+  size_t mprots2 = ((uintptr_t) mem + size) - (uintptr_t) guardend;
+  if (__mprotect (guardend, mprots2, prot) != 0)
+    return errno;
+#endif
+  return 0;
+}
+
+/* Mark the memory of the stack as usable to the kernel.  It frees everything
+   except for the space used for the TCB itself.  */
+static __always_inline void
+advise_stack_range (void *mem, size_t size, uintptr_t pd, size_t guardsize)
+{
+  uintptr_t sp = (uintptr_t) CURRENT_STACK_FRAME;
+  size_t pagesize_m1 = __getpagesize () - 1;
+#if _STACK_GROWS_DOWN && !defined(NEED_SEPARATE_REGISTER_STACK)
+  size_t freesize = (sp - (uintptr_t) mem) & ~pagesize_m1;
+  assert (freesize < size);
+  if (freesize > PTHREAD_STACK_MIN)
+    __madvise (mem, freesize - PTHREAD_STACK_MIN, MADV_DONTNEED);
+#else
+  /* Page aligned start of memory to free (higher than or equal
+     to current sp plus the minimum stack size).  */
+  uintptr_t freeblock = (sp + PTHREAD_STACK_MIN + pagesize_m1) & ~pagesize_m1;
+  uintptr_t free_end = (pd - guardsize) & ~pagesize_m1;
+  if (free_end > freeblock)
+    {
+      size_t freesize = free_end - freeblock;
+      assert (freesize < size);
+      __madvise ((void*) freeblock, freesize, MADV_DONTNEED);
+    }
+#endif
+}
 
 /* Returns a usable stack for a new thread either by allocating a
    new stack or reusing a cached stack of sufficient size.
@@ -352,7 +414,6 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
   struct pthread *pd;
   size_t size;
   size_t pagesize_m1 = __getpagesize () - 1;
-  void *stacktop;
 
   assert (powerof2 (pagesize_m1 + 1));
   assert (TCB_ALIGNMENT >= STACK_ALIGN);
@@ -372,6 +433,13 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
   if (__glibc_unlikely (attr->flags & ATTR_FLAG_STACKADDR))
     {
       uintptr_t adj;
+      char *stackaddr = (char *) attr->stackaddr;
+
+      /* Assume the same layout as the _STACK_GROWS_DOWN case, with struct
+	 pthread at the top of the stack block.  Later we adjust the guard
+	 location and stack address to match the _STACK_GROWS_UP case.  */
+      if (_STACK_GROWS_UP)
+	stackaddr += attr->stacksize;
 
       /* If the user also specified the size of the stack make sure it
 	 is large enough.  */
@@ -381,11 +449,11 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 
       /* Adjust stack size for alignment of the TLS block.  */
 #if TLS_TCB_AT_TP
-      adj = ((uintptr_t) attr->stackaddr - TLS_TCB_SIZE)
+      adj = ((uintptr_t) stackaddr - TLS_TCB_SIZE)
 	    & __static_tls_align_m1;
       assert (size > adj + TLS_TCB_SIZE);
 #elif TLS_DTV_AT_TP
-      adj = ((uintptr_t) attr->stackaddr - __static_tls_size)
+      adj = ((uintptr_t) stackaddr - __static_tls_size)
 	    & __static_tls_align_m1;
       assert (size > adj);
 #endif
@@ -395,10 +463,10 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	 the stack.  It is the user's responsibility to do this if it
 	 is wanted.  */
 #if TLS_TCB_AT_TP
-      pd = (struct pthread *) ((uintptr_t) attr->stackaddr
+      pd = (struct pthread *) ((uintptr_t) stackaddr
 			       - TLS_TCB_SIZE - adj);
 #elif TLS_DTV_AT_TP
-      pd = (struct pthread *) (((uintptr_t) attr->stackaddr
+      pd = (struct pthread *) (((uintptr_t) stackaddr
 				- __static_tls_size - adj)
 			       - TLS_PRE_TCB_SIZE);
 #endif
@@ -410,7 +478,7 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
       pd->specific[0] = pd->specific_1stblock;
 
       /* Remember the stack-related values.  */
-      pd->stackblock = (char *) attr->stackaddr - size;
+      pd->stackblock = (char *) stackaddr - size;
       pd->stackblock_size = size;
 
       /* This is a user-provided stack.  It will not be queued in the
@@ -423,18 +491,9 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
       __pthread_multiple_threads = *__libc_multiple_threads_ptr = 1;
 #endif
 
-#ifndef __ASSUME_PRIVATE_FUTEX
-      /* The thread must know when private futexes are supported.  */
-      pd->header.private_futex = THREAD_GETMEM (THREAD_SELF,
-						header.private_futex);
-#endif
-
 #ifdef NEED_DL_SYSINFO
       SETUP_THREAD_SYSINFO (pd);
 #endif
-
-      /* The process ID is also the same as that of the caller.  */
-      pd->pid = THREAD_GETMEM (THREAD_SELF, pid);
 
       /* Don't allow setxid until cloned.  */
       pd->setxid_futex = -1;
@@ -465,14 +524,6 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
       const int prot = (PROT_READ | PROT_WRITE
 			| ((GL(dl_stack_flags) & PF_X) ? PROT_EXEC : 0));
 
-#if COLORING_INCREMENT != 0
-      /* Add one more page for stack coloring.  Don't do it for stacks
-	 with 16 times pagesize or larger.  This might just cause
-	 unnecessary misalignment.  */
-      if (size <= 16 * pagesize_m1)
-	size += pagesize_m1 + 1;
-#endif
-
       /* Adjust the stack size for alignment.  */
       size &= ~__static_tls_align_m1;
       assert (size != 0);
@@ -480,6 +531,10 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
       /* Make sure the size of the stack is enough for the guard and
 	 eventually the thread descriptor.  */
       guardsize = (attr->guardsize + pagesize_m1) & ~pagesize_m1;
+      if (guardsize < attr->guardsize || size + guardsize < guardsize)
+	/* Arithmetic overflow.  */
+	return EINVAL;
+      size += guardsize;
       if (__builtin_expect (size < ((guardsize + __static_tls_size
 				     + MINIMAL_REST_STACK + pagesize_m1)
 				    & ~pagesize_m1),
@@ -501,8 +556,11 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	    size += pagesize_m1 + 1;
 #endif
 
-	  mem = mmap (NULL, size, prot,
-		      MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+	  /* If a guard page is required, avoid committing memory by first
+	     allocate with PROT_NONE and then reserve with required permission
+	     excluding the guard page.  */
+	  mem = __mmap (NULL, size, (guardsize == 0) ? prot : PROT_NONE,
+			MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
 
 	  if (__glibc_unlikely (mem == MAP_FAILED))
 	    return errno;
@@ -511,42 +569,36 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	     So we can never get a null pointer back from mmap.  */
 	  assert (mem != NULL);
 
-#if COLORING_INCREMENT != 0
-	  /* Atomically increment NCREATED.  */
-	  unsigned int ncreated = atomic_increment_val (&nptl_ncreated);
-
-	  /* We chose the offset for coloring by incrementing it for
-	     every new thread by a fixed amount.  The offset used
-	     module the page size.  Even if coloring would be better
-	     relative to higher alignment values it makes no sense to
-	     do it since the mmap() interface does not allow us to
-	     specify any alignment for the returned memory block.  */
-	  size_t coloring = (ncreated * COLORING_INCREMENT) & pagesize_m1;
-
-	  /* Make sure the coloring offsets does not disturb the alignment
-	     of the TCB and static TLS block.  */
-	  if (__glibc_unlikely ((coloring & __static_tls_align_m1) != 0))
-	    coloring = (((coloring + __static_tls_align_m1)
-			 & ~(__static_tls_align_m1))
-			& ~pagesize_m1);
-#else
-	  /* Unless specified we do not make any adjustments.  */
-# define coloring 0
-#endif
-
 	  /* Place the thread descriptor at the end of the stack.  */
 #if TLS_TCB_AT_TP
-	  pd = (struct pthread *) ((char *) mem + size - coloring) - 1;
+	  pd = (struct pthread *) ((((uintptr_t) mem + size)
+				    - TLS_TCB_SIZE)
+				   & ~__static_tls_align_m1);
 #elif TLS_DTV_AT_TP
-	  pd = (struct pthread *) ((((uintptr_t) mem + size - coloring
+	  pd = (struct pthread *) ((((uintptr_t) mem + size
 				    - __static_tls_size)
 				    & ~__static_tls_align_m1)
 				   - TLS_PRE_TCB_SIZE);
 #endif
 
+	  /* Now mprotect the required region excluding the guard area.  */
+	  if (__glibc_likely (guardsize > 0))
+	    {
+	      char *guard = guard_position (mem, size, guardsize, pd,
+					    pagesize_m1);
+	      if (setup_stack_prot (mem, size, guard, guardsize, prot) != 0)
+		{
+		  __munmap (mem, size);
+		  return errno;
+		}
+	    }
+
 	  /* Remember the stack-related values.  */
 	  pd->stackblock = mem;
 	  pd->stackblock_size = size;
+	  /* Update guardsize for newly allocated guardsize to avoid
+	     an mprotect in guard resize below.  */
+	  pd->guardsize = guardsize;
 
 	  /* We allocated the first block thread-specific data array.
 	     This address will not change for the lifetime of this
@@ -559,21 +611,12 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	  __pthread_multiple_threads = *__libc_multiple_threads_ptr = 1;
 #endif
 
-#ifndef __ASSUME_PRIVATE_FUTEX
-	  /* The thread must know when private futexes are supported.  */
-	  pd->header.private_futex = THREAD_GETMEM (THREAD_SELF,
-						    header.private_futex);
-#endif
-
 #ifdef NEED_DL_SYSINFO
 	  SETUP_THREAD_SYSINFO (pd);
 #endif
 
 	  /* Don't allow setxid until cloned.  */
 	  pd->setxid_futex = -1;
-
-	  /* The process ID is also the same as that of the caller.  */
-	  pd->pid = THREAD_GETMEM (THREAD_SELF, pid);
 
 	  /* Allocate the DTV for this thread.  */
 	  if (_dl_allocate_tls (TLS_TPADJ (pd)) == NULL)
@@ -582,7 +625,7 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	      assert (errno == ENOMEM);
 
 	      /* Free the stack memory we just allocated.  */
-	      (void) munmap (mem, size);
+	      (void) __munmap (mem, size);
 
 	      return errno;
 	    }
@@ -612,7 +655,7 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	      if (err != 0)
 		{
 		  /* Free the stack memory we just allocated.  */
-		  (void) munmap (mem, size);
+		  (void) __munmap (mem, size);
 
 		  return err;
 		}
@@ -630,14 +673,9 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
       /* Create or resize the guard area if necessary.  */
       if (__glibc_unlikely (guardsize > pd->guardsize))
 	{
-#ifdef NEED_SEPARATE_REGISTER_STACK
-	  char *guard = mem + (((size - guardsize) / 2) & ~pagesize_m1);
-#elif _STACK_GROWS_DOWN
-	  char *guard = mem;
-# elif _STACK_GROWS_UP
-	  char *guard = (char *) (((uintptr_t) pd - guardsize) & ~pagesize_m1);
-#endif
-	  if (mprotect (guard, guardsize, PROT_NONE) != 0)
+	  char *guard = guard_position (mem, size, guardsize, pd,
+					pagesize_m1);
+	  if (__mprotect (guard, guardsize, PROT_NONE) != 0)
 	    {
 	    mprot_error:
 	      lll_lock (stack_cache_lock, LLL_PRIVATE);
@@ -655,7 +693,7 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 		 of memory caused problems we better do not use it
 		 anymore.  Uh, and we ignore possible errors.  There
 		 is nothing we could do.  */
-	      (void) munmap (mem, size);
+	      (void) __munmap (mem, size);
 
 	      return errno;
 	    }
@@ -672,20 +710,26 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 	  char *oldguard = mem + (((size - pd->guardsize) / 2) & ~pagesize_m1);
 
 	  if (oldguard < guard
-	      && mprotect (oldguard, guard - oldguard, prot) != 0)
+	      && __mprotect (oldguard, guard - oldguard, prot) != 0)
 	    goto mprot_error;
 
-	  if (mprotect (guard + guardsize,
+	  if (__mprotect (guard + guardsize,
 			oldguard + pd->guardsize - guard - guardsize,
 			prot) != 0)
 	    goto mprot_error;
 #elif _STACK_GROWS_DOWN
-	  if (mprotect ((char *) mem + guardsize, pd->guardsize - guardsize,
+	  if (__mprotect ((char *) mem + guardsize, pd->guardsize - guardsize,
 			prot) != 0)
 	    goto mprot_error;
 #elif _STACK_GROWS_UP
-	  if (mprotect ((char *) pd - pd->guardsize,
-			pd->guardsize - guardsize, prot) != 0)
+         char *new_guard = (char *)(((uintptr_t) pd - guardsize)
+                                    & ~pagesize_m1);
+         char *old_guard = (char *)(((uintptr_t) pd - pd->guardsize)
+                                    & ~pagesize_m1);
+         /* The guard size difference might be > 0, but once rounded
+            to the nearest page the size difference might be zero.  */
+         if (new_guard > old_guard
+             && __mprotect (old_guard, new_guard - old_guard, prot) != 0)
 	    goto mprot_error;
 #endif
 
@@ -708,7 +752,7 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 				  - offsetof (pthread_mutex_t,
 					      __data.__list.__next));
   pd->robust_head.list_op_pending = NULL;
-#ifdef __PTHREAD_MUTEX_HAVE_PREV
+#if __PTHREAD_MUTEX_HAVE_PREV
   pd->robust_prev = &pd->robust_head;
 #endif
   pd->robust_head.list = &pd->robust_head;
@@ -716,21 +760,24 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
   /* We place the thread descriptor at the end of the stack.  */
   *pdp = pd;
 
-#if TLS_TCB_AT_TP
+#if _STACK_GROWS_DOWN
+  void *stacktop;
+
+# if TLS_TCB_AT_TP
   /* The stack begins before the TCB and the static TLS block.  */
   stacktop = ((char *) (pd + 1) - __static_tls_size);
-#elif TLS_DTV_AT_TP
+# elif TLS_DTV_AT_TP
   stacktop = (char *) (pd - 1);
-#endif
+# endif
 
-#ifdef NEED_SEPARATE_REGISTER_STACK
+# ifdef NEED_SEPARATE_REGISTER_STACK
   *stack = pd->stackblock;
   *stacksize = stacktop - *stack;
-#elif _STACK_GROWS_DOWN
+# else
   *stack = stacktop;
-#elif _STACK_GROWS_UP
+# endif
+#else
   *stack = pd->stackblock;
-  assert (*stack > 0);
 #endif
 
   return 0;
@@ -738,7 +785,6 @@ allocate_stack (const struct pthread_attr *attr, struct pthread **pdp,
 
 
 void
-internal_function
 __deallocate_stack (struct pthread *pd)
 {
   lll_lock (stack_cache_lock, LLL_PRIVATE);
@@ -762,7 +808,6 @@ __deallocate_stack (struct pthread *pd)
 
 
 int
-internal_function
 __make_stacks_executable (void **stack_endp)
 {
   /* First the main thread's stack.  */
@@ -865,9 +910,6 @@ __reclaim_stacks (void)
 	  /* This marks the stack as free.  */
 	  curp->tid = 0;
 
-	  /* The PID field must be initialized for the new process.  */
-	  curp->pid = self->pid;
-
 	  /* Account for the size of the stack.  */
 	  stack_cache_actsize += curp->stackblock_size;
 
@@ -891,13 +933,6 @@ __reclaim_stacks (void)
 		  }
 	    }
 	}
-    }
-
-  /* Reset the PIDs in any cached stacks.  */
-  list_for_each (runp, &stack_cache)
-    {
-      struct pthread *curp = list_entry (runp, struct pthread, list);
-      curp->pid = self->pid;
     }
 
   /* Add the stack of all running threads to the cache.  */
@@ -928,57 +963,7 @@ __reclaim_stacks (void)
 }
 
 
-#if HP_TIMING_AVAIL
-# undef __find_thread_by_id
-/* Find a thread given the thread ID.  */
-attribute_hidden
-struct pthread *
-__find_thread_by_id (pid_t tid)
-{
-  struct pthread *result = NULL;
-
-  lll_lock (stack_cache_lock, LLL_PRIVATE);
-
-  /* Iterate over the list with system-allocated threads first.  */
-  list_t *runp;
-  list_for_each (runp, &stack_used)
-    {
-      struct pthread *curp;
-
-      curp = list_entry (runp, struct pthread, list);
-
-      if (curp->tid == tid)
-	{
-	  result = curp;
-	  goto out;
-	}
-    }
-
-  /* Now the list with threads using user-allocated stacks.  */
-  list_for_each (runp, &__stack_user)
-    {
-      struct pthread *curp;
-
-      curp = list_entry (runp, struct pthread, list);
-
-      if (curp->tid == tid)
-	{
-	  result = curp;
-	  goto out;
-	}
-    }
-
- out:
-  lll_unlock (stack_cache_lock, LLL_PRIVATE);
-
-  return result;
-}
-#endif
-
-
-#ifdef SIGSETXID
 static void
-internal_function
 setxid_mark_thread (struct xid_command *cmdp, struct pthread *t)
 {
   int ch;
@@ -987,7 +972,7 @@ setxid_mark_thread (struct xid_command *cmdp, struct pthread *t)
   if (t->setxid_futex == -1
       && ! atomic_compare_and_exchange_bool_acq (&t->setxid_futex, -2, -1))
     do
-      lll_futex_wait (&t->setxid_futex, -2, LLL_PRIVATE);
+      futex_wait_simple (&t->setxid_futex, -2, FUTEX_PRIVATE);
     while (t->setxid_futex == -2);
 
   /* Don't let the thread exit before the setxid handler runs.  */
@@ -1005,7 +990,7 @@ setxid_mark_thread (struct xid_command *cmdp, struct pthread *t)
 	  if ((ch & SETXID_BITMASK) == 0)
 	    {
 	      t->setxid_futex = 1;
-	      lll_futex_wake (&t->setxid_futex, 1, LLL_PRIVATE);
+	      futex_wake (&t->setxid_futex, 1, FUTEX_PRIVATE);
 	    }
 	  return;
 	}
@@ -1016,7 +1001,6 @@ setxid_mark_thread (struct xid_command *cmdp, struct pthread *t)
 
 
 static void
-internal_function
 setxid_unmark_thread (struct xid_command *cmdp, struct pthread *t)
 {
   int ch;
@@ -1032,21 +1016,20 @@ setxid_unmark_thread (struct xid_command *cmdp, struct pthread *t)
 
   /* Release the futex just in case.  */
   t->setxid_futex = 1;
-  lll_futex_wake (&t->setxid_futex, 1, LLL_PRIVATE);
+  futex_wake (&t->setxid_futex, 1, FUTEX_PRIVATE);
 }
 
 
 static int
-internal_function
 setxid_signal_thread (struct xid_command *cmdp, struct pthread *t)
 {
   if ((t->cancelhandling & SETXID_BITMASK) == 0)
     return 0;
 
   int val;
+  pid_t pid = __getpid ();
   INTERNAL_SYSCALL_DECL (err);
-  val = INTERNAL_SYSCALL (tgkill, err, 3, THREAD_GETMEM (THREAD_SELF, pid),
-			  t->tid, SIGSETXID);
+  val = INTERNAL_SYSCALL_CALL (tgkill, err, pid, t->tid, SIGSETXID);
 
   /* If this failed, it must have had not started yet or else exited.  */
   if (!INTERNAL_SYSCALL_ERROR_P (val, err))
@@ -1072,8 +1055,13 @@ __nptl_setxid_error (struct xid_command *cmdp, int error)
       if (olderror == error)
 	break;
       if (olderror != -1)
-	/* Mismatch between current and previous results.  */
-	abort ();
+	{
+	  /* Mismatch between current and previous results.  Save the
+	     error value to memory so that is not clobbered by the
+	     abort function and preserved in coredumps.  */
+	  volatile int xid_err __attribute__((unused)) = error;
+	  abort ();
+	}
     }
   while (atomic_compare_and_exchange_bool_acq (&cmdp->error, error, -1));
 }
@@ -1141,7 +1129,8 @@ __nptl_setxid (struct xid_command *cmdp)
       int cur = cmdp->cntr;
       while (cur != 0)
 	{
-	  lll_futex_wait (&cmdp->cntr, cur, LLL_PRIVATE);
+	  futex_wait_simple ((unsigned int *) &cmdp->cntr, cur,
+			     FUTEX_PRIVATE);
 	  cur = cmdp->cntr;
 	}
     }
@@ -1184,13 +1173,10 @@ __nptl_setxid (struct xid_command *cmdp)
   lll_unlock (stack_cache_lock, LLL_PRIVATE);
   return result;
 }
-#endif  /* SIGSETXID.  */
-
 
 static inline void __attribute__((always_inline))
 init_one_static_tls (struct pthread *curp, struct link_map *map)
 {
-  dtv_t *dtv = GET_DTV (TLS_TPADJ (curp));
 # if TLS_TCB_AT_TP
   void *dest = (char *) curp - map->l_tls_offset;
 # elif TLS_DTV_AT_TP
@@ -1198,10 +1184,6 @@ init_one_static_tls (struct pthread *curp, struct link_map *map)
 # else
 #  error "Either TLS_TCB_AT_TP or TLS_DTV_AT_TP must be defined"
 # endif
-
-  /* Fill in the DTV slot so that a later LD/GD access will find it.  */
-  dtv[map->l_tls_modid].pointer.val = dest;
-  dtv[map->l_tls_modid].pointer.is_static = true;
 
   /* Initialize the memory.  */
   memset (__mempcpy (dest, map->l_tls_initimage, map->l_tls_initimage_size),
@@ -1254,7 +1236,8 @@ __wait_lookup_done (void)
 	continue;
 
       do
-	lll_futex_wait (gscope_flagp, THREAD_GSCOPE_FLAG_WAIT, LLL_PRIVATE);
+	futex_wait_simple ((unsigned int *) gscope_flagp,
+			   THREAD_GSCOPE_FLAG_WAIT, FUTEX_PRIVATE);
       while (*gscope_flagp == THREAD_GSCOPE_FLAG_WAIT);
     }
 
@@ -1276,7 +1259,8 @@ __wait_lookup_done (void)
 	continue;
 
       do
-	lll_futex_wait (gscope_flagp, THREAD_GSCOPE_FLAG_WAIT, LLL_PRIVATE);
+	futex_wait_simple ((unsigned int *) gscope_flagp,
+			   THREAD_GSCOPE_FLAG_WAIT, FUTEX_PRIVATE);
       while (*gscope_flagp == THREAD_GSCOPE_FLAG_WAIT);
     }
 

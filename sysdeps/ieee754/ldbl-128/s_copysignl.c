@@ -13,7 +13,7 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
+#if defined (LIBM_SCCS) && ! defined (lint)
 static char rcsid[] = "$NetBSD: $";
 #endif
 
@@ -23,16 +23,25 @@ static char rcsid[] = "$NetBSD: $";
  * with the sign bit of y.
  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
+#include <math-use-builtins.h>
 
-long double __copysignl(long double x, long double y)
+_Float128
+__copysignl (_Float128 x, _Float128 y)
 {
-	u_int64_t hx,hy;
-	GET_LDOUBLE_MSW64(hx,x);
-	GET_LDOUBLE_MSW64(hy,y);
-	SET_LDOUBLE_MSW64(x,(hx&0x7fffffffffffffffULL)
-			    |(hy&0x8000000000000000ULL));
-        return x;
+#if USE_COPYSIGNL_BUILTIN
+  return __builtin_copysignl (x, y);
+#else
+  /* Use generic implementation.  */
+  uint64_t hx, hy;
+  GET_LDOUBLE_MSW64 (hx, x);
+  GET_LDOUBLE_MSW64 (hy, y);
+  SET_LDOUBLE_MSW64 (x, (hx & 0x7fffffffffffffffULL)
+		     | (hy & 0x8000000000000000ULL));
+  return x;
+#endif /* ! USE_COPYSIGNL_BUILTIN  */
 }
-weak_alias (__copysignl, copysignl)
+libm_alias_ldouble (__copysign, copysign)

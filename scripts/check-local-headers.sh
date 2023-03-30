@@ -1,5 +1,5 @@
-#! /bin/bash
-# Copyright (C) 2005-2015 Free Software Foundation, Inc.
+#!/bin/bash
+# Copyright (C) 2005-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 #
 includedir="$1"
 objpfx="$2"
@@ -33,7 +33,7 @@ exec ${AWK} -v includedir="$includedir" '
 BEGIN {
   status = 0
   exclude = "^" includedir \
-    "/(.*-.*-.*/|)(asm[-/]|arch|linux/|selinux/|mach/|gd|nss3/|c\\+\\+/|sys/(capability|sdt(|-config))\\.h|libaudit\\.h)"
+    "/(.*-.*-.*/|.*-.*/|)(asm[-/]|arch|linux/|selinux/|mach/|mach_debug/|device/|hurd/(((hurd|ioctl)_types|paths)\\.h|ioctls\\.defs|ihash\\.h)|cthreads\\.h|gd|nss3/|nspr4?/|c\\+\\+/|sys/(capability|sdt(|-config))\\.h|libaudit\\.h)"
 }
 /^[^ ]/ && $1 ~ /.*:/ { obj = $1 }
 {

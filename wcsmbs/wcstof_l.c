@@ -1,5 +1,5 @@
 /* Convert string representing a number to integer value, using given locale.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,18 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stddef.h>
-#include <xlocale.h>
+#include <locale.h>
 
 
 #define	USE_WIDE_CHAR	1
-
-extern float ____wcstof_l_internal (const wchar_t *, wchar_t **, int,
-				    __locale_t);
-extern unsigned long long int ____wcstoull_l_internal (const wchar_t *,
-						       wchar_t **, int, int,
-						       __locale_t);
 
 #include <stdlib/strtof_l.c>

@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
   The GNU C Library is free software; you can redistribute it and/or
@@ -13,8 +13,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef _FENV_H
 # error "Never use <bits/fenv.h> directly; include <fenv.h> instead."
@@ -71,6 +71,23 @@ typedef unsigned short int fenv_t;
 /* If the default argument is used we use this value.  TODO 3*/
 #define FE_DFL_ENV	((const fenv_t *) -1l)
 
+#undef DELAY_FOR_VLFA_EXCEPTION
+#define DELAY_FOR_VLFA_EXCEPTION \
+"or %s34,14,(0)1\n\t" \
+"brgt.w  0,%s34,32\n\t" \
+"fencei\n\t" \
+"subs.w.sx  %s34,%s34,(63)0\n\t" \
+"br.l -24\n\t" \
+"nop\n\t"
+
 #ifdef __USE_GNU
 # define FE_NOMASK_ENV  ((const fenv_t *) -2)
+#endif
+
+#if __GLIBC_USE (IEC_60559_BFP_EXT_C2X)
+/* Type representing floating-point control modes.  */
+typedef unsigned short int femode_t;
+
+/* Default floating-point control modes.  */
+# define FE_DFL_MODE    ((const femode_t *) -1L)
 #endif

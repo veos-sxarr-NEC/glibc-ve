@@ -1,4 +1,4 @@
-/* Copyright (c) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@vt.uni-paderborn.de>, 1997.
 
@@ -14,10 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <rpcsvc/nis.h>
+#include <shlib-compat.h>
 
 #include "nis_xdr.h"
 #include "nis_intern.h"
@@ -148,6 +149,7 @@ nis_getservlist (const_nis_name dir)
 
   return serv;
 }
+libnsl_hidden_nolink_def (nis_getservlist, GLIBC_2_1)
 
 void
 nis_freeservlist (nis_server **serv)
@@ -166,3 +168,4 @@ nis_freeservlist (nis_server **serv)
     }
   free (serv);
 }
+libnsl_hidden_nolink_def (nis_freeservlist, GLIBC_2_1)

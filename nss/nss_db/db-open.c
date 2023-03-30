@@ -1,5 +1,5 @@
 /* Common database routines for nss_db.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -36,11 +36,7 @@ internal_setent (const char *file, struct nss_db_map *mapping)
 {
   enum nss_status status = NSS_STATUS_UNAVAIL;
 
-  int mode = O_RDONLY | O_LARGEFILE;
-#ifdef O_CLOEXEC
-  mode |= O_CLOEXEC;
-#endif
-  int fd = open_not_cancel_2 (file, mode);
+  int fd = __open_nocancel (file, O_RDONLY | O_LARGEFILE | O_CLOEXEC);
   if (fd != -1)
     {
       struct nss_db_header header;
@@ -56,7 +52,7 @@ internal_setent (const char *file, struct nss_db_map *mapping)
 	    status = NSS_STATUS_TRYAGAIN;
 	}
 
-      close_not_cancel_no_status (fd);
+      __close_nocancel_nostatus (fd);
     }
 
   return status;
@@ -67,5 +63,9 @@ internal_setent (const char *file, struct nss_db_map *mapping)
 void
 internal_endent (struct nss_db_map *mapping)
 {
-  munmap (mapping->header, mapping->len);
+  if (mapping->header != NULL)
+    {
+      munmap (mapping->header, mapping->len);
+      mapping->header = NULL;
+    }
 }

@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@vt.uni-paderborn.de>, 1997.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -28,11 +28,12 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 
 #include "nis_xdr.h"
 #include "nis_intern.h"
 #include <libnsl.h>
+#include <shlib-compat.h>
 
 static const struct timeval RPCTIMEOUT = {10, 0};
 static const struct timeval UDPTIMEOUT = {5, 0};
@@ -65,7 +66,7 @@ __nisbind_destroy (dir_binding *bind)
       clnt_destroy (bind->clnt);
     }
 }
-libnsl_hidden_def (__nisbind_destroy)
+libnsl_hidden_nolink_def (__nisbind_destroy, GLIBC_2_1)
 
 nis_error
 __nisbind_next (dir_binding *bind)
@@ -107,7 +108,7 @@ __nisbind_next (dir_binding *bind)
 
   return NIS_FAIL;
 }
-libnsl_hidden_def (__nisbind_next)
+libnsl_hidden_nolink_def (__nisbind_next, GLIBC_2_1)
 
 static struct ckey_cache_entry
 {
@@ -246,7 +247,7 @@ __nisbind_connect (dir_binding *dbp)
 
   return NIS_SUCCESS;
 }
-libnsl_hidden_def (__nisbind_connect)
+libnsl_hidden_nolink_def (__nisbind_connect, GLIBC_2_1)
 
 nis_error
 __nisbind_create (dir_binding *dbp, const nis_server *serv_val,
@@ -290,7 +291,7 @@ __nisbind_create (dir_binding *dbp, const nis_server *serv_val,
 
   return NIS_SUCCESS;
 }
-libnsl_hidden_def (__nisbind_create)
+libnsl_hidden_nolink_def (__nisbind_create, GLIBC_2_1)
 
 /* __nisbind_connect (dbp) must be run before calling this function !
    So we could use the same binding twice */
@@ -316,14 +317,15 @@ __do_niscall3 (dir_binding *dbp, u_long prog, xdrproc_t xargs, caddr_t req,
 	  switch (prog)
 	    {
 	    case NIS_IBLIST:
-	      if ((((nis_result *)resp)->status == NIS_CBRESULTS) &&
-		  (cb != NULL))
+	      if ((((nis_result *)resp)->status == NIS_CBRESULTS)
+		  && (cb != NULL))
 		{
 		  __nis_do_callback (dbp, &((nis_result *) resp)->cookie, cb);
 		  break;
 		}
 	      /* Yes, the missing break is correct. If we doesn't have to
 		 start a callback, look if we have to search another server */
+	      /* Fall through.  */
 	    case NIS_LOOKUP:
 	    case NIS_ADD:
 	    case NIS_MODIFY:
@@ -374,7 +376,7 @@ __do_niscall3 (dir_binding *dbp, u_long prog, xdrproc_t xargs, caddr_t req,
 
   return retcode;
 }
-libnsl_hidden_def (__do_niscall3)
+libnsl_hidden_nolink_def (__do_niscall3, GLIBC_PRIVATE)
 
 
 nis_error
@@ -501,7 +503,7 @@ rec_dirsearch (const_nis_name name, directory_obj *dir, nis_error *status)
 	    return dir;
 	  }
 	nis_free_directory (dir);
-	obj = calloc (1, sizeof(directory_obj));
+	obj = calloc (1, sizeof (directory_obj));
 	if (obj == NULL)
 	  {
 	    __free_fdresult (fd_res);
@@ -680,16 +682,18 @@ nis_server_cache_add (const_nis_name name, int search_parent,
   /* Choose which entry should be evicted from the cache.  */
   loc = &nis_server_cache[0];
   if (*loc != NULL)
-    for (i = 1; i < 16; ++i)
-      if (nis_server_cache[i] == NULL)
-	{
+    {
+      for (i = 1; i < 16; ++i)
+	if (nis_server_cache[i] == NULL)
+	  {
+	    loc = &nis_server_cache[i];
+	    break;
+	  }
+	else if ((*loc)->uses > nis_server_cache[i]->uses
+		 || ((*loc)->uses == nis_server_cache[i]->uses
+		     && (*loc)->expires > nis_server_cache[i]->expires))
 	  loc = &nis_server_cache[i];
-	  break;
-	}
-      else if ((*loc)->uses > nis_server_cache[i]->uses
-	       || ((*loc)->uses == nis_server_cache[i]->uses
-		   && (*loc)->expires > nis_server_cache[i]->expires))
-	loc = &nis_server_cache[i];
+    }
   old = *loc;
   *loc = new;
 
@@ -705,6 +709,7 @@ __nisfind_server (const_nis_name name, int search_parent,
   nis_error status;
   directory_obj *obj;
   struct timeval now;
+  struct timespec ts;
   unsigned int server_used = ~0;
   unsigned int current_ep = ~0;
 
@@ -714,7 +719,8 @@ __nisfind_server (const_nis_name name, int search_parent,
   if (*dir != NULL)
     return NIS_SUCCESS;
 
-  (void) gettimeofday (&now, NULL);
+  __clock_gettime (CLOCK_REALTIME, &ts);
+  TIMESPEC_TO_TIMEVAL (&now, &ts);
 
   if ((flags & NO_CACHE) == 0)
     *dir = nis_server_cache_search (name, search_parent, &server_used,
@@ -814,7 +820,7 @@ __prepare_niscall (const_nis_name name, directory_obj **dirp,
 
   return retcode;
 }
-libnsl_hidden_def (__prepare_niscall)
+libnsl_hidden_nolink_def (__prepare_niscall, GLIBC_PRIVATE)
 
 
 nis_error

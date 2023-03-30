@@ -1,5 +1,5 @@
 /* Return power of complex float value.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define __cpowf __cpowf_not_defined
 #define cpowf cpowf_not_defined
@@ -24,14 +24,18 @@
 
 #undef __cpowf
 #undef cpowf
-#define __cpowf internal_cpowf
 
 static _Complex float internal_cpowf (_Complex float x, _Complex float c);
 
-#include <math/s_cpowf.c>
-#include "cfloat-compat.h"
+#define M_DECL_FUNC(f) internal_cpowf
+#include <math-type-macros-float.h>
 
-#undef __cpowf
+/* Disable any aliasing from base template.  */
+#undef declare_mgen_alias
+#define declare_mgen_alias(__to, __from)
+
+#include <math/s_cpow_template.c>
+#include "cfloat-compat.h"
 
 c1_cfloat_rettype
 __c1_cpowf (c1_cfloat_decl (x), c1_cfloat_decl (c))
@@ -47,4 +51,4 @@ __c2_cpowf (c2_cfloat_decl (x), c2_cfloat_decl (c))
   return c2_cfloat_return (r);
 }
 
-cfloat_versions (cpowf);
+cfloat_versions (cpow);

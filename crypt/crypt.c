@@ -1,7 +1,7 @@
 /*
  * UFC-crypt: ultra fast crypt(3) implementation
  *
- * Copyright (C) 1991-2015 Free Software Foundation, Inc.
+ * Copyright (C) 1991-2020 Free Software Foundation, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; see the file COPYING.LIB.  If not,
- * see <http://www.gnu.org/licenses/>.
+ * see <https://www.gnu.org/licenses/>.
  *
  * @(#)crypt.c	2.25 12/20/96
  *
@@ -34,9 +34,8 @@
 #define SBA(sb, v) (*(long32*)((char*)(sb)+(v)))
 
 void
-_ufc_doit_r(itr, __data, res)
-     ufc_long itr, *res;
-     struct crypt_data * __restrict __data;
+_ufc_doit_r (ufc_long itr, struct crypt_data * __restrict __data,
+	     ufc_long *res)
 {
   int i;
   long32 s, *k;
@@ -80,9 +79,8 @@ _ufc_doit_r(itr, __data, res)
 #define SBA(sb, v) (*(long64*)((char*)(sb)+(v)))
 
 void
-_ufc_doit_r(itr, __data, res)
-     ufc_long itr, *res;
-     struct crypt_data * __restrict __data;
+_ufc_doit_r (ufc_long itr, struct crypt_data * __restrict __data,
+	     ufc_long *res)
 {
   int i;
   long64 l, r, s, *k;

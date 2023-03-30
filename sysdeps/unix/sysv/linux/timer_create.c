@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -35,10 +35,7 @@
 
 
 int
-timer_create (clock_id, evp, timerid)
-     clockid_t clock_id;
-     struct sigevent *evp;
-     timer_t *timerid;
+timer_create (clockid_t clock_id, struct sigevent *evp, timer_t *timerid)
 {
 #undef timer_create
   {

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,13 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdbool.h>
-
+#include <libc-diag.h>
 
 #ifndef ATTR
 # define ATTR NULL
@@ -45,11 +45,16 @@ do_test (void)
       return 1;
     }
 
+  /* This deliberately tests supplying a null pointer to a function whose
+     argument is marked __attribute__ ((nonnull)). */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_NEEDS_COMMENT (5, "-Wnonnull");
   if (!ATTR_NULL && pthread_mutexattr_destroy (ATTR) != 0)
     {
       puts ("mutexattr_destroy failed");
       return 1;
     }
+  DIAG_POP_NEEDS_COMMENT;
 
   if (pthread_mutex_lock (&m) != 0)
     {

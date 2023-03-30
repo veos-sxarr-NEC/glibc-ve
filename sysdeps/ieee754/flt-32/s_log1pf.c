@@ -13,8 +13,12 @@
  * ====================================================
  */
 
+#include <float.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libc-diag.h>
 
 static const float
 ln2_hi =   6.9313812256e-01,	/* 0x3f317180 */
@@ -48,7 +52,10 @@ __log1pf(float x)
 	    if(ax<0x31000000) {			/* |x| < 2**-29 */
 		math_force_eval(two25+x);	/* raise inexact */
 		if (ax<0x24800000)		/* |x| < 2**-54 */
+		  {
+		    math_check_force_underflow (x);
 		    return x;
+		  }
 		else
 		    return x - x*x*(float)0.5;
 	    }
@@ -93,7 +100,18 @@ __log1pf(float x)
 	s = f/((float)2.0+f);
 	z = s*s;
 	R = z*(Lp1+z*(Lp2+z*(Lp3+z*(Lp4+z*(Lp5+z*(Lp6+z*Lp7))))));
-	if(k==0) return f-(hfsq-s*(hfsq+R)); else
-		 return k*ln2_hi-((hfsq-(s*(hfsq+R)+(k*ln2_lo+c)))-f);
+	if (k == 0)
+	  return f - (hfsq - s * (hfsq + R));
+	else
+	  {
+	    /* With GCC 7 when compiling with -Os the compiler warns
+	       that c might be used uninitialized.  This can't be true
+	       because k must be 0 for c to be uninitialized and we
+	       handled that computation earlier without using c.  */
+	    DIAG_PUSH_NEEDS_COMMENT;
+	    DIAG_IGNORE_Os_NEEDS_COMMENT (7, "-Wmaybe-uninitialized");
+	    return k * ln2_hi - ((hfsq - (s * (hfsq + R)
+					  + (k * ln2_lo + c))) - f);
+	    DIAG_POP_NEEDS_COMMENT;
+	  }
 }
-weak_alias (__log1pf, log1pf)

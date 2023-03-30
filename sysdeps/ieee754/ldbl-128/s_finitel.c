@@ -25,12 +25,12 @@ static char rcsid[] = "$NetBSD: $";
 #include <math.h>
 #include <math_private.h>
 
-int __finitel(long double x)
+int __finitel(_Float128 x)
 {
 	int64_t hx;
 	GET_LDOUBLE_MSW64(hx,x);
-	return (int)((u_int64_t)((hx&0x7fffffffffffffffLL)
-				 -0x7fff000000000000LL)>>63);
+	return (int)((uint64_t)((hx&0x7fff000000000000LL)
+				-0x7fff000000000000LL)>>63);
 }
-hidden_def (__finitel)
+mathx_hidden_def (__finitel)
 weak_alias (__finitel, finitel)

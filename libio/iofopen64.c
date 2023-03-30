@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -29,18 +29,14 @@
 #include <stdlib.h>
 
 /* iofopen.c defines _IO_fopen64/fopen64 as aliases if O_LARGEFILE==0.  */
-#if !defined _LIBC || (defined O_LARGEFILE && O_LARGEFILE != 0)
+#if defined O_LARGEFILE && O_LARGEFILE != 0
 
-_IO_FILE *
-_IO_fopen64 (filename, mode)
-     const char *filename;
-     const char *mode;
+FILE *
+_IO_fopen64 (const char *filename, const char *mode)
 {
   return __fopen_internal (filename, mode, 0);
 }
 
-#ifdef weak_alias
 weak_alias (_IO_fopen64, fopen64)
-#endif
 
 #endif

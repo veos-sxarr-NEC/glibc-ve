@@ -1,5 +1,5 @@
 /* Conversion module for UTF-16.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1999.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <byteswap.h>
 #include <dlfcn.h>
@@ -295,6 +295,12 @@ gconv_end (struct __gconv_step *data)
 	  {								      \
 	    uint16_t u2;						      \
 									      \
+	    if (__glibc_unlikely (u1 >= 0xdc00))			      \
+	      {								      \
+		/* This is no valid first word for a surrogate.  */	      \
+		STANDARD_FROM_LOOP_ERR_HANDLER (2);			      \
+	      }								      \
+									      \
 	    /* It's a surrogate character.  At least the first word says      \
 	       it is.  */						      \
 	    if (__glibc_unlikely (inptr + 4 > inend))			      \
@@ -329,6 +335,12 @@ gconv_end (struct __gconv_step *data)
 	  }								      \
 	else								      \
 	  {								      \
+	    if (__glibc_unlikely (u1 >= 0xdc00))			      \
+	      {								      \
+		/* This is no valid first word for a surrogate.  */	      \
+		STANDARD_FROM_LOOP_ERR_HANDLER (2);			      \
+	      }								      \
+									      \
 	    /* It's a surrogate character.  At least the first word says      \
 	       it is.  */						      \
 	    if (__glibc_unlikely (inptr + 4 > inend))			      \

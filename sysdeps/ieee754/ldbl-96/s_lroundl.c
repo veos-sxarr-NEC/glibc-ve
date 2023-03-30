@@ -1,5 +1,5 @@
 /* Round long double value to long int.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,18 +15,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <fenv.h>
+#include <limits.h>
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
 
 long int
 __lroundl (long double x)
 {
   int32_t j0;
-  u_int32_t se, i1, i0;
+  uint32_t se, i1, i0;
   long int result;
   int sign;
 
@@ -40,7 +43,7 @@ __lroundl (long double x)
 	return j0 < -1 ? 0 : sign;
       else
 	{
-	  u_int32_t j = i0 + (0x40000000 >> j0);
+	  uint32_t j = i0 + (0x40000000 >> j0);
 	  if (j < i0)
 	    {
 	      j >>= 1;
@@ -49,6 +52,13 @@ __lroundl (long double x)
 	    }
 
 	  result = j >> (31 - j0);
+#ifdef FE_INVALID
+	  if (sizeof (long int) == 4
+	      && sign == 1
+	      && result == LONG_MIN)
+	    /* Rounding brought the value out of range.  */
+	    feraiseexcept (FE_INVALID);
+#endif
 	}
     }
   else if (j0 < (int32_t) (8 * sizeof (long int)) - 1)
@@ -57,24 +67,46 @@ __lroundl (long double x)
 	result = ((long int) i0 << (j0 - 31)) | (i1 << (j0 - 63));
       else
 	{
-	  u_int32_t j = i1 + (0x80000000 >> (j0 - 31));
+	  uint32_t j = i1 + (0x80000000 >> (j0 - 31));
+	  unsigned long int ures = i0;
+
 	  if (j < i1)
-	    ++i0;
+	    ++ures;
 
 	  if (j0 == 31)
-	    result = (long int) i0;
+	    result = ures;
 	  else
-	    result = ((long int) i0 << (j0 - 31)) | (j >> (63 - j0));
+	    {
+	      result = (ures << (j0 - 31)) | (j >> (63 - j0));
+#ifdef FE_INVALID
+	      if (sizeof (long int) == 8
+		  && sign == 1
+		  && result == LONG_MIN)
+		/* Rounding brought the value out of range.  */
+		feraiseexcept (FE_INVALID);
+#endif
+	    }
 	}
     }
   else
     {
-      /* The number is too large.  It is left implementation defined
-	 what happens.  */
+      /* The number is too large.  Unless it rounds to LONG_MIN,
+	 FE_INVALID must be raised and the return value is
+	 unspecified.  */
+#ifdef FE_INVALID
+      if (sizeof (long int) == 4
+	  && x <= (long double) LONG_MIN - 0.5L)
+	{
+	  /* If truncation produces LONG_MIN, the cast will not raise
+	     the exception, but may raise "inexact".  */
+	  feraiseexcept (FE_INVALID);
+	  return LONG_MIN;
+	}
+#endif
       return (long int) x;
     }
 
   return sign * result;
 }
 
-weak_alias (__lroundl, lroundl)
+libm_alias_ldouble (__lround, lround)

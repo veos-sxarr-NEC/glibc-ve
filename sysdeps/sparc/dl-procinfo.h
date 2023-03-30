@@ -1,5 +1,5 @@
 /* Linux/sparc version of processor capability information handling macros.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jj@ultra.linux.cz>, 1999.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DL_PROCINFO_H
 #define _DL_PROCINFO_H	1
@@ -23,7 +23,7 @@
 #include <ldsodefs.h>
 #include <sysdep.h>
 
-#define _DL_HWCAP_COUNT 27
+#define _DL_HWCAP_COUNT 28
 
 static inline int
 __attribute__ ((unused))
@@ -31,8 +31,8 @@ _dl_procinfo (unsigned int type, unsigned long int word)
 {
   int i;
 
-  /* Fallback to unknown output mechanism.  */
-  if (type == AT_HWCAP2)
+  /* Fallback to generic output mechanism.  */
+  if (type != AT_HWCAP)
     return -1;
 
   _dl_printf ("AT_HWCAP:   ");
@@ -70,9 +70,6 @@ _dl_string_hwcap (const char *str)
 #define HWCAP_IMPORTANT_V9	(__WORDSIZE == 64 ? 0 : HWCAP_SPARC_V9)
 #define HWCAP_IMPORTANT		(HWCAP_IMPORTANT_V9 | HWCAP_SPARC_ULTRA3 \
 				 | HWCAP_SPARC_BLKINIT | HWCAP_SPARC_N2)
-
-/* There are no different platforms defined.  */
-#define _dl_platform_string(idx) ""
 
 /* There're no platforms to filter out.  */
 #define _DL_HWCAP_PLATFORM 0

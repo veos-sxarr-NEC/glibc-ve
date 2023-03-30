@@ -56,9 +56,11 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
+#include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 /* log(1+x) = x - .5 x^2 + x^3 l(x)
    -.0078125 <= x <= +.0078125
@@ -219,6 +221,8 @@ __ieee754_logl(long double x)
   /* On this interval the table is not used due to cancellation error.  */
   if ((x <= 1.0078125L) && (x >= 0.9921875L))
     {
+      if (x == 1.0L)
+	return 0.0L;
       z = x - 1.0L;
       k = 64;
       t = 1.0L;
@@ -268,7 +272,7 @@ __ieee754_logl(long double x)
   /* Series expansion of log(1+z).  */
   w = z * z;
   /* Avoid spurious underflows.  */
-  if (__glibc_unlikely(w <= ldbl_epsilon))
+  if (__glibc_unlikely (fabsl (z) <= ldbl_epsilon))
     y = 0.0L;
   else
     {
@@ -294,4 +298,4 @@ __ieee754_logl(long double x)
   y += e * ln2a;
   return y;
 }
-strong_alias (__ieee754_logl, __logl_finite)
+libm_alias_finite (__ieee754_logl, __logl)

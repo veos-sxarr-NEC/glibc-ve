@@ -1,5 +1,5 @@
 /* Expression parsing for plural form selection.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    Written by Ulrich Drepper <drepper@cygnus.com>, 2000.
 
    This program is free software: you can redistribute it and/or modify
@@ -13,7 +13,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "plural-exp.h"
+#include <plural-exp.h>
 
 #if (defined __GNUC__ && !(defined __APPLE_CC_ && __APPLE_CC__ > 1) && \
      !defined __cplusplus)					       \
@@ -94,7 +94,6 @@ init_germanic_plural (void)
 #endif
 
 void
-internal_function
 EXTRACT_PLURAL_EXPRESSION (const char *nullentry,
 			   const struct expression **pluralp,
 			   unsigned long int *npluralsp)

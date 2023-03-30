@@ -1,5 +1,5 @@
 /* Conversion to and from IBM939.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Masahide Washizawa <washi@yamato.ibm.co.jp>, 2000.
 
@@ -15,7 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+/* IBM939 is designed for the representation of Japanese Latin/Kanji
+   using a stateful EBCDIC encoding scheme.  It is also known as
+   CCSID 939 or CP939. See:
+   https://www-01.ibm.com/software/globalization/ccsid/ccsid939.html */
 
 #include <dlfcn.h>
 #include <stdint.h>
@@ -104,24 +109,14 @@ enum
 									      \
     if (__builtin_expect (ch, 0) == SO)					      \
       {									      \
-	/* Shift OUT, change to DBCS converter.  */			      \
-	if (curcs == db)						      \
-	  {								      \
-	    result = __GCONV_ILLEGAL_INPUT;				      \
-	    break;							      \
-	  }								      \
+	/* Shift OUT, change to DBCS converter (redundant escape okay).  */   \
 	curcs = db;							      \
 	++inptr;							      \
 	continue;							      \
       }									      \
     else if (__builtin_expect (ch, 0) == SI)				      \
       {									      \
-	/* Shift IN, change to SBCS converter.  */			      \
-	if (curcs == sb)						      \
-	  {								      \
-	    result = __GCONV_ILLEGAL_INPUT;				      \
-	    break;							      \
-	  }								      \
+	/* Shift IN, change to SBCS converter (redundant escape okay).  */    \
 	curcs = sb;							      \
 	++inptr;							      \
 	continue;							      \
@@ -195,7 +190,6 @@ enum
     uint32_t ch = get32 (inptr);					      \
     const struct gap *rp1 = __ucs4_to_ibm939sb_idx;			      \
     const struct gap *rp2 = __ucs4_to_ibm939db_idx;			      \
-    const char *cp;							      \
 									      \
     if (__glibc_unlikely (ch >= 0xffff))				      \
       {									      \
@@ -207,14 +201,16 @@ enum
       ++rp1;								      \
 									      \
     /* Use the UCS4 table for single byte.  */				      \
+    unsigned char sbconv;						      \
     if (__builtin_expect (ch < rp1->start, 0)				      \
-	|| (cp = __ucs4_to_ibm939sb[ch + rp1->idx],			      \
-	    __builtin_expect (cp[0], L'\1') == L'\0' && ch != '\0'))	      \
+	|| (sbconv = __ucs4_to_ibm939sb[ch + rp1->idx],			      \
+	    __builtin_expect (sbconv, L'\1') == L'\0' && ch != '\0'))	      \
       {									      \
 	/* Use the UCS4 table for double byte.  */			      \
 	while (ch > rp2->end)						      \
 	  ++rp2;							      \
 									      \
+	const char *cp;							      \
 	if (__builtin_expect (ch < rp2->start, 0)			      \
 	    || (cp = __ucs4_to_ibm939db[ch + rp2->idx],			      \
 		__builtin_expect (cp[0], L'\1')==L'\0' && ch != '\0'))	      \
@@ -255,6 +251,7 @@ enum
 		break;							      \
 	      }								      \
 	    *outptr++ = SI;						      \
+	    curcs = sb;							      \
 	  }								      \
 									      \
 	if (__glibc_unlikely (outptr + 1 > outend))			      \
@@ -267,8 +264,7 @@ enum
 	else if (ch == 0x5c)						      \
 	  *outptr++ = 0xb2;						      \
 	else								      \
-	  *outptr++ = cp[0];						      \
-	curcs = sb;							      \
+	  *outptr++ = sbconv;						      \
       }									      \
 									      \
     /* Now that we wrote the output increment the input pointer.  */	      \

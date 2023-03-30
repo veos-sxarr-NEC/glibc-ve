@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "libioP.h"
 #include "strfile.h"
@@ -25,15 +25,15 @@ struct _IO_FILE_memstream
 {
   _IO_strfile _sf;
   char **bufloc;
-  _IO_size_t *sizeloc;
+  size_t *sizeloc;
 };
 
 
-static int _IO_mem_sync (_IO_FILE* fp) __THROW;
-static void _IO_mem_finish (_IO_FILE* fp, int) __THROW;
+static int _IO_mem_sync (FILE* fp) __THROW;
+static void _IO_mem_finish (FILE* fp, int) __THROW;
 
 
-static const struct _IO_jump_t _IO_mem_jumps =
+static const struct _IO_jump_t _IO_mem_jumps libio_vtable =
 {
   JUMP_INIT_DUMMY,
   JUMP_INIT (finish, _IO_mem_finish),
@@ -60,10 +60,8 @@ static const struct _IO_jump_t _IO_mem_jumps =
 /* Open a stream that writes into a malloc'd buffer that is expanded as
    necessary.  *BUFLOC and *SIZELOC are updated with the buffer's location
    and the number of characters written on fflush or fclose.  */
-_IO_FILE *
-open_memstream (bufloc, sizeloc)
-     char **bufloc;
-     _IO_size_t *sizeloc;
+FILE *
+__open_memstream (char **bufloc, size_t *sizeloc)
 {
   struct locked_FILE
   {
@@ -82,30 +80,33 @@ open_memstream (bufloc, sizeloc)
   new_f->fp._sf._sbf._f._lock = &new_f->lock;
 #endif
 
-  buf = calloc (1, _IO_BUFSIZ);
+  buf = calloc (1, BUFSIZ);
   if (buf == NULL)
     {
       free (new_f);
       return NULL;
     }
-  _IO_init (&new_f->fp._sf._sbf._f, 0);
-  _IO_JUMPS ((struct _IO_FILE_plus *) &new_f->fp._sf._sbf) = &_IO_mem_jumps;
-  _IO_str_init_static_internal (&new_f->fp._sf, buf, _IO_BUFSIZ, buf);
+  _IO_init_internal (&new_f->fp._sf._sbf._f, 0);
+  _IO_JUMPS_FILE_plus (&new_f->fp._sf._sbf) = &_IO_mem_jumps;
+  _IO_str_init_static_internal (&new_f->fp._sf, buf, BUFSIZ, buf);
   new_f->fp._sf._sbf._f._flags &= ~_IO_USER_BUF;
-  new_f->fp._sf._s._allocate_buffer = (_IO_alloc_type) malloc;
-  new_f->fp._sf._s._free_buffer = (_IO_free_type) free;
+  new_f->fp._sf._s._allocate_buffer_unused = (_IO_alloc_type) malloc;
+  new_f->fp._sf._s._free_buffer_unused = (_IO_free_type) free;
 
   new_f->fp.bufloc = bufloc;
   new_f->fp.sizeloc = sizeloc;
 
-  return (_IO_FILE *) &new_f->fp._sf._sbf;
+  /* Disable single thread optimization.  BZ 21735.  */
+  new_f->fp._sf._sbf._f._flags2 |= _IO_FLAGS2_NEED_LOCK;
+
+  return (FILE *) &new_f->fp._sf._sbf;
 }
-libc_hidden_def (open_memstream)
+libc_hidden_def (__open_memstream)
+weak_alias (__open_memstream, open_memstream)
 
 
 static int
-_IO_mem_sync (fp)
-     _IO_FILE* fp;
+_IO_mem_sync (FILE *fp)
 {
   struct _IO_FILE_memstream *mp = (struct _IO_FILE_memstream *) fp;
 
@@ -114,8 +115,6 @@ _IO_mem_sync (fp)
       _IO_str_overflow (fp, '\0');
       --fp->_IO_write_ptr;
     }
-  else
-    *fp->_IO_write_ptr = '\0';
 
   *mp->bufloc = fp->_IO_write_base;
   *mp->sizeloc = fp->_IO_write_ptr - fp->_IO_write_base;
@@ -125,9 +124,7 @@ _IO_mem_sync (fp)
 
 
 static void
-_IO_mem_finish (fp, dummy)
-     _IO_FILE* fp;
-     int dummy;
+_IO_mem_finish (FILE *fp, int dummy)
 {
   struct _IO_FILE_memstream *mp = (struct _IO_FILE_memstream *) fp;
 

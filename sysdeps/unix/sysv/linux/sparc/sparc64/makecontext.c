@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>.
 
@@ -14,14 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
 
-extern void __start_context (struct ucontext *ucp);
+extern void __start_context (ucontext_t *ucp);
 
 void
 __makecontext (ucontext_t *ucp, void (*func) (void), int argc, ...)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #define _ERRNO_H	1
@@ -43,3 +43,4 @@ PSEUDO_END (__vfork)
 libc_hidden_def (__vfork)
 
 weak_alias (__vfork, vfork)
+strong_alias (__vfork, __libc_vfork)

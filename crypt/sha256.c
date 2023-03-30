@@ -1,6 +1,6 @@
 /* Functions to compute SHA256 message digest of files or memory blocks.
    according to the definition of SHA256 in FIPS 180-2.
-   Copyright (C) 2007-2015 Free Software Foundation, Inc.
+   Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Written by Ulrich Drepper <drepper@redhat.com>, 2007.  */
 
@@ -81,14 +81,12 @@ static const uint32_t K[64] =
     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
   };
 
-void
-sha256_process_block (const void *, size_t, struct sha256_ctx *);
+void __sha256_process_block (const void *, size_t, struct sha256_ctx *);
 
 /* Initialize structure containing state of computation.
    (FIPS 180-2:5.3.2)  */
 void
-__sha256_init_ctx (ctx)
-     struct sha256_ctx *ctx;
+__sha256_init_ctx (struct sha256_ctx *ctx)
 {
   ctx->H[0] = 0x6a09e667;
   ctx->H[1] = 0xbb67ae85;
@@ -110,9 +108,7 @@ __sha256_init_ctx (ctx)
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 void *
-__sha256_finish_ctx (ctx, resbuf)
-     struct sha256_ctx *ctx;
-     void *resbuf;
+__sha256_finish_ctx (struct sha256_ctx *ctx, void *resbuf)
 {
   /* Take yet unprocessed bytes into account.  */
   uint32_t bytes = ctx->buflen;
@@ -129,12 +125,12 @@ __sha256_finish_ctx (ctx, resbuf)
   ctx->buffer64[(bytes + pad) / 8] = SWAP64 (ctx->total64 << 3);
 #else
   ctx->buffer32[(bytes + pad + 4) / 4] = SWAP (ctx->total[TOTAL64_low] << 3);
-  ctx->buffer32[(bytes + pad) / 4] = SWAP ((ctx->total[TOTAL64_high] << 3) |
-					   (ctx->total[TOTAL64_low] >> 29));
+  ctx->buffer32[(bytes + pad) / 4] = SWAP ((ctx->total[TOTAL64_high] << 3)
+					   | (ctx->total[TOTAL64_low] >> 29));
 #endif
 
   /* Process last bytes.  */
-  sha256_process_block (ctx->buffer, bytes + pad + 8, ctx);
+  __sha256_process_block (ctx->buffer, bytes + pad + 8, ctx);
 
   /* Put result from CTX in first 32 bytes following RESBUF.  */
   for (unsigned int i = 0; i < 8; ++i)
@@ -145,10 +141,7 @@ __sha256_finish_ctx (ctx, resbuf)
 
 
 void
-__sha256_process_bytes (buffer, len, ctx)
-     const void *buffer;
-     size_t len;
-     struct sha256_ctx *ctx;
+__sha256_process_bytes (const void *buffer, size_t len, struct sha256_ctx *ctx)
 {
   /* When we already have some bits in our internal buffer concatenate
      both inputs first.  */
@@ -162,7 +155,7 @@ __sha256_process_bytes (buffer, len, ctx)
 
       if (ctx->buflen > 64)
 	{
-	  sha256_process_block (ctx->buffer, ctx->buflen & ~63, ctx);
+	  __sha256_process_block (ctx->buffer, ctx->buflen & ~63, ctx);
 
 	  ctx->buflen &= 63;
 	  /* The regions in the following copy operation cannot overlap.  */
@@ -188,14 +181,14 @@ __sha256_process_bytes (buffer, len, ctx)
       if (UNALIGNED_P (buffer))
 	while (len > 64)
 	  {
-	    sha256_process_block (memcpy (ctx->buffer, buffer, 64), 64, ctx);
+	    __sha256_process_block (memcpy (ctx->buffer, buffer, 64), 64, ctx);
 	    buffer = (const char *) buffer + 64;
 	    len -= 64;
 	  }
       else
 #endif
 	{
-	  sha256_process_block (buffer, len & ~63, ctx);
+	  __sha256_process_block (buffer, len & ~63, ctx);
 	  buffer = (const char *) buffer + (len & ~63);
 	  len &= 63;
 	}
@@ -210,7 +203,7 @@ __sha256_process_bytes (buffer, len, ctx)
       left_over += len;
       if (left_over >= 64)
 	{
-	  sha256_process_block (ctx->buffer, 64, ctx);
+	  __sha256_process_block (ctx->buffer, 64, ctx);
 	  left_over -= 64;
 	  memcpy (ctx->buffer, &ctx->buffer[64], left_over);
 	}

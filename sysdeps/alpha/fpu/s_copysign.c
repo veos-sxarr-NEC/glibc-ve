@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Richard Henderson.
 
@@ -14,10 +14,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 #include <math_ldbl_opt.h>
+#include <libm-alias-double.h>
 
 double
 __copysign (double x, double y)
@@ -25,15 +27,7 @@ __copysign (double x, double y)
   return __builtin_copysign (x, y);
 }
 
-weak_alias (__copysign, copysign)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__copysign, __copysignl)
-weak_alias (__copysign, copysignl)
-#endif
-#if IS_IN (libm)
-# if LONG_DOUBLE_COMPAT(libm, GLIBC_2_0)
-compat_symbol (libm, __copysign, copysignl, GLIBC_2_0);
-# endif
-#elif LONG_DOUBLE_COMPAT(libc, GLIBC_2_0)
+libm_alias_double (__copysign, copysign)
+#if LONG_DOUBLE_COMPAT (libc, GLIBC_2_0)
 compat_symbol (libc, __copysign, copysignl, GLIBC_2_0);
 #endif

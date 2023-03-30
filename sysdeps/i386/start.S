@@ -1,5 +1,5 @@
 /* Startup code compliant to the ELF i386 ABI.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This is the canonical entry point, usually the first thing in the text
    segment.  The SVR4/i386 ABI (pages 3-31, 3-32) says that when the entry
@@ -52,10 +52,11 @@
 					NULL
 */
 
-	.text
-	.globl _start
-	.type _start,@function
-_start:
+#include <sysdep.h>
+
+ENTRY (_start)
+	/* Clearing frame pointer is insufficient, use CFI.  */
+	cfi_undefined (eip)
 	/* Clear the frame pointer.  The ABI suggests this be done, to mark
 	   the outermost frame obviously.  */
 	xorl %ebp, %ebp
@@ -81,7 +82,7 @@ _start:
 	pushl %edx		/* Push address of the shared library
 				   termination function.  */
 
-#ifdef SHARED
+#ifdef PIC
 	/* Load PIC register.  */
 	call 1f
 	addl $_GLOBAL_OFFSET_TABLE_, %ebx
@@ -95,7 +96,17 @@ _start:
 	pushl %ecx		/* Push second argument: argv.  */
 	pushl %esi		/* Push first argument: argc.  */
 
+# ifdef SHARED
 	pushl main@GOT(%ebx)
+# else
+	/* Avoid relocation in static PIE since _start is called before
+	   it is relocated.  Don't use "leal main@GOTOFF(%ebx), %eax"
+	   since main may be in a shared object.  Linker will convert
+	   "movl main@GOT(%ebx), %eax" to "leal main@GOTOFF(%ebx), %eax"
+	   if main is defined locally.  */
+	movl main@GOT(%ebx), %eax
+	pushl %eax
+# endif
 
 	/* Call the user's main function, and exit with its value.
 	   But let the libc call main.    */
@@ -117,10 +128,11 @@ _start:
 
 	hlt			/* Crash if somehow `exit' does return.  */
 
-#ifdef SHARED
+#ifdef PIC
 1:	movl	(%esp), %ebx
 	ret
 #endif
+END (_start)
 
 /* To fulfill the System V/i386 ABI we need this symbol.  Yuck, it's so
    meaningless since we don't support machines < 80386.  */

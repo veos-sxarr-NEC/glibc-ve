@@ -45,6 +45,8 @@ if test -z "$libc_mips_float"; then
 fi
 
 libc_mips_o32_fp=
+libc_cv_mips_fp64=
+libc_cv_mips_modd_spreg=
 
 if test x"$libc_mips_abi" = xo32 -a x"$libc_mips_float" = xhard; then
   AC_COMPILE_IFELSE(
@@ -84,8 +86,13 @@ if test x"$libc_mips_abi" = xo32 -a x"$libc_mips_float" = xhard; then
               [libc_mips_o32_fp=64],
               [])])])])])],
     [])
+
+  LIBC_TRY_CC_OPTION([-mfp64], [libc_cv_mips_fp64=yes], [libc_cv_mips_fp64=no])
+  LIBC_TRY_CC_OPTION([-Werror -modd-spreg], [libc_cv_mips_modd_spreg=yes], [libc_cv_mips_modd_spreg=no])
 fi
 LIBC_CONFIG_VAR([o32-fpabi],[${libc_mips_o32_fp}])
+LIBC_CONFIG_VAR([has-mpf64],[${libc_cv_mips_fp64}])
+LIBC_CONFIG_VAR([has-modd-spreg],[${libc_cv_mips_modd_spreg}])
 
 AC_COMPILE_IFELSE(
   [AC_LANG_PROGRAM([
@@ -124,9 +131,38 @@ libc_cv_gcc_unwind_find_fde=yes
 
 if test -z "$arch_minimum_kernel"; then
   if test x$libc_cv_mips_nan2008 = xyes; then
-    # FIXME: Adjust this setting to the actual first upstream kernel
-    # version to support the 2008 NaN encoding and then remove this
-    # comment.
-    arch_minimum_kernel=10.0.0
+    arch_minimum_kernel=4.5.0
   fi
 fi
+
+# Check if we are supposed to run on kernels older than 4.8.0. If so,
+# force executable stack to avoid potential runtime problems with fpu
+# emulation.
+# NOTE: The check below assumes that in absence of user-provided minumum_kernel
+# we will default to arch_minimum_kernel which is currently less than 4.8.0 for
+# all known configurations. If this changes, the check must be updated.
+AC_CACHE_CHECK([whether the compiler must use executable stack],
+        libc_cv_mips_force_execstack, [dnl
+libc_cv_mips_force_execstack=no
+  if test $libc_mips_float = hard; then
+    if test -n "$minimum_kernel"; then
+       changequote(,)
+       min_version=$((`echo "$minimum_kernel.0.0.0" | sed 's/\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1 \* 65536 + \2 \* 256 + \3/'`))
+       changequote([,])
+       if test $min_version -lt 264192; then
+         libc_cv_mips_force_execstack=yes
+       fi
+    else
+      libc_cv_mips_force_execstack=yes
+    fi
+  fi])
+
+libc_mips_has_gnustack=$libc_cv_as_noexecstack
+
+if test $libc_cv_mips_force_execstack = yes; then
+  libc_mips_has_gnustack=no
+  AC_MSG_WARN([forcing executable stack for pre-4.8.0 Linux kernels])
+fi
+
+LIBC_CONFIG_VAR([mips-force-execstack],[${libc_cv_mips_force_execstack}])
+LIBC_CONFIG_VAR([mips-has-gnustack],[${libc_mips_has_gnustack}])

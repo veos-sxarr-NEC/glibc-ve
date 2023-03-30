@@ -1,5 +1,4 @@
-/* 64-bit preadv.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,30 +13,28 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
-#include <errno.h>
-#include <stddef.h>
-#include <sys/param.h>
-/* Hide the preadv64 declaration.  */
-#define preadv64 __redirect_preadv64
 #include <sys/uio.h>
-
 #include <sysdep-cancel.h>
-#include <sys/syscall.h>
-#include <kernel-features.h>
+
 #include <io_hook.h>
 
+#if IS_IN (libc)
 #define weak_variable weak_function
 
 ssize_t weak_variable (* __preadv_hook)
   (int, const struct iovec *, int, off_t) = NULL;
-
-#ifndef __ASSUME_PREADV
-static ssize_t __atomic_preadv_replacement (int, const struct iovec *,
-					    int, off_t) internal_function;
 #endif
+
+#ifndef __OFF_T_MATCHES_OFF64_T
+
+# ifdef __ASSUME_PREADV
+
+#  ifndef __NR_preadv
+#   define __NR_preadv __NR_preadv64
+#  endif
 
 ssize_t
 preadv (int fd, const struct iovec *vector, int count, off_t offset)
@@ -46,40 +43,31 @@ preadv (int fd, const struct iovec *vector, int count, off_t offset)
     = atomic_forced_read(__preadv_hook);
   if (hook)
     return hook(fd, vector, count, offset);
-
-#ifdef __NR_preadv
-  ssize_t result;
-
-  if (SINGLE_THREAD_P)
-    result = INLINE_SYSCALL (preadv, 4, fd, vector, count, offset);
-  else
-    {
-      int oldtype = LIBC_CANCEL_ASYNC ();
-
-      result = INLINE_SYSCALL (preadv, 4, fd, vector, count, offset);
-
-      LIBC_CANCEL_RESET (oldtype);
-    }
-# ifdef __ASSUME_PREADV
-  return result;
-# endif
-#endif
-
-#ifndef __ASSUME_PREADV
-# ifdef __NR_preadv
+  return SYSCALL_CANCEL (preadv, fd, vector, count, offset);
+}
+# else
+static ssize_t __atomic_preadv_replacement (int, const struct iovec *,
+					    int, off_t);
+ssize_t
+preadv (int fd, const struct iovec *vector, int count, off_t offset)
+{
+  ssize_t (*hook) (int, const struct iovec *, int, off_t)
+    = atomic_forced_read(__preadv_hook);
+  if (hook)
+    return hook(fd, vector, count, offset);
+#  ifdef __NR_preadv
+  ssize_t result = SYSCALL_CANCEL (preadv, fd, vector, count,
+				    offset);
   if (result >= 0 || errno != ENOSYS)
     return result;
-# endif
-
+#  endif
   return __atomic_preadv_replacement (fd, vector, count, offset);
-#endif
 }
-#undef preadv64
-strong_alias (preadv, preadv64)
+#  define PREADV static __atomic_preadv_replacement
+#  define PREAD __pread
+#  define OFF_T off_t
+#  include <sysdeps/posix/preadv_common.c>
+# endif /* __ASSUME_PREADV  */
 
-#ifndef __ASSUME_PREADV
-# define PREADV static internal_function __atomic_preadv_replacement
-# define PREAD __pread
-# define OFF_T off_t
-# include <sysdeps/posix/preadv.c>
+libc_hidden_def (preadv)
 #endif

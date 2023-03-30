@@ -1,7 +1,6 @@
 /* Compute sine and cosine of argument.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 2018-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
-   Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -15,11 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <errno.h>
+#include <stdint.h>
 #include <math.h>
-
-#include <math_private.h>
+#include <math-barriers.h>
+#include <libm-alias-float.h>
+#include "math_config.h"
+#include "s_sincosf.h"
 
 #ifndef SINCOSF
 # define SINCOSF_FUNC __sincosf
@@ -27,55 +30,74 @@
 # define SINCOSF_FUNC SINCOSF
 #endif
 
+/* Fast sincosf implementation.  Worst-case ULP is 0.5607, maximum relative
+   error is 0.5303 * 2^-23.  A single-step range reduction is used for
+   small values.  Large inputs have their range reduced using fast integer
+   arithmetic.  */
 void
-SINCOSF_FUNC (float x, float *sinx, float *cosx)
+SINCOSF_FUNC (float y, float *sinp, float *cosp)
 {
-  int32_t ix;
+  double x = y;
+  double s;
+  int n;
+  const sincos_t *p = &__sincosf_table[0];
 
-  /* High word of x. */
-  GET_FLOAT_WORD (ix, x);
-
-  /* |x| ~< pi/4 */
-  ix &= 0x7fffffff;
-  if (ix <= 0x3f490fd8)
+  if (abstop12 (y) < abstop12 (pio4))
     {
-      *sinx = __kernel_sinf (x, 0.0, 0);
-      *cosx = __kernel_cosf (x, 0.0);
+      double x2 = x * x;
+
+      if (__glibc_unlikely (abstop12 (y) < abstop12 (0x1p-12f)))
+      {
+	/* Force underflow for tiny y.  */
+	if (__glibc_unlikely (abstop12 (y) < abstop12 (0x1p-126f)))
+	  math_force_eval ((float)x2);
+	*sinp = y;
+	*cosp = 1.0f;
+	return;
+      }
+
+      sincosf_poly (x, x2, p, 0, sinp, cosp);
     }
-  else if (ix>=0x7f800000)
+  else if (abstop12 (y) < abstop12 (120.0f))
     {
-      /* sin(Inf or NaN) is NaN */
-      *sinx = *cosx = x - x;
+      x = reduce_fast (x, p, &n);
+
+      /* Setup the signs for sin and cos.  */
+      s = p->sign[n & 3];
+
+      if (n & 2)
+	p = &__sincosf_table[1];
+
+      sincosf_poly (x * s, x * x, p, n, sinp, cosp);
+    }
+  else if (__glibc_likely (abstop12 (y) < abstop12 (INFINITY)))
+    {
+      uint32_t xi = asuint (y);
+      int sign = xi >> 31;
+
+      x = reduce_large (xi, &n);
+
+      /* Setup signs for sin and cos - include original sign.  */
+      s = p->sign[(n + sign) & 3];
+
+      if ((n + sign) & 2)
+	p = &__sincosf_table[1];
+
+      sincosf_poly (x * s, x * x, p, n, sinp, cosp);
     }
   else
     {
-      /* Argument reduction needed.  */
-      float y[2];
-      int n;
-
-      n = __ieee754_rem_pio2f (x, y);
-      switch (n & 3)
-	{
-	case 0:
-	  *sinx = __kernel_sinf (y[0], y[1], 1);
-	  *cosx = __kernel_cosf (y[0], y[1]);
-	  break;
-	case 1:
-	  *sinx = __kernel_cosf (y[0], y[1]);
-	  *cosx = -__kernel_sinf (y[0], y[1], 1);
-	  break;
-	case 2:
-	  *sinx = -__kernel_sinf (y[0], y[1], 1);
-	  *cosx = -__kernel_cosf (y[0], y[1]);
-	  break;
-	default:
-	  *sinx = -__kernel_cosf (y[0], y[1]);
-	  *cosx = __kernel_sinf (y[0], y[1], 1);
-	  break;
-	}
+      /* Return NaN if Inf or NaN for both sin and cos.  */
+      *sinp = *cosp = y - y;
+#if WANT_ERRNO
+      /* Needed to set errno for +-Inf, the add is a hack to work
+	 around a gcc register allocation issue: just passing y
+	 affects code generation in the fast path (PR86901).  */
+      __math_invalidf (y + y);
+#endif
     }
 }
 
 #ifndef SINCOSF
-weak_alias (__sincosf, sincosf)
+libm_alias_float (__sincos, sincos)
 #endif

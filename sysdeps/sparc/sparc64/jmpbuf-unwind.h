@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David S. Miller <davem@davemloft.net>, 2005.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <setjmp.h>
 #include <stdint.h>
@@ -22,15 +22,16 @@
 
 /* Test if longjmp to JMPBUF would unwind the frame
    containing a local variable at ADDRESS.  */
-#define _JMPBUF_UNWINDS(jmpbuf, address, demangle)			\
-  ((unsigned long int) (address) < (jmpbuf)->uc_mcontext.mc_gregs[MC_O6] + 2047)
+#define _JMPBUF_UNWINDS(jmpbuf, address, demangle)	\
+  ((unsigned long int) (address)			\
+   < (jmpbuf)->__uc_mcontext.__mc_gregs[MC_O6] + 2047)
 
 #define _JMPBUF_CFA_UNWINDS_ADJ(_jmpbuf, _context, _adj) \
   _JMPBUF_UNWINDS_ADJ (_jmpbuf, (void *) _Unwind_GetCFA (_context), _adj)
 
 #define _JMPBUF_UNWINDS_ADJ(_jmpbuf, _address, _adj) \
   ((uintptr_t) (_address) - (_adj) \
-   < (uintptr_t) (_jmpbuf)[0].uc_mcontext.mc_gregs[MC_O6] + 2047 - (_adj))
+   < (uintptr_t) (_jmpbuf)[0].__uc_mcontext.__mc_gregs[MC_O6] + 2047 - (_adj))
 
 /* We use the normal lobngjmp for unwinding.  */
 #define __libc_unwind_longjmp(buf, val) __libc_longjmp (buf, val)

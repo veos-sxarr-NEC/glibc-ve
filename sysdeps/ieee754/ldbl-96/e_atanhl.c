@@ -32,8 +32,12 @@
  *
  */
 
+#include <float.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const long double one = 1.0, huge = 1e4900L;
 
@@ -44,7 +48,7 @@ __ieee754_atanhl(long double x)
 {
 	long double t;
 	int32_t ix;
-	u_int32_t se,i0,i1;
+	uint32_t se,i0,i1;
 	GET_LDOUBLE_WORDS(se,i0,i1,x);
 	ix = se&0x7fff;
 	if ((ix+((((i0&0x7fffffff)|i1)|(-((i0&0x7fffffff)|i1)))>>31))>0x3fff)
@@ -52,9 +56,10 @@ __ieee754_atanhl(long double x)
 	    return (x-x)/(x-x);
 	if(ix==0x3fff)
 	    return x/zero;
-	if(ix<0x3fe3) {
+	if(ix<0x3fdf) {
 	    math_force_eval(huge+x);
-	    return x;	/* x<2**-28 */
+	    math_check_force_underflow (x);
+	    return x;	/* x<2**-32 */
 	}
 	SET_LDOUBLE_EXP(x,ix);
 	if(ix<0x3ffe) {		/* x < 0.5 */
@@ -64,4 +69,4 @@ __ieee754_atanhl(long double x)
 	    t = 0.5*__log1pl((x+x)/(one-x));
 	if(se<=0x7fff) return t; else return -t;
 }
-strong_alias (__ieee754_atanhl, __atanhl_finite)
+libm_alias_finite (__ieee754_atanhl, __atanhl)

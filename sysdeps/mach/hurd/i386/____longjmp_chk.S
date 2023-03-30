@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <jmpbuf-offsets.h>
@@ -36,9 +36,11 @@ longjmp_msg:
 			cfi_register(%ebx,%ecx);			      \
 			LOAD_PIC_REG (bx);				      \
 			leal	longjmp_msg@GOTOFF(%ebx), %eax;		      \
+			movl	%eax, (%esp);				      \
 			call	HIDDEN_JUMPTARGET(__fortify_fail)
 #else
 # define CALL_FAIL	movl	$longjmp_msg, %eax;			      \
+			movl	%eax, (%esp);				      \
 			call	HIDDEN_JUMPTARGET(__fortify_fail)
 #endif
 
@@ -66,7 +68,7 @@ ENTRY (____longjmp_chk)
 
 	/* TODO: need locking?  */
 	/* struct hurd_sigstate * _hurd_self_sigstate (void) */
-	call	_hurd_self_sigstate
+	call	HIDDEN_JUMPTARGET(_hurd_self_sigstate)
 	/* TODO: %eax and %eax->sigaltstack are always valid?  */
 
 	testl	$SS_ONSTACK, (HURD_SIGSTATE__SIGALTSTACK__OFFSET + SIGALTSTACK__SS_FLAGS__OFFSET)(%eax)

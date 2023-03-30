@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Makefile configuration options for the GNU C library.
@@ -50,7 +50,7 @@ export sysdep_dir := $(sysdep_dir)
 include $(common-objpfx)config.make
 
 # What flags to give to sources which call user provided callbacks
-uses-callbacks = $(exceptions)
+uses-callbacks = -fexceptions
 
 # What flags to give to tests which test stack alignment
 stack-align-test-flags =
@@ -59,15 +59,7 @@ stack-align-test-flags =
 # `configure' writes a definition of `config-sysdirs' in `config.make'.
 sysdirs := $(foreach D,$(config-sysdirs),$(firstword $(filter /%,$D) $(..)$D))
 
-# Add-ons that contribute sysdeps trees get added to the include list
-# after sysdeps/generic.  This makes #include <sysdeps/...> work right
-# to find specific add-on files without assuming the add-on directory name.
-# It also means that headers can go into an add-on's base directory
-# instead of the add-on needing a sysdeps/generic of its own.
-sysdeps-srcdirs := $(foreach add-on,$(sysdeps-add-ons),\
-			     $(firstword $(filter /%,$(add-on)) \
-					 $(..)$(add-on)))
-+sysdep_dirs = $(sysdirs) $(sysdeps-srcdirs)
++sysdep_dirs = $(sysdirs)
 ifdef objdir
 +sysdep_dirs := $(objdir) $(+sysdep_dirs)
 endif
@@ -81,8 +73,8 @@ $(common-objpfx)config.make: $(common-objpfx)config.status \
 			     $(..)config.make.in $(..)config.h.in
 	cd $(<D); $(SHELL) $(<F)
 
-# Find all the add-on and sysdeps configure fragments, to make sure we
-# re-run configure when any of them changes.
+# Find all the sysdeps configure fragments, to make sure we re-run
+# configure when any of them changes.
 $(common-objpfx)config.status: $(..)version.h $(..)configure \
 			       $(foreach dir,$(sysdirs),\
 					 $(wildcard $(dir)/Implies) \
@@ -90,14 +82,7 @@ $(common-objpfx)config.status: $(..)version.h $(..)configure \
 						    $(firstword $(wildcard \
  $(addprefix $(dir)/,configure configure.ac))))) \
 			       $(patsubst %.ac,%,\
- $(wildcard $(..)sysdeps/*/preconfigure $(..)sysdeps/*/preconfigure.ac)) \
-			       $(patsubst %.ac,%,\
-					  $(foreach add-on,$(add-ons),\
-						    $(firstword $(wildcard \
- $(addprefix $(firstword $(filter /%,$(add-on)) $(..)$(add-on))/,\
-	     configure configure.ac))) \
- $(wildcard $(addprefix $(firstword $(filter /%,$(add-on)) $(..)$(add-on))/,\
-			sysdeps/*/preconfigure sysdeps/*/preconfigure.ac))))
+ $(wildcard $(..)sysdeps/*/preconfigure $(..)sysdeps/*/preconfigure.ac))
 	@cd $(@D); if test -f $(@F); then exec $(SHELL) $(@F) --recheck; else \
 	 echo The GNU C library has not been configured. >&2; \
 	 echo Run \`configure\' to configure it before building. >&2; \
@@ -190,18 +175,19 @@ zonedir = $(datadir)/zoneinfo
 endif
 inst_zonedir = $(install_root)$(zonedir)
 
-# Where to install the locale files.
-ifndef localedir
-localedir = $(libdir)/locale
+# Where to install the compiled binary locale archive and compiled
+# binary locale files.
+ifndef complocaledir
+complocaledir = $(libdir)/locale
 endif
-inst_localedir = $(install_root)$(localedir)
+inst_complocaledir = $(install_root)$(complocaledir)
 
 # Where to install the message catalog data files (which are
 # machine-independent).
-ifndef msgcatdir
-msgcatdir = $(datadir)/locale
+ifndef localedir
+localedir = $(datadir)/locale
 endif
-inst_msgcatdir = $(install_root)$(msgcatdir)
+inst_localedir = $(install_root)$(localedir)
 
 # Where to install the locale charmap source files.
 ifndef i18ndir
@@ -347,15 +333,10 @@ endif
 endif
 
 # Flags to pass the C compiler when assembling preprocessed assembly code
-# (`.S' files).  On some systems the assembler doesn't understand the `#' line
-# directives the preprocessor produces.  If you have troubling compiling
-# assembly code, try using -P here to suppress these directives.
+# (`.S' files).
 ifndef asm-CPPFLAGS
 asm-CPPFLAGS =
 endif
-
-as-needed := -Wl,--as-needed
-no-as-needed := -Wl,--no-as-needed
 
 # Must be supported by the linker.
 no-whole-archive = -Wl,--no-whole-archive
@@ -368,6 +349,14 @@ start-installed-name = crt1.o
 # binaries, simply set it to the normal name.
 ifndef static-start-installed-name
 static-start-installed-name = $(start-installed-name)
+endif
+
+ifeq (yes,$(enable-static-pie))
+# Link with rcrt1.o, instead of crt1.o, to call _dl_relocate_static_pie
+# to relocate static PIE.
+real-static-start-installed-name = r$(static-start-installed-name)
+else
+real-static-start-installed-name = $(static-start-installed-name)
 endif
 
 ifeq (yesyes,$(build-shared)$(have-z-combreloc))
@@ -389,12 +378,47 @@ LDFLAGS.so += $(hashstyle-LDFLAGS)
 LDFLAGS-rtld += $(hashstyle-LDFLAGS)
 endif
 
+ifeq (yes,$(enable-static-pie))
+pic-default = -DPIC
+# Compile libc.a and libc_p.a with -fPIE/-fpie for static PIE.
+pie-default = $(pie-ccflag)
+ifeq (yes,$(have-static-pie))
+default-pie-ldflag = -static-pie
+else
+# Static PIE can't have dynamic relocations in read-only segments since
+# static PIE is mapped into memory by kernel.  --eh-frame-hdr is needed
+# for PIE to support exception.
+default-pie-ldflag = -Wl,-pie,--no-dynamic-linker,--eh-frame-hdr,-z,text
+endif
+endif
+
+# If lazy relocations are disabled, add the -z now flag.  Use
+# LDFLAGS-lib.so instead of LDFLAGS.so, to avoid adding the flag to
+# test modules.
+ifeq ($(bind-now),yes)
+LDFLAGS-lib.so += -Wl,-z,now
+# Extra flags for dynamically linked non-test main programs.
+link-extra-flags += -Wl,-z,now
+endif
+
+# Command to run after every final link (executable or shared object).
+# This is invoked with $(call after-link,...), so it should operate on
+# the file $1.  This can be set to do some sort of post-processing on
+# binaries, or to perform some sort of static sanity check.
+ifndef after-link
+after-link =
+endif
+
+# Additional libraries to link into every test.
+link-extra-libs-tests = $(libsupport)
+
 # Command for linking PIE programs with the C library.
 ifndef +link-pie
-+link-pie-before-libc = $(CC) -pie -Wl,-O1 -nostdlib -nostartfiles -o $@ \
++link-pie-before-libc = $(if $($(@F)-no-pie),$(no-pie-ldflag),-pie) \
+	     -Wl,-O1 -nostdlib -nostartfiles -o $@ \
 	     $(sysdep-LDFLAGS) $(LDFLAGS) $(LDFLAGS-$(@F)) \
 	     $(combreloc-LDFLAGS) $(relro-LDFLAGS) $(hashstyle-LDFLAGS) \
-	     $(addprefix $(csu-objpfx),S$(start-installed-name)) \
+	     $(firstword $(CRT-$(@F)) $(csu-objpfx)S$(start-installed-name)) \
 	     $(+preinit) $(+prectorS) \
 	     $(filter-out $(addprefix $(csu-objpfx),start.o \
 						    S$(start-installed-name))\
@@ -402,16 +426,28 @@ ifndef +link-pie
 			  $(common-objpfx)libc% $(+postinit),$^) \
 	     $(link-extra-libs)
 +link-pie-after-libc = $(+postctorS) $(+postinit)
-+link-pie = $(+link-pie-before-libc) $(rtld-LDFLAGS) $(link-libc) \
-	    $(+link-pie-after-libc)
-+link-pie-tests = $(+link-pie-before-libc) $(rtld-tests-LDFLAGS) \
-		  $(link-libc-tests) $(+link-pie-after-libc)
+define +link-pie
+$(CC) $(link-libc-rpath-link) $(+link-pie-before-libc) $(rtld-LDFLAGS) \
+  $(link-extra-flags) $(link-libc) $(+link-pie-after-libc)
+$(call after-link,$@)
+endef
+define +link-pie-tests
+$(CC) $(+link-pie-before-libc) $(rtld-tests-LDFLAGS) $(link-libc-tests) \
+  $(+link-pie-after-libc)
+$(call after-link,$@)
+endef
+define +link-pie-printers-tests
+$(CC) $(+link-pie-before-libc) $(built-rtld-LDFLAGS) \
+  $(link-libc-printers-tests) $(+link-pie-after-libc)
+$(call after-link,$@)
+endef
 endif
 # Command for statically linking programs with the C library.
 ifndef +link-static
-+link-static-before-libc = $(CC) -nostdlib -nostartfiles -static -o $@ \
++link-static-before-libc = -nostdlib -nostartfiles -static -o $@ \
+	      $(if $($(@F)-no-pie),$(no-pie-ldflag),$(default-pie-ldflag)) \
 	      $(sysdep-LDFLAGS) $(LDFLAGS) $(LDFLAGS-$(@F))  \
-	      $(addprefix $(csu-objpfx),$(static-start-installed-name)) \
+	      $(firstword $(CRT-$(@F)) $(csu-objpfx)$(real-static-start-installed-name)) \
 	      $(+preinit) $(+prectorT) \
 	      $(filter-out $(addprefix $(csu-objpfx),start.o \
 						     $(start-installed-name))\
@@ -419,18 +455,32 @@ ifndef +link-static
 			   $(common-objpfx)libc% $(+postinit),$^) \
 	      $(link-extra-libs-static)
 +link-static-after-libc = $(+postctorT) $(+postinit)
-+link-static = $(+link-static-before-libc) $(link-libc-static) \
-	       $(+link-static-after-libc)
-+link-static-tests = $(+link-static-before-libc) $(link-libc-static-tests) \
-		     $(+link-static-after-libc)
+define +link-static
+$(CC) $(+link-static-before-libc) $(link-extra-flags) $(link-libc-static) \
+  $(+link-static-after-libc)
+$(call after-link,$@)
+endef
+define +link-static-tests
+$(CC) $(+link-static-before-libc) $(link-libc-static-tests) \
+  $(+link-static-after-libc)
+$(call after-link,$@)
+endef
 endif
 # Commands for linking programs with the C library.
 ifndef +link
 ifeq (yes,$(build-shared))
-+link-before-libc = $(CC) -nostdlib -nostartfiles -o $@ \
+ifeq (yes,$(cc-pie-default))
+no-pie-ldflag = -no-pie
+endif
+ifeq (yes,$(build-pie-default))
++link = $(+link-pie)
++link-tests = $(+link-pie-tests)
++link-printers-tests = $(+link-pie-printers-tests)
+else  # not build-pie-default
++link-before-libc = -nostdlib -nostartfiles -o $@ \
 	      $(sysdep-LDFLAGS) $(LDFLAGS) $(LDFLAGS-$(@F)) \
 	      $(combreloc-LDFLAGS) $(relro-LDFLAGS) $(hashstyle-LDFLAGS) \
-	      $(addprefix $(csu-objpfx),$(start-installed-name)) \
+	      $(firstword $(CRT-$(@F)) $(csu-objpfx)$(start-installed-name)) \
 	      $(+preinit) $(+prector) \
 	      $(filter-out $(addprefix $(csu-objpfx),start.o \
 						     $(start-installed-name))\
@@ -438,54 +488,106 @@ ifeq (yes,$(build-shared))
 			   $(common-objpfx)libc% $(+postinit),$^) \
 	      $(link-extra-libs)
 +link-after-libc = $(+postctor) $(+postinit)
-+link = $(+link-before-libc) $(rtld-LDFLAGS) $(link-libc) \
-	$(+link-after-libc)
-+link-tests = $(+link-before-libc) $(rtld-tests-LDFLAGS) \
-	      $(link-libc-tests) $(+link-after-libc)
-else
+define +link
+$(CC) $(link-libc-rpath-link) $(+link-before-libc) $(rtld-LDFLAGS) \
+  $(link-extra-flags) $(link-libc) $(+link-after-libc)
+$(call after-link,$@)
+endef
+define +link-tests
+$(CC) $(+link-before-libc) $(rtld-tests-LDFLAGS) $(link-libc-tests) \
+		     $(+link-after-libc)
+$(call after-link,$@)
+endef
+define +link-printers-tests
+$(CC) $(+link-before-libc) $(built-rtld-LDFLAGS) $(link-libc-printers-tests) \
+		     $(+link-after-libc)
+$(call after-link,$@)
+endef
+endif  # build-pie-default
+else  # build-static
 +link = $(+link-static)
 +link-tests = $(+link-static-tests)
-endif
-endif
++link-printers-tests = $(+link-static-tests)
+endif  # build-shared
+endif  # +link
+
+# The pretty printer test programs need to be compiled without optimizations
+# so they won't confuse gdb.  We could use either the 'GCC optimize' pragma
+# or the 'optimize' function attribute to achieve this; however, at least on
+# ARM, gcc always produces different debugging symbols when invoked with
+# a -O greater than 0 than when invoked with -O0, regardless of anything else
+# we're using to suppress optimizations.  Therefore, we need to explicitly pass
+# -O0 to it through CFLAGS.
+# Additionally, the build system will try to -include $(common-objpfx)/config.h
+# when compiling the tests, which will throw an error if some special macros
+# (such as __OPTIMIZE__ and IS_IN_build) aren't defined.  To avoid this, we
+# tell gcc to define IS_IN_build.
+CFLAGS-printers-tests := -O0 -ggdb3 -DIS_IN_build
+
 ifeq (yes,$(build-shared))
+# These indicate whether to link using the built ld.so or the installed one.
+installed-rtld-LDFLAGS = -Wl,-dynamic-linker=$(rtlddir)/$(rtld-installed-name)
+built-rtld-LDFLAGS = -Wl,-dynamic-linker=$(elf-objpfx)ld.so
+
 ifndef rtld-LDFLAGS
-rtld-LDFLAGS = -Wl,-dynamic-linker=$(rtlddir)/$(rtld-installed-name)
+rtld-LDFLAGS = $(installed-rtld-LDFLAGS)
 endif
+
 ifndef rtld-tests-LDFLAGS
 ifeq (yes,$(build-hardcoded-path-in-tests))
-rtld-tests-LDFLAGS = -Wl,-dynamic-linker=$(elf-objpfx)ld.so
+rtld-tests-LDFLAGS = $(built-rtld-LDFLAGS)
 else
-rtld-tests-LDFLAGS = $(rtld-LDFLAGS)
-endif
-endif
-endif
+rtld-tests-LDFLAGS = $(installed-rtld-LDFLAGS)
+endif  # build-hardcoded-path-in-tests
+endif  # rtld-tests-LDFLAGS
+
+endif  # build-shared
+
 ifndef link-libc
 ifeq (yes,$(build-shared))
 # We need the versioned name of libc.so in the deps of $(others) et al
 # so that the symlink to libc.so is created before anything tries to
 # run the linked programs.
+link-libc-rpath = -Wl,-rpath=$(rpath-link)
 link-libc-rpath-link = -Wl,-rpath-link=$(rpath-link)
+
+# For programs which are not tests, $(link-libc-rpath-link) is added
+# directly in $(+link), $(+link-pie) above, so that -Wl,-rpath-link
+# comes before the expansion of LDLIBS-* and affects libraries added
+# there.  For shared objects, -Wl,-rpath-link is added via
+# $(build-shlib-helper) and $(build-module-helper) in Makerules (also
+# before the expansion of LDLIBS-* variables).
+
+# Tests use -Wl,-rpath instead of -Wl,-rpath-link for
+# build-hardcoded-path-in-tests.
 ifeq (yes,$(build-hardcoded-path-in-tests))
-link-libc-tests-rpath-link = -Wl,-rpath=$(rpath-link)
+link-libc-tests-rpath-link = $(link-libc-rpath)
 else
 link-libc-tests-rpath-link = $(link-libc-rpath-link)
-endif
+endif  # build-hardcoded-path-in-tests
+
 link-libc-before-gnulib = $(common-objpfx)libc.so$(libc.so-version) \
 			  $(common-objpfx)$(patsubst %,$(libtype.oS),c) \
-			  $(as-needed) $(elf-objpfx)ld.so \
-			  $(no-as-needed)
-link-libc = $(link-libc-rpath-link) $(link-libc-before-gnulib) $(gnulib)
+			  -Wl,--as-needed $(elf-objpfx)ld.so \
+			  -Wl,--no-as-needed
+link-libc = $(link-libc-before-gnulib) $(gnulib)
+
+link-libc-tests-after-rpath-link = $(link-libc-before-gnulib) $(gnulib-tests)
 link-libc-tests = $(link-libc-tests-rpath-link) \
-		  $(link-libc-before-gnulib) $(gnulib-tests)
+		  $(link-libc-tests-after-rpath-link)
+# Pretty printer test programs always require rpath instead of rpath-link.
+link-libc-printers-tests = $(link-libc-rpath) \
+			   $(link-libc-tests-after-rpath-link)
+
 # This is how to find at build-time things that will be installed there.
-rpath-dirs = math elf dlfcn nss nis rt resolv crypt
+rpath-dirs = math elf dlfcn nss nis rt resolv mathvec support
 rpath-link = \
 $(common-objdir):$(subst $(empty) ,:,$(patsubst ../$(subdir),.,$(rpath-dirs:%=$(common-objpfx)%)))
-else
+else  # build-static
 link-libc = $(common-objpfx)libc.a $(otherlibs) $(gnulib) $(common-objpfx)libc.a $(gnulib)
 link-libc-tests = $(common-objpfx)libc.a $(otherlibs) $(gnulib-tests) $(common-objpfx)libc.a $(gnulib-tests)
-endif
-endif
+endif  # build-shared
+endif  # link-libc
 
 # Differences in the linkers on the various platforms.
 LDFLAGS-rpath-ORIGIN = -Wl,-rpath,'$$ORIGIN'
@@ -574,9 +676,14 @@ endif
 +prectorS = `$(CC) $(sysdep-LDFLAGS) --print-file-name=crtbeginS.o`
 +postctorS = `$(CC) $(sysdep-LDFLAGS) --print-file-name=crtendS.o`
 # Variants of the two previous definitions for statically linking programs.
+ifeq (yes,$(enable-static-pie))
+# Static PIE must use PIE variants.
++prectorT = $(+prectorS)
++postctorT = $(+postctorS)
+else
 +prectorT = `$(CC) $(sysdep-LDFLAGS) --print-file-name=crtbeginT.o`
 +postctorT = `$(CC) $(sysdep-LDFLAGS) --print-file-name=crtend.o`
-+interp = $(addprefix $(elf-objpfx),interp.os)
+endif
 csu-objpfx = $(common-objpfx)csu/
 elf-objpfx = $(common-objpfx)elf/
 
@@ -590,6 +697,11 @@ endif
 # <variable>=<value> assignments for environment variables.
 ifndef test-wrapper-env
 test-wrapper-env = $(test-wrapper) env
+endif
+# Likewise, but the program's environment will be empty except for any
+# explicit <variable>=<value> assignments preceding the program name.
+ifndef test-wrapper-env-only
+test-wrapper-env-only = $(test-wrapper) env -i
 endif
 
 # Whether to run test programs built for the library's host system.
@@ -633,7 +745,7 @@ endif
 # $(run-program-env) is the default environment variable settings to
 # use when running a program built with the newly built library.
 run-program-env = VE_GCONV_PATH=$(common-objpfx)iconvdata \
-		  VE_LOCPATH=$(common-objpfx)localedata LC_ALL=C
+                 VE_LOCPATH=$(common-objpfx)localedata LC_ALL=C
 # $(run-program-prefix) is a command that, when prepended to the name
 # of a program built with the newly built library, produces a command
 # that, executed on the build system on which "make" is run, runs that
@@ -658,8 +770,6 @@ built-program-cmd = $(built-program-cmd-before-env) $(run-program-env) \
 # for which the library is built, runs the newly built program that is
 # the second dependency of the makefile target in which
 # $(host-built-program-cmd) is used.
-#host-built-program-cmd = $(run-via-rtld-prefix) $(ve_exec_cmd) $(built-program-file)
-
 host-built-program-cmd = $(built-program-file)
 
 ifndef LD
@@ -716,15 +826,16 @@ endif
 
 # Extra flags to pass to GCC.
 ifeq ($(all-warnings),yes)
-+gccwarn := -Wall -Wwrite-strings -Winline -Wcast-qual -Wbad-function-cast -Wmissing-noreturn -Wmissing-prototypes -Wmissing-declarations -Wcomment -Wcomments -Wtrigraphs -Wsign-compare -Wfloat-equal -Wmultichar
++gccwarn := -Wall -Wwrite-strings -Wcast-qual -Wbad-function-cast -Wmissing-noreturn -Wmissing-prototypes -Wmissing-declarations -Wcomment -Wcomments -Wtrigraphs -Wsign-compare -Wfloat-equal -Wmultichar
 else
-+gccwarn := -Wall -Wwrite-strings -Winline
++gccwarn := -Wall -Wwrite-strings
 endif
 +gccwarn += -Wundef
 ifeq ($(enable-werror),yes)
-+gccwarn += -Wno-error=undef
+#+gccwarn += -Werror
++gccwarn +=
 endif
-+gccwarn-c = -Wstrict-prototypes
++gccwarn-c = -Wstrict-prototypes -Wold-style-definition
 
 # We do not depend on the address of constants in different files to be
 # actually different, so allow the compiler to merge them all.
@@ -734,6 +845,16 @@ endif
 # mode and also change the rounding mode in a few functions. So,
 # disable any optimization that assume default rounding mode.
 +math-flags = -frounding-math
+
+# Logically only "libnldbl", "nonlib" and "testsuite" should be using
+# -fno-math-errno. However due to GCC bug #88576, only "libm" can use
+# -fno-math-errno.
++extra-math-flags = $(if $(filter libm,$(in-module)),-fno-math-errno,-fmath-errno)
+
+# We might want to compile with some stack-protection flag.
+ifneq ($(stack-protector),)
++stack-protector=$(stack-protector)
+endif
 
 # This is the program that generates makefile dependencies from C source files.
 # The -MP flag tells GCC >= 3.2 (which we now require) to produce dummy
@@ -794,11 +915,9 @@ ifeq	"$(strip $(+cflags))" ""
 +cflags	:= $(default_cflags)
 endif	# $(+cflags) == ""
 
-+cflags += $(cflags-cpu) $(+gccwarn) $(+merge-constants) $(+math-flags)
++cflags += $(cflags-cpu) $(+gccwarn) $(+merge-constants) $(+math-flags) \
+	   $(+stack-protector)
 +gcc-nowarn := -w
-
-# Don't duplicate options if we inherited variables from the parent.
-+cflags	:= $(sort $(+cflags))
 
 # Each sysdeps directory can contain header files that both will be
 # used to compile and will be installed.  Each can also contain an
@@ -823,26 +942,27 @@ libio-include = -I$(..)libio
 # List of non-library modules that we build.
 built-modules = iconvprogs iconvdata ldconfig lddlibc4 libmemusage \
 		libSegFault libpcprofile librpcsvc locale-programs \
-		memusagestat nonlib nscd extramodules libnldbl
-
-# We don't include libc-modules.h when these targets are being built.  These
-# targets don't (and will likely never need to) use the IS_IN facility.  In
-# fact, shlib-versions should not use it because that will create a circular
-# dependency as libc-modules.h is generated from shlib-versions.
-skip-module-cppflags = shlib-versions.v.i Versions.v.i
+		memusagestat nonlib nscd extramodules libnldbl libsupport \
+		testsuite
 
 in-module = $(subst -,_,$(firstword $(libof-$(basename $(@F))) \
 				    $(libof-$(<F)) \
 				    $(libof-$(@F)) \
 				    libc))
 
+# Build ld.so, libc.so and libpthread.so with -ftls-model=initial-exec
+tls-model = $(if $(filter libpthread rtld \
+			  libc,$(in-module)),-ftls-model=initial-exec,)
+
 module-cppflags-real = -include $(common-objpfx)libc-modules.h \
 		       -DMODULE_NAME=$(in-module)
 
-# We don't need libc-modules.h and the MODULE_NAME definition for
-# shlib-version.v.i.
-module-cppflags = $(if $(filter $(@F),$(skip-module-cppflags)), \
-		       ,$(module-cppflags-real))
+# We don't need libc-modules.h and the MODULE_NAME definition for .v.i
+# files.  These targets don't (and will likely never need to) use the IS_IN
+# facility.  In fact, shlib-versions should not use it because that will
+# create a circular dependency as libc-modules.h is generated from
+# shlib-versions.
+module-cppflags = $(if $(filter %.v.i,$(@F)),,$(module-cppflags-real))
 
 # These are the variables that the implicit compilation rules use.
 # Note that we can't use -std=* in CPPFLAGS, because it overrides
@@ -856,13 +976,20 @@ CPPFLAGS = $(config-extra-cppflags) $(CPPUNDEFS) $(CPPFLAGS-config) \
 	   $(foreach lib,$(libof-$(basename $(@F))) \
 			 $(libof-$(<F)) $(libof-$(@F)),$(CPPFLAGS-$(lib))) \
 	   $(CPPFLAGS-$(<F)) $(CPPFLAGS-$(@F)) $(CPPFLAGS-$(basename $(@F)))
-override CFLAGS	= -std=gnu99 $(gnu89-inline-CFLAGS) $(config-extra-cflags) \
+
+ifneq (no,$(have-tunables))
+CPPFLAGS += -DTOP_NAMESPACE=glibc
+endif
+
+override CFLAGS	= -std=gnu11 -fgnu89-inline $(config-extra-cflags) \
 		  $(filter-out %frame-pointer,$(+cflags)) $(+gccwarn-c) \
+		  $(+extra-math-flags) \
 		  $(sysdep-CFLAGS) $(CFLAGS-$(suffix $@)) $(CFLAGS-$(<F)) \
-		  $(CFLAGS-$(@F)) \
+		  $(CFLAGS-$(@F)) $(tls-model) \
 		  $(foreach lib,$(libof-$(basename $(@F))) \
 				$(libof-$(<F)) $(libof-$(@F)),$(CFLAGS-$(lib)))
-override CXXFLAGS = $(c++-sysincludes) \
+# Use our copies of cstdlib and cmath.
+override CXXFLAGS = -I$(common-objpfx) $(c++-sysincludes) \
 		    $(filter-out %frame-pointer,$(+cflags)) $(sysdep-CFLAGS) \
 		    $(CFLAGS-$(suffix $@)) $(CFLAGS-$(<F)) $(CFLAGS-$(@F))
 
@@ -877,10 +1004,12 @@ endif
 # The compilation rules use $(CPPFLAGS-${SUFFIX}) and $(CFLAGS-${SUFFIX})
 # to pass different flags for each flavor.
 libtypes = $(foreach o,$(object-suffixes-for-libc),$(libtype$o))
-all-object-suffixes := .o .os .op .og .oS
+# .op may be added to all-object-suffixes below.
+all-object-suffixes := .o .os .oS
 object-suffixes :=
 CPPFLAGS-.o = $(pic-default)
-CFLAGS-.o = $(filter %frame-pointer,$(+cflags))
+# libc.a must be compiled with -fPIE/-fpie for static PIE.
+CFLAGS-.o = $(filter %frame-pointer,$(+cflags)) $(pie-default)
 libtype.o := lib%.a
 object-suffixes += .o
 ifeq (yes,$(build-shared))
@@ -903,9 +1032,11 @@ PIE-ccflag = -fPIE
 ifeq (yes,$(build-profile))
 # Under --enable-profile, we will build a static library of profiled objects.
 # The profiled object files are named foo.op.
+all-object-suffixes += .op
 object-suffixes += .op
 CPPFLAGS-.op = -DPROF $(pic-default)
-CFLAGS-.op = -pg
+# libc_p.a must be compiled with -fPIE/-fpie for static PIE.
+CFLAGS-.op = -pg $(pie-default)
 libtype.op = lib%_p.a
 endif
 
@@ -922,7 +1053,7 @@ object-suffixes-for-libc += .oS
 # Must build the routines as PIC, though, because they can end up in (users')
 # shared objects.  We don't want to use CFLAGS-os because users may, for
 # example, make that processor-specific.
-CFLAGS-.oS = $(CFLAGS-.o) $(PIC-ccflag)
+CFLAGS-.oS = $(CFLAGS-.o) $(PIC-ccflag) $(extra-nonshared-cflags)
 CPPFLAGS-.oS = $(CPPFLAGS-.o) -DPIC -DLIBC_NONSHARED=1
 libtype.oS = lib%_nonshared.a
 endif
@@ -931,7 +1062,7 @@ endif
 ifndef ASFLAGS
 ASFLAGS := $(filter -g% -fdebug-prefix-map=%,$(CFLAGS))
 endif
-ASFLAGS += $(ASFLAGS-config) $(asflags-cpu)
+override ASFLAGS += -Werror=undef $(ASFLAGS-config) $(asflags-cpu)
 
 ifndef BUILD_CC
 BUILD_CC = $(CC)
@@ -983,8 +1114,6 @@ endif
 ifeq ($(sysd-sorted-done),t)
 -include $(common-objpfx)soversions.mk
 ifndef avoid-generated
-# This lets add-ons give more-specific matches that override defaults
-# in the top-level file.
 $(common-objpfx)shlib-versions.v.i: \
 	$(wildcard $(+sysdep_dirs:=/shlib-versions) \
 		   $(subdir-srcdirs:=/shlib-versions)) \
@@ -1014,6 +1143,7 @@ postclean-generated += soversions.mk soversions.i \
 		       shlib-versions.v shlib-versions.v.i
 
 before-compile += $(common-objpfx)libc-modules.h
+common-generated += libc-modules.h libc-modules.stmp
 ifeq ($(soversions.mk-done),t)
 # Generate a header with macro definitions for use with the IS_IN macro.
 # These are the possible values for the MODULE_NAME macro defined when building
@@ -1028,7 +1158,77 @@ $(common-objpfx)libc-modules.stmp: $(..)scripts/gen-libc-modules.awk \
 
 endif
 
-common-generated += libc-modules.h libc-modules.stmp
+# Build the tunables list header early since it could be used by any module in
+# glibc.
+ifneq (no,$(have-tunables))
+before-compile += $(common-objpfx)dl-tunable-list.h
+common-generated += dl-tunable-list.h dl-tunable-list.stmp
+
+$(common-objpfx)dl-tunable-list.h: $(common-objpfx)dl-tunable-list.stmp; @:
+$(common-objpfx)dl-tunable-list.stmp: \
+		$(..)scripts/gen-tunables.awk \
+		$(..)elf/dl-tunables.list \
+		$(wildcard $(subdirs:%=$(..)%/dl-tunables.list)) \
+		$(wildcard $(sysdirs:%=%/dl-tunables.list))
+	$(AWK) -f $^ > ${@:stmp=T}
+	$(move-if-change) ${@:stmp=T} ${@:stmp=h}
+	touch $@
+endif
+
+# Generate version maps, but wait until sysdep-subdirs is known
+ifeq ($(sysd-sorted-done),t)
+ifeq ($(build-shared),yes)
+-include $(common-objpfx)sysd-versions
+-include $(common-objpfx)Versions.mk
+$(addprefix $(common-objpfx),$(version-maps)): $(common-objpfx)sysd-versions
+common-generated += $(version-maps)
+postclean-generated += sysd-versions Versions.all abi-versions.h \
+		       Versions.def Versions.v.i Versions.v Versions.mk
+
+ifndef avoid-generated
+ifneq ($(sysd-versions-subdirs),$(sorted-subdirs) $(config-sysdirs))
+sysd-versions-force = FORCE
+FORCE:
+endif
+
+$(common-objpfx)Versions.def: $(..)scripts/versionlist.awk \
+			      $(common-objpfx)Versions.v
+	LC_ALL=C $(AWK) -f $^ > $@T
+	mv -f $@T $@
+
+$(common-objpfx)Versions.all: $(..)scripts/firstversions.awk \
+			      $(common-objpfx)soversions.i \
+			      $(common-objpfx)Versions.def
+	{ while read which lib version setname; do \
+	    test x"$$which" = xDEFAULT || continue; \
+	    test -z "$$setname" || echo "$$lib : $$setname"; \
+	  done < $(word 2,$^); \
+	  cat $(word 3,$^); \
+	} | LC_ALL=C $(AWK) -f $< > $@T
+	mv -f $@T $@
+$(common-objpfx)Versions.mk: $(..)scripts/haveversions.awk \
+			     $(common-objpfx)Versions.all
+	$(AWK) -f $^ > $@T
+	mv -f $@T $@
+# See %.v/%.v.i implicit rules in Makeconfig.
+$(common-objpfx)Versions.v.i: $(wildcard $(subdirs:%=$(..)%/Versions)) \
+			      $(wildcard $(sysdirs:%=%/Versions)) \
+			      $(sysd-versions-force)
+$(common-objpfx)sysd-versions: $(common-objpfx)versions.stmp
+$(common-objpfx)versions.stmp: $(common-objpfx)Versions.all \
+			       $(common-objpfx)Versions.v \
+			       $(..)scripts/versions.awk
+	( echo 'sysd-versions-subdirs = $(subdirs) $(config-sysdirs)' ; \
+	  cat $(word 2,$^) \
+	  | LC_ALL=C $(AWK) -v buildroot=$(common-objpfx) -v defsfile=$< \
+			    -v move_if_change='$(move-if-change)' \
+			    -f $(word 3,$^); \
+	) > $(common-objpfx)sysd-versionsT
+	mv -f $(common-objpfx)sysd-versionsT $(common-objpfx)sysd-versions
+	touch $@
+endif # avoid-generated
+endif # $(build-shared) = yes
+endif # sysd-sorted-done
 
 # The name under which the run-time dynamic linker is installed.
 # We are currently going for the convention that `/lib/ld.so.1'
@@ -1056,19 +1256,32 @@ endif
 
 ifeq ($(build-shared),yes)
 libm = $(common-objpfx)math/libm.so$(libm.so-version)
+libmvec = $(common-objpfx)mathvec/libmvec.so$(libmvec.so-version)
 else
 libm = $(common-objpfx)math/libm.a
+libmvec = $(common-objpfx)mathvec/libmvec.a
 endif
 
-# These are the subdirectories containing the library source.  The order
-# is more or less arbitrary.  The sorting step will take care of the
-# dependencies.
+ifeq ($(build-shared),yes)
+libsupport = $(common-objpfx)support/libsupport_nonshared.a
+else
+libsupport = $(common-objpfx)support/libsupport.a
+endif
+
+# This is a partial list of subdirectories containing the library source.
+# The order is more or less arbitrary.  The sorting step will take care of the
+# dependencies and generate sorted-subdirs dynamically.
 all-subdirs = csu assert ctype locale intl catgets math setjmp signal	    \
 	      stdlib stdio-common libio malloc string wcsmbs time dirent    \
 	      grp pwd posix io termios resource misc socket sysvipc gmon    \
 	      gnulib iconv iconvdata wctype manual shadow gshadow po argp   \
-	      crypt localedata timezone rt conform debug		    \
-	      $(add-on-subdirs) dlfcn elf
+	      localedata timezone rt conform debug mathvec support	    \
+	      dlfcn elf
+
+ifeq ($(build-crypt),yes)
+all-subdirs += crypt
+rpath-dirs += crypt
+endif
 
 ifndef avoid-generated
 # sysd-sorted itself will contain rules making the sysd-sorted target

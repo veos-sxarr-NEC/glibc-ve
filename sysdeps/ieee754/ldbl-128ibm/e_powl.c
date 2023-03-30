@@ -28,7 +28,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __ieee754_powl(x,y) return x**y
  *
@@ -66,6 +66,8 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const long double bp[] = {
   1.0L,
@@ -148,7 +150,7 @@ long double
 __ieee754_powl (long double x, long double y)
 {
   long double z, ax, z_h, z_l, p_h, p_l;
-  long double y1, t1, t2, r, s, t, u, v, w;
+  long double y1, t1, t2, r, s, sgn, t, u, v, w;
   long double s2, s_h, s_l, t_h, t_l, ay;
   int32_t i, j, k, yisint, n;
   uint32_t ix, iy;
@@ -165,11 +167,11 @@ __ieee754_powl (long double x, long double y)
   iy = hy & 0x7fffffff;
 
   /* y==zero: x**0 = 1 */
-  if ((iy | ly) == 0)
+  if ((iy | ly) == 0 && !issignaling (x))
     return one;
 
   /* 1.0**y = 1; -1.0**+-Inf = 1 */
-  if (x == one)
+  if (x == one && !issignaling (y))
     return one;
   if (x == -1.0L && ((iy - 0x7ff00000) | ly) == 0)
     return one;
@@ -194,10 +196,10 @@ __ieee754_powl (long double x, long double y)
 	yisint = 2;		/* even integer y */
       else if (iy >= 0x3ff00000)	/* 1.0 */
 	{
-	  if (__floorl (y) == y)
+	  if (floorl (y) == y)
 	    {
 	      z = 0.5 * y;
-	      if (__floorl (z) == z)
+	      if (floorl (z) == z)
 		yisint = 2;
 	      else
 		yisint = 1;
@@ -233,7 +235,7 @@ __ieee754_powl (long double x, long double y)
 	  if (hy == 0x3fe00000)
 	    {			/* y is  0.5 */
 	      if (hx >= 0)		/* x >= +0 */
-		return __ieee754_sqrtl (x);
+		return sqrtl (x);
 	    }
 	}
     }
@@ -260,8 +262,13 @@ __ieee754_powl (long double x, long double y)
     }
 
   /* (x<0)**(non-int) is NaN */
-  if (((((u_int32_t) hx >> 31) - 1) | yisint) == 0)
+  if (((((uint32_t) hx >> 31) - 1) | yisint) == 0)
     return (x - x) / (x - x);
+
+  /* sgn (sign of result -ve**odd) = -1 else = 1 */
+  sgn = one;
+  if (((((uint32_t) hx >> 31) - 1) | (yisint - 1)) == 0)
+    sgn = -one;			/* (-ve)**(odd int) */
 
   /* |y| is huge.
      2^-16495 = 1/2 of smallest representable value.
@@ -272,15 +279,15 @@ __ieee754_powl (long double x, long double y)
       if (iy > 0x47d654b0)
 	{
 	  if (ix <= 0x3fefffff)
-	    return (hy < 0) ? huge * huge : tiny * tiny;
+	    return (hy < 0) ? sgn * huge * huge : sgn * tiny * tiny;
 	  if (ix >= 0x3ff00000)
-	    return (hy > 0) ? huge * huge : tiny * tiny;
+	    return (hy > 0) ? sgn * huge * huge : sgn * tiny * tiny;
 	}
       /* over/underflow if x is not close to one */
       if (ix < 0x3fefffff)
-	return (hy < 0) ? huge * huge : tiny * tiny;
+	return (hy < 0) ? sgn * huge * huge : sgn * tiny * tiny;
       if (ix > 0x3ff00000)
-	return (hy > 0) ? huge * huge : tiny * tiny;
+	return (hy > 0) ? sgn * huge * huge : sgn * tiny * tiny;
     }
 
   ay = y > 0 ? y : -y;
@@ -351,11 +358,6 @@ __ieee754_powl (long double x, long double y)
   t1 = ldbl_high (t1);
   t2 = z_l - (((t1 - t) - dp_h[k]) - z_h);
 
-  /* s (sign of result -ve**odd) = -1 else = 1 */
-  s = one;
-  if (((((u_int32_t) hx >> 31) - 1) | (yisint - 1)) == 0)
-    s = -one;			/* (-ve)**(odd int) */
-
   /* split up y into y1+y2 and compute (y1+y2)*(t1+t2) */
   y1 = ldbl_high (y);
   p_l = (y - y1) * t1 + y * t2;
@@ -367,22 +369,22 @@ __ieee754_powl (long double x, long double y)
     {
       /* if z > 16384 */
       if (((j - 0x40d00000) | lj) != 0)
-	return s * huge * huge;	/* overflow */
+	return sgn * huge * huge;	/* overflow */
       else
 	{
 	  if (p_l + ovt > z - p_h)
-	    return s * huge * huge;	/* overflow */
+	    return sgn * huge * huge;	/* overflow */
 	}
     }
   else if ((j & 0x7fffffff) >= 0x40d01b90)	/* z <= -16495 */
     {
       /* z < -16495 */
       if (((j - 0xc0d01bc0) | lj) != 0)
-	return s * tiny * tiny;	/* underflow */
+	return sgn * tiny * tiny;	/* underflow */
       else
 	{
 	  if (p_l <= z - p_h)
-	    return s * tiny * tiny;	/* underflow */
+	    return sgn * tiny * tiny;	/* underflow */
 	}
     }
   /* compute 2**(p_h+p_l) */
@@ -391,7 +393,7 @@ __ieee754_powl (long double x, long double y)
   n = 0;
   if (i > 0x3fe00000)
     {				/* if |z| > 0.5, set n = [z+0.5] */
-      n = __floorl (z + 0.5L);
+      n = floorl (z + 0.5L);
       t = n;
       p_h -= t;
     }
@@ -408,7 +410,8 @@ __ieee754_powl (long double x, long double y)
   t1 = z - t * u / v;
   r = (z * t1) / (t1 - two) - (w + z * w);
   z = one - (r - z);
-  z = __scalbnl (z, n);
-  return s * z;
+  z = __scalbnl (sgn * z, n);
+  math_check_force_underflow (z);
+  return z;
 }
-strong_alias (__ieee754_powl, __powl_finite)
+libm_alias_finite (__ieee754_powl, __powl)

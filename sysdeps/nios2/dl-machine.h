@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  Nios II version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h
@@ -186,14 +186,15 @@ _start:\n\
 
 /* ELF_RTYPE_CLASS_PLT iff TYPE describes relocation of a PLT entry, so
    PLT entries should not be allowed to define the value.
-   ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to one
+   ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve to one
    of the main executable's symbols, as for a COPY reloc.  */
 #define elf_machine_type_class(type)				\
   ((((type) == R_NIOS2_JUMP_SLOT				\
      || (type) == R_NIOS2_TLS_DTPMOD				\
      || (type) == R_NIOS2_TLS_DTPREL				\
      || (type) == R_NIOS2_TLS_TPREL) * ELF_RTYPE_CLASS_PLT)	\
-   | (((type) == R_NIOS2_COPY) * ELF_RTYPE_CLASS_COPY))
+   | (((type) == R_NIOS2_COPY) * ELF_RTYPE_CLASS_COPY)		\
+   | (((type) == R_NIOS2_GLOB_DAT) * ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA))
 
 /* A reloc type used for ld.so cmdline arg lookups to reject PLT entries.  */
 #define ELF_MACHINE_JMP_SLOT  R_NIOS2_JUMP_SLOT
@@ -206,6 +207,7 @@ _start:\n\
 
 static inline Elf32_Addr
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf32_Rela *reloc,
 		       Elf32_Addr *reloc_addr, Elf32_Addr value)
 {
@@ -248,7 +250,7 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
     {
       const Elf32_Sym *const refsym = sym;
       struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-      Elf32_Addr value = sym == NULL ? 0 : sym_map->l_addr + sym->st_value;
+      Elf32_Addr value = SYMBOL_ADDRESS (sym_map, sym, true);
 
       switch (r_type)
 	{

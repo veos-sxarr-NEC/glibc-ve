@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper, <drepper@gnu.ai.mit.edu>.
 
@@ -14,19 +14,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/types.h>
 
 
 struct catalog_obj
 {
-  u_int32_t magic;
-  u_int32_t plane_size;
-  u_int32_t plane_depth;
+  uint32_t magic;
+  uint32_t plane_size;
+  uint32_t plane_depth;
   /* This is in fact two arrays in one: always a pair of name and
      pointer into the data area.  */
-  u_int32_t name_ptr[0];
+  uint32_t name_ptr[0];
 };
 
 
@@ -37,7 +37,7 @@ typedef struct catalog_info
 
   size_t plane_size;
   size_t plane_depth;
-  u_int32_t *name_ptr;
+  uint32_t *name_ptr;
   const char *strings;
 
   struct catalog_obj *file_ptr;

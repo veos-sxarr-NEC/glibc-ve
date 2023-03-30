@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@suse.de>, 1998.
 
@@ -14,9 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <alloca.h>
 #include <ctype.h>
 #include <errno.h>
 #include <grp.h>
@@ -27,6 +26,7 @@
 #include <rpcsvc/yp.h>
 #include <rpcsvc/ypclnt.h>
 #include <sys/param.h>
+#include <scratch_buffer.h>
 
 #include "nss-nis.h"
 #include <libnsl.h>
@@ -120,27 +120,30 @@ internal_getgrent_r (struct group *grp, char *buffer, size_t buflen,
 static int
 get_uid (const char *user, uid_t *uidp)
 {
-  size_t buflen = sysconf (_SC_GETPW_R_SIZE_MAX);
-  char *buf = (char *) alloca (buflen);
+  struct scratch_buffer tmpbuf;
+  scratch_buffer_init (&tmpbuf);
 
   while (1)
     {
       struct passwd result;
       struct passwd *resp;
 
-      int r = getpwnam_r (user, &result, buf, buflen, &resp);
+      int r = getpwnam_r (user, &result, tmpbuf.data, tmpbuf.length, &resp);
       if (r == 0 && resp != NULL)
 	{
 	  *uidp = resp->pw_uid;
+	  scratch_buffer_free (&tmpbuf);
 	  return 0;
 	}
 
       if (r != ERANGE)
 	break;
 
-      buf = extend_alloca (buf, buflen, 2 * buflen);
+      if (!scratch_buffer_grow (&tmpbuf))
+	return 1;
     }
 
+  scratch_buffer_free (&tmpbuf);
   return 1;
 }
 
@@ -254,8 +257,6 @@ _nss_nis_initgroups_dyn (const char *user, gid_t group, long int *start,
     }
 
   struct group grpbuf, *g;
-  size_t buflen = sysconf (_SC_GETPW_R_SIZE_MAX);
-  char *tmpbuf;
   enum nss_status status;
   intern_t intern = { NULL, NULL, 0 };
   gid_t *groups = *groupsp;
@@ -264,19 +265,27 @@ _nss_nis_initgroups_dyn (const char *user, gid_t group, long int *start,
   if (status != NSS_STATUS_SUCCESS)
     return status;
 
-  tmpbuf = __alloca (buflen);
+  struct scratch_buffer tmpbuf;
+  scratch_buffer_init (&tmpbuf);
 
-  do
+  while (1)
     {
       while ((status =
-	      internal_getgrent_r (&grpbuf, tmpbuf, buflen, errnop,
+	      internal_getgrent_r (&grpbuf, tmpbuf.data, tmpbuf.length, errnop,
 				   &intern)) == NSS_STATUS_TRYAGAIN
              && *errnop == ERANGE)
-	tmpbuf = extend_alloca (tmpbuf, buflen, 2 * buflen);
+	if (!scratch_buffer_grow (&tmpbuf))
+	  {
+	    status = NSS_STATUS_TRYAGAIN;
+	    goto done;
+	  }
 
       if (status != NSS_STATUS_SUCCESS)
-	goto done;
-
+	{
+	  if (status == NSS_STATUS_NOTFOUND)
+	    status = NSS_STATUS_SUCCESS;
+	  goto done;
+	}
 
       g = &grpbuf;
       if (g->gr_gid != group)
@@ -304,7 +313,11 @@ _nss_nis_initgroups_dyn (const char *user, gid_t group, long int *start,
 
 		    newgroups = realloc (groups, newsize * sizeof (*groups));
 		    if (newgroups == NULL)
-		      goto done;
+		      {
+			status = NSS_STATUS_TRYAGAIN;
+			*errnop = errno;
+			goto done;
+		      }
 		    *groupsp = groups = newgroups;
                     *size = newsize;
                   }
@@ -316,7 +329,6 @@ _nss_nis_initgroups_dyn (const char *user, gid_t group, long int *start,
               }
         }
     }
-  while (status == NSS_STATUS_SUCCESS);
 
 done:
   while (intern.start != NULL)
@@ -325,6 +337,7 @@ done:
       intern.start = intern.start->next;
       free (intern.next);
     }
+  scratch_buffer_free (&tmpbuf);
 
-  return NSS_STATUS_SUCCESS;
+  return status;
 }

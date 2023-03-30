@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Define the machine-dependent type `jmp_buf'.  */
 
@@ -25,7 +25,7 @@
 # error "Never include <bits/setjmp.h> directly; use <setjmp.h> instead."
 #endif
 
-typedef struct
+typedef struct __jmp_buf_internal_tag
   {
     /* There are 21 4-byte registers that should be saved:
        r1, r2, r13-r31. Actually, there seems no need to save

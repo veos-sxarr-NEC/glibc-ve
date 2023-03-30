@@ -1,5 +1,5 @@
 /* Set floating-point environment exception handling.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <fenv.h>
 #include <math.h>
@@ -23,7 +23,8 @@
 int
 fesetexceptflag (const fexcept_t *flagp, int excepts)
 {
-  fenv_t temp = *flagp & excepts & FE_ALL_EXCEPT;
+  excepts &= FE_ALL_EXCEPT;
+  fenv_t temp = *flagp & excepts;
 
   /* Get the current FPU environment.  We have to do this since we
      cannot separately set the status word. And store the new status
@@ -32,8 +33,9 @@ fesetexceptflag (const fexcept_t *flagp, int excepts)
      floating-point instruction.*/
 
   __asm__ ("sfr %%s1\n\t"
+	   "nnd %%s1, %1, %%s1\n\t"	
 	"or %%s1, %0, %%s1\n\t"
-	"lfr %%s1":: "r" (temp): "%s1");
+	"lfr %%s1":: "r" (temp),"r"(excepts) : "%s1");
 
   /* Success.  */
   return 0;

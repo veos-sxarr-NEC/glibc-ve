@@ -1,10 +1,16 @@
+# This file is part of the GNU C Library and contains locale data.
+# The Free Software Foundation does not claim any copyright interest
+# in the locale data contained in this file.  The foregoing does not
+# affect the license of the GNU C Library as a whole.  It does not
+# exempt you from the conditions of the license if your use would
+# otherwise be governed by that license.
+
 LC_COLLATE
 
 copy "iso14651_t1_common"
 
-script <HAN>
+reorder-after <BEFORE-LATIN>
 
-order_start <HAN>;forward;forward;forward;forward,position
 <U5416> <U5416>;IGNORE;IGNORE;IGNORE	#吖104
 <U814C> <U814C>;IGNORE;IGNORE;IGNORE	#腌185
 <U9312> <U9312>;IGNORE;IGNORE;IGNORE	#錒0
@@ -25501,7 +25507,7 @@ order_start <HAN>;forward;forward;forward;forward,position
 <U8444> <U8444>;IGNORE;IGNORE;IGNORE	#葄0
 <U888F> <U888F>;IGNORE;IGNORE;IGNORE	#袏0
 <U963C> <U963C>;IGNORE;IGNORE;IGNORE	#阼0
-#
-order_end
-#
+
+reorder-end
+
 END LC_COLLATE

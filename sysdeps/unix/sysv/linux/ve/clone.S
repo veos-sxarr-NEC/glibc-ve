@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 
@@ -41,6 +41,7 @@
 */
 
  #include <sysdep.h>
+ #define _ERRNO_H        1
  #include <bits/errno.h>
 
 .section data
@@ -73,18 +74,15 @@
 	st	%s15, 176+48(,%sp)
 	st	%s62, 176+56(,%sp)
 
-	lea %got,_GLOBAL_OFFSET_TABLE_@PC_LO(-24)
-        and %got,%got,(32)0
+	addi %got,-16,_GLOBAL_OFFSET_TABLE_@PC_LO
         sic %plt
         lea.sl %got,_GLOBAL_OFFSET_TABLE_@PC_HI(%plt,%got)
 
 #ifndef SHARED
-	lea     %s12, __getpagesize@CALL_LO
-        and     %s12, %s12,(32)0
+	addi %s12,0,__getpagesize@CALL_LO
         lea.sl  %s12, __getpagesize@CALL_HI(,%s12)
 #else
-        lea     %s12, __getpagesize@PLT_LO(-24)
-        and     %s12,%s12,(32)0
+	addi %s12,-16,__getpagesize@PLT_LO
         sic     %s55
         lea.sl  %s12, __getpagesize@PLT_HI(%s12,%s55)
 #endif
@@ -125,6 +123,11 @@
 	shm.l   %s7, 0x30(%s46)         /* %s7 = Guard (Guard Pointer) */
 	or	%s49, 0, %s1		/* Store value of s1 in temp register */
 
+	or %s34,10,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
 	monc				/* syscall()			     */
 	brne.l.t 0, %s0, 3f		/* Return from parent context	     */
 
@@ -138,24 +141,6 @@
 	addu.l  %s58, %s47, %s58
         or      %s8, %s58,(0)1           /* set initial stack_limit */
 
-	/* Test if CLONE_THREAD and CLONE_VM                                 */
-	lea     %s35, CLONE_THREAD
-	and     %s3, %s35, %s49
-	brne.l.t 0, %s3, 2f                     /* Branch if CLONE_THREAD        */
-
-	or      %s0, -1, (0)1           /* Set -1 if pid is not required     */
-	lea     %s35, CLONE_VM
-	and     %s3, %s35, %s49
-	brne.l.t 0, %s3, 1f                    /* Branch if CLONE_VM            */
-
-	/* Call syscall getpid()                                             */
-	or      %s0, SYS_ify(getpid), (0)1
-	ld      %s46, SHM_OFFSET(, %tp)
-	shm.l   %s0, 0x0(%s46)
-	monc
-1:	stl     %s0, TID_OFFSET(,%tp)
-	stl     %s0, PID_OFFSET(,%tp)
-2:
 	or	%s0, %s61, (0)1		/* %s0 = Functions Args pointer      */
 	or	%s12, %s62, (0)1	/* %s12 = Child function pointer     */
 	bsic	%s10, 0x0(, %s12)	/* Invoke child function	     */
@@ -169,6 +154,11 @@
 	ld	%s46, SHM_OFFSET(, %tp)		/* Fetch SHM area offset    */
 	shm.l	%s0, 0x0(%s46)
 	shm.l	%s1, 0x8(%s46)
+	or %s34,10,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
 	monc
 3:	beq.l.t 0,0x0(, %lr)
 error:
@@ -177,3 +167,4 @@ error:
 	beq.l.t 0,0x0(, %lr)
 
 PSEUDO_END (__clone)
+libc_hidden_def (__clone)

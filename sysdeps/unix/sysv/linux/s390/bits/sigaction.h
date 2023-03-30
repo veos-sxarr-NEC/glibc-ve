@@ -1,5 +1,5 @@
 /* Definitions for 31 & 64 bit S/390 sigaction.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+#ifndef _BITS_SIGACTION_H
+#define _BITS_SIGACTION_H 1
 
 #ifndef _SIGNAL_H
 # error "Never include <bits/sigaction.h> directly; use <signal.h> instead."
@@ -27,7 +30,7 @@
 struct sigaction
   {
     /* Signal handler.	*/
-#ifdef __USE_POSIX199309
+#if defined __USE_POSIX199309 || defined __USE_XOPEN_EXTENDED
     union
       {
 	/* Used if SA_SIGINFO is not set.  */
@@ -57,7 +60,7 @@ struct sigaction
 struct sigaction
   {
     /* Signal handler.  */
-#ifdef __USE_POSIX199309
+#if defined __USE_POSIX199309 || defined __USE_XOPEN_EXTENDED
     union
       {
 	/* Used if SA_SIGINFO is not set.  */
@@ -88,10 +91,10 @@ struct sigaction
 #define SA_NOCLDWAIT  2		 /* Don't create zombie on child death.  */
 #define SA_SIGINFO    4		 /* Invoke signal-catching function with
 				    three arguments instead of one.  */
-#if defined __USE_UNIX98 || defined __USE_MISC
+#if defined __USE_XOPEN_EXTENDED || defined __USE_MISC
 # define SA_ONSTACK   0x08000000 /* Use signal stack by using `sa_restorer'. */
 #endif
-#if defined __USE_UNIX98 || defined __USE_XOPEN2K8
+#if defined __USE_XOPEN_EXTENDED || defined __USE_XOPEN2K8
 # define SA_RESTART   0x10000000 /* Restart syscall on signal return.  */
 # define SA_NODEFER   0x40000000 /* Don't automatically block the signal when
 				    its handler is being executed.	 */
@@ -110,3 +113,5 @@ struct sigaction
 #define	SIG_BLOCK     0		 /* Block signals.  */
 #define	SIG_UNBLOCK   1		 /* Unblock signals.  */
 #define	SIG_SETMASK   2		 /* Set the set of blocked signals.  */
+
+#endif

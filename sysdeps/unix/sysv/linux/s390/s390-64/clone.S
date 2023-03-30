@@ -1,5 +1,5 @@
 /* Wrapper around clone system call.  64 bit S/390 version.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    Contributed by Martin Schwidefsky (schwidefsky@de.ibm.com).
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone is even more special than fork as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -55,22 +55,16 @@ error:
 PSEUDO_END (__clone)
 
 thread_start:
-	tmh	%r3,1		/* CLONE_THREAD == 0x00010000 */
-	jne	1f
-	lhi	%r2,-1
-	tml	%r3,256		/* CLONE_VM == 0x00000100 */
-	jne	2f
-	svc	SYS_ify(getpid)
-2:	ear	%r3,%a0
-	sllg	%r3,%r3,32
-	ear	%r3,%a1
-	st	%r2,PID(%r3)
-	st	%r2,TID(%r3)
-1:
+	cfi_startproc
+	/* Mark r14 as undefined in order to stop unwinding here!  */
+	cfi_undefined (r14)
 	/* fn is in gpr 1, arg in gpr 0 */
 	lgr	%r2,%r0		/* set first parameter to void *arg */
 	aghi	%r15,-160	/* make room on the stack for the save area */
 	xc	0(8,%r15),0(%r15)
 	basr	%r14,%r1	/* jump to fn */
 	DO_CALL	(exit, 1)
+	cfi_endproc
+
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

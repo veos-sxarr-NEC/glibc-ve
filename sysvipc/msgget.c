@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/msg.h>
 #include <errno.h>
@@ -23,9 +23,7 @@
    parameter describes how to proceed with clashing of key values.  */
 
 int
-msgget (key, msgflg)
-     key_t key;
-     int msgflg;
+msgget (key_t key, int msgflg)
 {
   __set_errno (ENOSYS);
   return -1;

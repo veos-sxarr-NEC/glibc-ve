@@ -1,5 +1,5 @@
 /* Optimized memcmp implementation for PowerPC64.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -22,8 +22,19 @@
 		    const char *s2 [r4],
 		    size_t size [r5])  */
 
+#ifndef MEMCMP
+# define MEMCMP memcmp
+#endif
+
+#ifndef __LITTLE_ENDIAN__
 	.machine power4
-EALIGN (memcmp, 4, 0)
+#else
+/* Little endian is only available since POWER8, so it's safe to
+   specify .machine as power8 (or older), even though this is a POWER4
+   file.  Since the little-endian code uses 'ldbrx', power7 is enough. */
+	.machine power7
+#endif
+ENTRY_TOCLESS (MEMCMP, 4)
 	CALL_MCOUNT 3
 
 #define rRTN	r3
@@ -52,8 +63,8 @@ EALIGN (memcmp, 4, 0)
    byte loop.  */
 	blt	cr1, L(bytealigned)
 	std	rWORD8, -8(r1)
-	cfi_offset(rWORD8, -8)
 	std	rWORD7, -16(r1)
+	cfi_offset(rWORD8, -8)
 	cfi_offset(rWORD7, -16)
 	bne	L(unaligned)
 /* At this point we know both strings have the same alignment and the
@@ -728,18 +739,18 @@ L(unaligned):
    the actual start of rSTR2.  */
 	clrrdi	rSTR2, rSTR2, 3
 	std	rWORD2_SHIFT, -48(r1)
-	cfi_offset(rWORD2_SHIFT, -48)
 /* Compute the left/right shift counts for the unaligned rSTR2,
    compensating for the logical (DW aligned) start of rSTR1.  */
 	clrldi	rSHL, rWORD8_SHIFT, 61
 	clrrdi	rSTR1, rSTR1, 3
 	std	rWORD4_SHIFT, -56(r1)
-	cfi_offset(rWORD4_SHIFT, -56)
 	sldi	rSHL, rSHL, 3
 	cmpld	cr5, rWORD8_SHIFT, rSTR2
 	add	rN, rN, r12
 	sldi	rWORD6, r12, 3
 	std	rWORD6_SHIFT, -64(r1)
+	cfi_offset(rWORD2_SHIFT, -48)
+	cfi_offset(rWORD4_SHIFT, -56)
 	cfi_offset(rWORD6_SHIFT, -64)
 	subfic	rSHR, rSHL, 64
 	srdi	r0, rN, 5	/* Divide by 32 */
@@ -833,15 +844,15 @@ L(duPs4):
 	.align	4
 L(DWunaligned):
 	std	rWORD8_SHIFT, -40(r1)
-	cfi_offset(rWORD8_SHIFT, -40)
 	clrrdi	rSTR2, rSTR2, 3
 	std	rWORD2_SHIFT, -48(r1)
-	cfi_offset(rWORD2_SHIFT, -48)
 	srdi	r0, rN, 5	/* Divide by 32 */
 	std	rWORD4_SHIFT, -56(r1)
-	cfi_offset(rWORD4_SHIFT, -56)
 	andi.	r12, rN, 24	/* Get the DW remainder */
 	std	rWORD6_SHIFT, -64(r1)
+	cfi_offset(rWORD8_SHIFT, -40)
+	cfi_offset(rWORD2_SHIFT, -48)
+	cfi_offset(rWORD4_SHIFT, -56)
 	cfi_offset(rWORD6_SHIFT, -64)
 	sldi	rSHL, rSHL, 3
 #ifdef __LITTLE_ENDIAN__
@@ -1360,6 +1371,6 @@ L(duzeroLength):
 	li	rRTN, 0
 	blr
 
-END (memcmp)
+END (MEMCMP)
 libc_hidden_builtin_def (memcmp)
 weak_alias (memcmp, bcmp)

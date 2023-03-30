@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 1998.
 
@@ -14,12 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 
 int failed = 0;
@@ -87,8 +88,8 @@ check_tzvars (const char *name, int dayl, int timez, const char *const tznam[])
 }
 
 
-int
-main (int argc, char ** argv)
+static int
+do_test (void)
 {
   time_t t;
   const struct test_times *pt;
@@ -166,3 +167,6 @@ main (int argc, char ** argv)
 
   return failed ? EXIT_FAILURE : EXIT_SUCCESS;
 }
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"

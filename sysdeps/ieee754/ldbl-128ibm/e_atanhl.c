@@ -28,8 +28,11 @@
  *
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const long double one = 1.0L, huge = 1e300L;
 
@@ -54,7 +57,11 @@ __ieee754_atanhl(long double x)
 	    if (t == one)
 		return x/zero;
 	}
-	if(ix<0x3e20000000000000LL&&(huge+x)>zero) return x;	/* x<2**-29 */
+	if(ix<0x3c70000000000000LL&&(huge+x)>zero)	/* x<2**-56 */
+	  {
+	    math_check_force_underflow (x);
+	    return x;
+	  }
 	x = fabsl (x);
 	if(ix<0x3fe0000000000000LL) {		/* x < 0.5 */
 	    t = x+x;
@@ -63,4 +70,4 @@ __ieee754_atanhl(long double x)
 	    t = 0.5*__log1pl((x+x)/(one-x));
 	if(hx>=0) return t; else return -t;
 }
-strong_alias (__ieee754_atanhl, __atanhl_finite)
+libm_alias_finite (__ieee754_atanhl, __atanhl)

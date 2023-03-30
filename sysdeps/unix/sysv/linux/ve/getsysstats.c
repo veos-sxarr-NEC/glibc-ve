@@ -1,5 +1,5 @@
 /* Determine various system internal values, Linux version.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,8 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <alloca.h>
 #include <assert.h>
@@ -75,6 +75,7 @@ __get_nprocs (void)
 err_out:
   return res;
 }
+libc_hidden_def (__get_nprocs)
 weak_alias (__get_nprocs, get_nprocs)
 
 
@@ -89,6 +90,7 @@ __get_nprocs_conf (void)
 
   return result;
 }
+libc_hidden_def (__get_nprocs_conf)
 weak_alias (__get_nprocs_conf, get_nprocs_conf)
 
 int __lsysinfo(struct sysinfo *info)
@@ -105,7 +107,6 @@ int __lsysinfo(struct sysinfo *info)
 /* General function to get information about memory status from proc
    filesystem.  */
 static long int
-internal_function
 phys_pages_info (const char *func)
 {
 	unsigned long long mem = -1;
@@ -135,6 +136,7 @@ __get_phys_pages (void)
 
   return phys_pages_info (__func__);
 }
+libc_hidden_def (__get_phys_pages)
 weak_alias (__get_phys_pages, get_phys_pages)
 
 
@@ -148,4 +150,5 @@ __get_avphys_pages (void)
 
   return phys_pages_info (__func__);
 }
+libc_hidden_def (__get_avphys_pages)
 weak_alias (__get_avphys_pages, get_avphys_pages)

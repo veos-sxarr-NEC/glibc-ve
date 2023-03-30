@@ -1,6 +1,6 @@
-#! /bin/sh
+#!/bin/sh
 # Generate test locale files.
-# Copyright (C) 2000-2015 Free Software Foundation, Inc.
+# Copyright (C) 2000-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,8 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
+# Changes by NEC Corporation for the VE port, 2020
 
 set -e
 
@@ -30,12 +31,14 @@ generate_locale ()
   charmap=$1
   input=$2
   out=$3
-  localedefs="$(cut -d' ' -f4 <<< $localedef_after_env)"
+  flags=$4
+  ret=0
+  localedefs="$(echo $localedef_after_env | cut -d' ' -f4)"
 
-  if ${localedef_before_env} ${run_program_env} VE_I18NPATH=. \
-     ${localedefs} --quiet -c -f $charmap -i $input \
-			    ${common_objpfx}localedata/$out
-  then
+  ${localedef_before_env} ${run_program_env} VE_I18NPATH=../localedata \
+	${localedefs} $flags -f $charmap -i $input \
+	${common_objpfx}localedata/$out || ret=$?
+  if [ $ret -eq 0 ]; then
     # The makefile checks the timestamp of the LC_CTYPE file,
     # but localedef won't have touched it if it was able to
     # hard-link it to an existing file.
@@ -49,8 +52,29 @@ generate_locale ()
 
 locfile=`echo $locfile|sed 's|.*/\([^/]*/LC_CTYPE\)|\1|'`
 locale=`echo $locfile|sed 's|\([^.]*\)[.].*/LC_CTYPE|\1|'`
-charmap=`echo $locfile|sed 's|[^.]*[.]\(.*\)/LC_CTYPE|\1|'`
+charmap=`echo $locfile|sed 's|[^.]*[.]\([^@ ]*\)\(@[^ ]*\)\?/LC_CTYPE|\1|'`
+modifier=`echo $locfile|sed 's|[^.]*[.]\([^@ ]*\)\(@[^ ]*\)\?/LC_CTYPE|\2|'`
 
 echo "Generating locale $locale.$charmap: this might take a while..."
-generate_locale `echo $charmap | sed -e s/SJIS/SHIFT_JIS/` $locale \
-		$locale.$charmap
+
+# Run quietly and force output.
+flags="--quiet -c"
+
+# For SJIS the charmap is SHIFT_JIS. We just want the locale to have
+# a slightly nicer name instead of using "*.SHIFT_SJIS", but that
+# means we need a mapping here.
+charmap_real="$charmap"
+if [ "$charmap" = "SJIS" ]; then
+  charmap_real="SHIFT_JIS"
+fi
+
+# In addition to this the SHIFT_JIS character maps are not ASCII
+# compatible so we must use `--no-warnings=ascii' to disable the
+# warning. See localedata/Makefile $(INSTALL-SUPPORTED-LOCALES)
+# for the same logic.
+if [ "$charmap_real" = 'SHIFT_JIS' ] \
+   || [ "$charmap_real" = 'SHIFT_JISX0213' ]; then
+  flags="$flags --no-warnings=ascii"
+fi
+
+generate_locale $charmap_real $locale$modifier $locale.$charmap$modifier "$flags"

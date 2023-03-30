@@ -1,4 +1,4 @@
-/* Copyright (C) 2007-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -24,28 +24,10 @@
 int
 fallocate64 (int fd, int mode, __off64_t offset, __off64_t len)
 {
-#ifdef __NR_fallocate
-  if (SINGLE_THREAD_P)
-    return INLINE_SYSCALL (fallocate, 6, fd, mode,
-			   __LONG_LONG_PAIR ((long int) (offset >> 32),
-					     (long int) offset),
-			   __LONG_LONG_PAIR ((long int) (len >> 32),
-					     (long int) len));
-
-  int result;
-  int oldtype = LIBC_CANCEL_ASYNC ();
-
-  result = INLINE_SYSCALL (fallocate, 6, fd, mode,
-			   __LONG_LONG_PAIR ((long int) (offset >> 32),
-					     (long int) offset),
-			   __LONG_LONG_PAIR ((long int) (len >> 32),
-					     (long int) len));
-
-  LIBC_CANCEL_RESET (oldtype);
-
-  return result;
-#else
-  __set_errno (ENOSYS);
-  return -1;
-#endif
+  return SYSCALL_CANCEL (fallocate, fd, mode,
+			 SYSCALL_LL64 (offset), SYSCALL_LL64 (len));
 }
+
+#ifdef __OFF_T_MATCHES_OFF64_T
+weak_alias (fallocate64, fallocate)
+#endif

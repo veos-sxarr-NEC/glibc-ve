@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -14,10 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 
 #include "nsswitch.h"
 
@@ -113,8 +113,7 @@ __libc_lock_define_initialized (static, lock)
 
 /* The lookup function for the first entry of this service.  */
 extern int DB_LOOKUP_FCT (service_user **nip, const char *name,
-			  const char *name2, void **fctp)
-     internal_function;
+			  const char *name2, void **fctp);
 libc_hidden_proto (DB_LOOKUP_FCT)
 
 void

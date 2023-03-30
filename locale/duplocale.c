@@ -1,5 +1,5 @@
 /* Duplicate handle for selection of locales.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,10 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <locale.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,8 +29,8 @@
 __libc_rwlock_define (extern , __libc_setlocale_lock attribute_hidden)
 
 
-__locale_t
-__duplocale (__locale_t dataset)
+locale_t
+__duplocale (locale_t dataset)
 {
   /* This static object is returned for newlocale (LC_ALL_MASK, "C").  */
   if (dataset == _nl_C_locobj_ptr)
@@ -40,7 +40,7 @@ __duplocale (__locale_t dataset)
   if (dataset == LC_GLOBAL_LOCALE)
     dataset = &_nl_global_locale;
 
-  __locale_t result;
+  locale_t result;
   int cnt;
   size_t names_len = 0;
 

@@ -1,5 +1,5 @@
 /* Definitions for Linux/HPPA sigaction.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,17 +14,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+#ifndef _BITS_SIGACTION_H
+#define _BITS_SIGACTION_H 1
 
 #ifndef _SIGNAL_H
 # error "Never include <bits/sigaction.h> directly; use <signal.h> instead."
 #endif
 
+#include <bits/wordsize.h>
+
 /* Structure describing the action to be taken when a signal arrives.  */
 struct sigaction
   {
     /* Signal handler.  */
-#ifdef __USE_POSIX199309
+#if defined __USE_POSIX199309 || defined __USE_XOPEN_EXTENDED
     union
       {
 	/* Used if SA_SIGINFO is not set.  */
@@ -40,7 +45,10 @@ struct sigaction
 #endif
 
     /* Special flags.  */
-    unsigned long int sa_flags;
+#if __WORDSIZE == 64
+    int __glibc_reserved0;
+#endif
+    int sa_flags;
 
     /* Additional set of signals to be blocked.  */
     __sigset_t sa_mask;
@@ -52,8 +60,10 @@ struct sigaction
 #define SA_NOCLDWAIT  0x00000080  /* Don't create zombie on child death.  */
 #define SA_SIGINFO    0x00000010  /* Invoke signal-catching function with
 				     three arguments instead of one.  */
-#if defined __USE_UNIX98 || defined __USE_MISC
+#if defined __USE_XOPEN_EXTENDED || defined __USE_MISC
 # define SA_ONSTACK   0x00000001 /* Use signal stack by using `sa_restorer'. */
+#endif
+#if defined __USE_XOPEN_EXTENDED || defined __USE_XOPEN2K8
 # define SA_RESETHAND 0x00000004 /* Reset to SIG_DFL on entry to handler.  */
 # define SA_NODEFER   0x00000020 /* Don't automatically block the signal
 				    when its handler is being executed.  */
@@ -72,3 +82,5 @@ struct sigaction
 #define SIG_BLOCK          0	/* for blocking signals */
 #define SIG_UNBLOCK        1	/* for unblocking signals */
 #define SIG_SETMASK        2	/* for setting the signal mask */
+
+#endif

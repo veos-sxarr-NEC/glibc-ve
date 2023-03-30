@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,27 +13,26 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
 #include "mathimpl.h"
+#include <libm-alias-finite.h>
 
 #ifndef FUNC
 # define FUNC __ieee754_fmod
-# define FUNC_FINITE __fmod_finite
+# define FUNC_FINITE __fmod
 #endif
 #ifndef float_type
 # define float_type double
 #endif
 
 float_type
-FUNC (x, y)
-     float_type x;
-     float_type y;
+FUNC (float_type x, float_type y)
 {
   return __m81_u(FUNC)(x, y);
 }
 #ifdef FUNC_FINITE
-strong_alias (FUNC, FUNC_FINITE)
+libm_alias_finite (FUNC, FUNC_FINITE)
 #endif

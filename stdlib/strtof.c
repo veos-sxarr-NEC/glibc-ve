@@ -1,6 +1,6 @@
 /* Read decimal floating point numbers.
    This file is part of the GNU C Library.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1995.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,10 +15,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* The actual implementation for all floating point sizes is in strtod.c.
    These macros tell it to produce the `float' version, `strtof'.  */
+
+#include <bits/floatn.h>
+
+#if __HAVE_FLOAT32 && !__HAVE_DISTINCT_FLOAT32
+# define strtof32 __hide_strtof32
+# define wcstof32 __hide_wcstof32
+#endif
 
 #define	FLOAT		float
 #define	FLT		FLT
@@ -32,3 +39,13 @@
 
 
 #include "strtod.c"
+
+#if __HAVE_FLOAT32 && !__HAVE_DISTINCT_FLOAT32
+# undef strtof32
+# undef wcstof32
+# ifdef USE_WIDE_CHAR
+weak_alias (wcstof, wcstof32)
+# else
+weak_alias (strtof, strtof32)
+# endif
+#endif

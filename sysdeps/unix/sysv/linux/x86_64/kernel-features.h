@@ -1,6 +1,6 @@
 /* Set flags signalling availability of kernel features based on given
    kernel version number.  x86-64 version.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,24 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-/* The accept4 syscall was added for x86-64 in 2.6.28.  */
-#define __ASSUME_ACCEPT4_SYSCALL	1
-
-/* The recvmmsg syscall was added for x86-64 in 2.6.33.  */
-#if __LINUX_KERNEL_VERSION >= 0x020621
-# define __ASSUME_RECVMMSG_SYSCALL	1
-#endif
-
-/* The sendmmsg syscall was added for x86-64 in 3.0.  */
-#if __LINUX_KERNEL_VERSION >= 0x030000
-# define __ASSUME_SENDMMSG_SYSCALL	1
-#endif
-
-/* getcpu is a syscall for x86-64 since 3.1.  */
-#if __LINUX_KERNEL_VERSION >= 0x030100
-# define __ASSUME_GETCPU_SYSCALL	1
+/* Define that x32 is a ILP32 ABI to set the correct interface to pass
+   64-bits values through syscalls.  */
+#ifdef __ILP32__
+# define __ASSUME_WORDSIZE64_ILP32	1
 #endif
 
 #include_next <kernel-features.h>

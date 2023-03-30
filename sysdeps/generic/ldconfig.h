@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 1999.
 
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef _LDCONFIG_H
 #define _LDCONFIG_H
@@ -43,6 +43,10 @@
 #define FLAG_MIPS_LIB32_NAN2008		0x0c00
 #define FLAG_MIPS64_LIBN32_NAN2008	0x0d00
 #define FLAG_MIPS64_LIBN64_NAN2008	0x0e00
+#define FLAG_RISCV_FLOAT_ABI_SOFT	0x0f00
+#define FLAG_RISCV_FLOAT_ABI_DOUBLE	0x1000
+#define FLAG_VE1_LIB64			0x1100
+#define FLAG_VE3_LIB64			0x1200
 
 /* Name of auxiliary cache.  */
 #ifdef __ve__

@@ -1,5 +1,5 @@
 /* Software floating-point emulation. Common operations.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Richard Henderson (rth@cygnus.com),
 		  Jakub Jelinek (jj@ultra.linux.cz),
@@ -27,12 +27,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#define _FP_DECL(wc, X)				\
-  _FP_I_TYPE X##_c __attribute__ ((unused));	\
-  _FP_I_TYPE X##_s __attribute__ ((unused));	\
-  _FP_I_TYPE X##_e __attribute__ ((unused));	\
+#ifndef SOFT_FP_OP_COMMON_H
+#define SOFT_FP_OP_COMMON_H	1
+
+#define _FP_DECL(wc, X)						\
+  _FP_I_TYPE X##_c __attribute__ ((unused)) _FP_ZERO_INIT;	\
+  _FP_I_TYPE X##_s __attribute__ ((unused)) _FP_ZERO_INIT;	\
+  _FP_I_TYPE X##_e __attribute__ ((unused)) _FP_ZERO_INIT;	\
   _FP_FRAC_DECL_##wc (X)
 
 /* Test whether the qNaN bit denotes a signaling NaN.  */
@@ -895,6 +898,7 @@
 	case _FP_CLS_COMBINE (FP_CLS_NAN, FP_CLS_INF):		\
 	case _FP_CLS_COMBINE (FP_CLS_NAN, FP_CLS_ZERO):		\
 	  R##_s = X##_s;					\
+	  /* FALLTHRU */					\
 								\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_INF):		\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_NORMAL):	\
@@ -908,6 +912,7 @@
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_NAN):		\
 	case _FP_CLS_COMBINE (FP_CLS_ZERO, FP_CLS_NAN):		\
 	  R##_s = Y##_s;					\
+	  /* FALLTHRU */					\
 								\
 	case _FP_CLS_COMBINE (FP_CLS_NORMAL, FP_CLS_INF):	\
 	case _FP_CLS_COMBINE (FP_CLS_NORMAL, FP_CLS_ZERO):	\
@@ -924,7 +929,7 @@
 	  break;						\
 								\
 	default:						\
-	  abort ();						\
+	  _FP_UNREACHABLE;					\
 	}							\
     }								\
   while (0)
@@ -1060,6 +1065,7 @@
 	case _FP_CLS_COMBINE (FP_CLS_NAN, FP_CLS_INF):			\
 	case _FP_CLS_COMBINE (FP_CLS_NAN, FP_CLS_ZERO):			\
 	  _FP_FMA_T##_s = X##_s;					\
+	  /* FALLTHRU */						\
 									\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_INF):			\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_NORMAL):		\
@@ -1073,6 +1079,7 @@
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_NAN):			\
 	case _FP_CLS_COMBINE (FP_CLS_ZERO, FP_CLS_NAN):			\
 	  _FP_FMA_T##_s = Y##_s;					\
+	  /* FALLTHRU */						\
 									\
 	case _FP_CLS_COMBINE (FP_CLS_NORMAL, FP_CLS_INF):		\
 	case _FP_CLS_COMBINE (FP_CLS_NORMAL, FP_CLS_ZERO):		\
@@ -1089,7 +1096,7 @@
 	  break;							\
 									\
 	default:							\
-	  abort ();							\
+	  _FP_UNREACHABLE;						\
 	}								\
 									\
       /* T = X * Y is zero, infinity or NaN.  */			\
@@ -1116,6 +1123,7 @@
 	  R##_s = Z##_s;						\
 	  _FP_FRAC_COPY_##wc (R, Z);					\
 	  R##_c = Z##_c;						\
+	  R##_e = Z##_e;						\
 	  break;							\
 									\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_INF):			\
@@ -1144,7 +1152,7 @@
 	  break;							\
 									\
 	default:							\
-	  abort ();							\
+	  _FP_UNREACHABLE;						\
 	}								\
     done_fma: ;								\
     }									\
@@ -1194,6 +1202,7 @@
 								\
 	case _FP_CLS_COMBINE (FP_CLS_NORMAL, FP_CLS_ZERO):	\
 	  FP_SET_EXCEPTION (FP_EX_DIVZERO);			\
+	  /* FALLTHRU */					\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_ZERO):		\
 	case _FP_CLS_COMBINE (FP_CLS_INF, FP_CLS_NORMAL):	\
 	  R##_c = FP_CLS_INF;					\
@@ -1211,7 +1220,7 @@
 	  break;						\
 								\
 	default:						\
-	  abort ();						\
+	  _FP_UNREACHABLE;					\
 	}							\
     }								\
   while (0)
@@ -1251,6 +1260,46 @@
     }									\
   while (0)
 
+/* Helper for comparisons.  If denormal operands would raise an
+   exception, check for them, and flush to zero as appropriate
+   (otherwise, we need only check and flush to zero if it might affect
+   the result, which is done later with _FP_CMP_CHECK_FLUSH_ZERO).  */
+#define _FP_CMP_CHECK_DENORM(fs, wc, X, Y)				\
+  do									\
+    {									\
+      if (FP_EX_DENORM != 0)						\
+	{								\
+	  /* We must ensure the correct exceptions are raised for	\
+	     denormal operands, even though this may not affect the	\
+	     result of the comparison.  */				\
+	  if (FP_DENORM_ZERO)						\
+	    {								\
+	      _FP_CHECK_FLUSH_ZERO (fs, wc, X);				\
+	      _FP_CHECK_FLUSH_ZERO (fs, wc, Y);				\
+	    }								\
+	  else								\
+	    {								\
+	      if ((X##_e == 0 && !_FP_FRAC_ZEROP_##wc (X))		\
+		  || (Y##_e == 0 && !_FP_FRAC_ZEROP_##wc (Y)))		\
+		FP_SET_EXCEPTION (FP_EX_DENORM);			\
+	    }								\
+	}								\
+    }									\
+  while (0)
+
+/* Helper for comparisons.  Check for flushing denormals for zero if
+   we didn't need to check earlier for any denormal operands.  */
+#define _FP_CMP_CHECK_FLUSH_ZERO(fs, wc, X, Y)	\
+  do						\
+    {						\
+      if (FP_EX_DENORM == 0)			\
+	{					\
+	  _FP_CHECK_FLUSH_ZERO (fs, wc, X);	\
+	  _FP_CHECK_FLUSH_ZERO (fs, wc, Y);	\
+	}					\
+    }						\
+  while (0)
+
 /* Main differential comparison routine.  The inputs should be raw not
    cooked.  The return is -1, 0, 1 for normal values, UN
    otherwise.  */
@@ -1258,6 +1307,7 @@
 #define _FP_CMP(fs, wc, ret, X, Y, un, ex)				\
   do									\
     {									\
+      _FP_CMP_CHECK_DENORM (fs, wc, X, Y);				\
       /* NANs are unordered.  */					\
       if ((X##_e == _FP_EXPMAX_##fs && !_FP_FRAC_ZEROP_##wc (X))	\
 	  || (Y##_e == _FP_EXPMAX_##fs && !_FP_FRAC_ZEROP_##wc (Y)))	\
@@ -1270,8 +1320,7 @@
 	  int _FP_CMP_is_zero_x;					\
 	  int _FP_CMP_is_zero_y;					\
 									\
-	  _FP_CHECK_FLUSH_ZERO (fs, wc, X);				\
-	  _FP_CHECK_FLUSH_ZERO (fs, wc, Y);				\
+	  _FP_CMP_CHECK_FLUSH_ZERO (fs, wc, X, Y);			\
 									\
 	  _FP_CMP_is_zero_x						\
 	    = (!X##_e && _FP_FRAC_ZEROP_##wc (X)) ? 1 : 0;		\
@@ -1306,6 +1355,7 @@
 #define _FP_CMP_EQ(fs, wc, ret, X, Y, ex)				\
   do									\
     {									\
+      _FP_CMP_CHECK_DENORM (fs, wc, X, Y);				\
       /* NANs are unordered.  */					\
       if ((X##_e == _FP_EXPMAX_##fs && !_FP_FRAC_ZEROP_##wc (X))	\
 	  || (Y##_e == _FP_EXPMAX_##fs && !_FP_FRAC_ZEROP_##wc (Y)))	\
@@ -1315,8 +1365,7 @@
 	}								\
       else								\
 	{								\
-	  _FP_CHECK_FLUSH_ZERO (fs, wc, X);				\
-	  _FP_CHECK_FLUSH_ZERO (fs, wc, Y);				\
+	  _FP_CMP_CHECK_FLUSH_ZERO (fs, wc, X, Y);			\
 									\
 	  (ret) = !(X##_e == Y##_e					\
 		    && _FP_FRAC_EQ_##wc (X, Y)				\
@@ -1331,6 +1380,7 @@
 #define _FP_CMP_UNORD(fs, wc, ret, X, Y, ex)				\
   do									\
     {									\
+      _FP_CMP_CHECK_DENORM (fs, wc, X, Y);				\
       (ret) = ((X##_e == _FP_EXPMAX_##fs && !_FP_FRAC_ZEROP_##wc (X))	\
 	       || (Y##_e == _FP_EXPMAX_##fs && !_FP_FRAC_ZEROP_##wc (Y))); \
       if (ret)								\
@@ -1749,12 +1799,13 @@
       __label__ pack_semiraw;						\
       if (r)								\
 	{								\
-	  rtype _FP_FROM_INT_ur;					\
+	  rtype _FP_FROM_INT_ur = (r);					\
 									\
 	  if ((X##_s = ((r) < 0)))					\
-	    (r) = -(rtype) (r);						\
+	    _FP_FROM_INT_ur = -_FP_FROM_INT_ur;				\
 									\
-	  _FP_FROM_INT_ur = (rtype) (r);				\
+	  _FP_STATIC_ASSERT ((rsize) <= 2 * _FP_W_TYPE_SIZE,		\
+			     "rsize too large");			\
 	  (void) (((rsize) <= _FP_W_TYPE_SIZE)				\
 		  ? ({							\
 		      int _FP_FROM_INT_lz;				\
@@ -1763,17 +1814,15 @@
 		      X##_e = (_FP_EXPBIAS_##fs + _FP_W_TYPE_SIZE - 1	\
 			       - _FP_FROM_INT_lz);			\
 		    })							\
-		  : (((rsize) <= 2 * _FP_W_TYPE_SIZE)			\
-		     ? ({						\
-			 int _FP_FROM_INT_lz;				\
-			 __FP_CLZ_2 (_FP_FROM_INT_lz,			\
-				     (_FP_W_TYPE) (_FP_FROM_INT_ur	\
-						   >> _FP_W_TYPE_SIZE), \
-				     (_FP_W_TYPE) _FP_FROM_INT_ur);	\
-			 X##_e = (_FP_EXPBIAS_##fs + 2 * _FP_W_TYPE_SIZE - 1 \
-				  - _FP_FROM_INT_lz);			\
-		       })						\
-		     : (abort (), 0)));					\
+		  : ({						\
+		      int _FP_FROM_INT_lz;				\
+		      __FP_CLZ_2 (_FP_FROM_INT_lz,			\
+				  (_FP_W_TYPE) (_FP_FROM_INT_ur		\
+						>> _FP_W_TYPE_SIZE),	\
+				  (_FP_W_TYPE) _FP_FROM_INT_ur);	\
+		      X##_e = (_FP_EXPBIAS_##fs + 2 * _FP_W_TYPE_SIZE - 1 \
+			       - _FP_FROM_INT_lz);			\
+		    }));						\
 									\
 	  if ((rsize) - 1 + _FP_EXPBIAS_##fs >= _FP_EXPMAX_##fs		\
 	      && X##_e >= _FP_EXPMAX_##fs)				\
@@ -1825,16 +1874,24 @@
 
 
 /* Extend from a narrower floating-point format to a wider one.  Input
-   and output are raw.  */
-#define FP_EXTEND(dfs, sfs, dwc, swc, D, S)				\
+   and output are raw.  If CHECK_NAN, then signaling NaNs are
+   converted to quiet with the "invalid" exception raised; otherwise
+   signaling NaNs remain signaling with no exception.  */
+#define _FP_EXTEND_CNAN(dfs, sfs, dwc, swc, D, S, check_nan)		\
   do									\
     {									\
-      if (_FP_FRACBITS_##dfs < _FP_FRACBITS_##sfs			\
-	  || (_FP_EXPMAX_##dfs - _FP_EXPBIAS_##dfs			\
-	      < _FP_EXPMAX_##sfs - _FP_EXPBIAS_##sfs)			\
-	  || (_FP_EXPBIAS_##dfs < _FP_EXPBIAS_##sfs + _FP_FRACBITS_##sfs - 1 \
-	      && _FP_EXPBIAS_##dfs != _FP_EXPBIAS_##sfs))		\
-	abort ();							\
+      _FP_STATIC_ASSERT (_FP_FRACBITS_##dfs >= _FP_FRACBITS_##sfs,	\
+			 "destination mantissa narrower than source");	\
+      _FP_STATIC_ASSERT ((_FP_EXPMAX_##dfs - _FP_EXPBIAS_##dfs		\
+			  >= _FP_EXPMAX_##sfs - _FP_EXPBIAS_##sfs),	\
+			 "destination max exponent smaller"		\
+			 " than source");				\
+      _FP_STATIC_ASSERT (((_FP_EXPBIAS_##dfs				\
+			   >= (_FP_EXPBIAS_##sfs			\
+			       + _FP_FRACBITS_##sfs - 1))		\
+			  || (_FP_EXPBIAS_##dfs == _FP_EXPBIAS_##sfs)), \
+			 "source subnormals do not all become normal,"	\
+			 " but bias not the same");			\
       D##_s = S##_s;							\
       _FP_FRAC_COPY_##dwc##_##swc (D, S);				\
       if (_FP_EXP_NORMAL (sfs, swc, S))					\
@@ -1876,27 +1933,35 @@
 	      D##_e = _FP_EXPMAX_##dfs;					\
 	      if (!_FP_FRAC_ZEROP_##swc (S))				\
 		{							\
-		  if (_FP_FRAC_SNANP (sfs, S))				\
+		  if (check_nan && _FP_FRAC_SNANP (sfs, S))		\
 		    FP_SET_EXCEPTION (FP_EX_INVALID			\
 				      | FP_EX_INVALID_SNAN);		\
 		  _FP_FRAC_SLL_##dwc (D, (_FP_FRACBITS_##dfs		\
 					  - _FP_FRACBITS_##sfs));	\
-		  _FP_SETQNAN (dfs, dwc, D);				\
+		  if (check_nan)					\
+		    _FP_SETQNAN (dfs, dwc, D);				\
 		}							\
 	    }								\
 	}								\
     }									\
   while (0)
 
+#define FP_EXTEND(dfs, sfs, dwc, swc, D, S)		\
+    _FP_EXTEND_CNAN (dfs, sfs, dwc, swc, D, S, 1)
+
 /* Truncate from a wider floating-point format to a narrower one.
    Input and output are semi-raw.  */
 #define FP_TRUNC(dfs, sfs, dwc, swc, D, S)				\
   do									\
     {									\
-      if (_FP_FRACBITS_##sfs < _FP_FRACBITS_##dfs			\
-	  || (_FP_EXPBIAS_##sfs < _FP_EXPBIAS_##dfs + _FP_FRACBITS_##dfs - 1 \
-	      && _FP_EXPBIAS_##sfs != _FP_EXPBIAS_##dfs))		\
-	abort ();							\
+      _FP_STATIC_ASSERT (_FP_FRACBITS_##sfs >= _FP_FRACBITS_##dfs,	\
+			 "destination mantissa wider than source");	\
+      _FP_STATIC_ASSERT (((_FP_EXPBIAS_##sfs				\
+			   >= (_FP_EXPBIAS_##dfs			\
+			       + _FP_FRACBITS_##dfs - 1))		\
+			  || _FP_EXPBIAS_##sfs == _FP_EXPBIAS_##dfs),	\
+			 "source subnormals do not all become same,"	\
+			 " but bias not the same");			\
       D##_s = S##_s;							\
       if (_FP_EXP_NORMAL (sfs, swc, S))					\
 	{								\
@@ -1976,6 +2041,27 @@
     }									\
   while (0)
 
+/* Truncate from a wider floating-point format to a narrower one.
+   Input and output are cooked.  */
+#define FP_TRUNC_COOKED(dfs, sfs, dwc, swc, D, S)			\
+  do									\
+    {									\
+      _FP_STATIC_ASSERT (_FP_FRACBITS_##sfs >= _FP_FRACBITS_##dfs,	\
+			 "destination mantissa wider than source");	\
+      if (S##_c == FP_CLS_NAN)						\
+	_FP_FRAC_SRL_##swc (S, (_FP_WFRACBITS_##sfs			\
+				- _FP_WFRACBITS_##dfs));		\
+      else								\
+	_FP_FRAC_SRS_##swc (S, (_FP_WFRACBITS_##sfs			\
+				- _FP_WFRACBITS_##dfs),			\
+			    _FP_WFRACBITS_##sfs);			\
+      _FP_FRAC_COPY_##dwc##_##swc (D, S);				\
+      D##_e = S##_e;							\
+      D##_c = S##_c;							\
+      D##_s = S##_s;							\
+    }									\
+  while (0)
+
 /* Helper primitives.  */
 
 /* Count leading zeros in a word.  */
@@ -1985,14 +2071,18 @@
 # define __FP_CLZ(r, x)							\
   do									\
     {									\
+      _FP_STATIC_ASSERT ((sizeof (_FP_W_TYPE) == sizeof (unsigned int)	\
+			  || (sizeof (_FP_W_TYPE)			\
+			      == sizeof (unsigned long))		\
+			  || (sizeof (_FP_W_TYPE)			\
+			      == sizeof (unsigned long long))),		\
+			 "_FP_W_TYPE size unsupported for clz");	\
       if (sizeof (_FP_W_TYPE) == sizeof (unsigned int))			\
 	(r) = __builtin_clz (x);					\
       else if (sizeof (_FP_W_TYPE) == sizeof (unsigned long))		\
 	(r) = __builtin_clzl (x);					\
-      else if (sizeof (_FP_W_TYPE) == sizeof (unsigned long long))	\
+      else /* sizeof (_FP_W_TYPE) == sizeof (unsigned long long).  */	\
 	(r) = __builtin_clzll (x);					\
-      else								\
-	abort ();							\
     }									\
   while (0)
 #endif /* ndef __FP_CLZ */
@@ -2061,3 +2151,5 @@
 #define _FP_DIV_MEAT_1_loop(fs, R, X, Y)  _FP_DIV_MEAT_N_loop (fs, 1, R, X, Y)
 #define _FP_DIV_MEAT_2_loop(fs, R, X, Y)  _FP_DIV_MEAT_N_loop (fs, 2, R, X, Y)
 #define _FP_DIV_MEAT_4_loop(fs, R, X, Y)  _FP_DIV_MEAT_N_loop (fs, 4, R, X, Y)
+
+#endif /* !SOFT_FP_OP_COMMON_H */

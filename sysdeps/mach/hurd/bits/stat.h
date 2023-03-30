@@ -1,4 +1,4 @@
-/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if !defined _SYS_STAT_H && !defined _FCNTL_H
 # error "Never include <bits/stat.h> directly; use <sys/stat.h> instead."
@@ -218,13 +218,46 @@ struct stat64
 #define S_IMMAP0	000100000000
 
 /* ALL the unused bits.  */
-#define	S_ISPARE	(~(S_IFMT|S_ITRANS|S_INOCACHE|S_IMMAP0|    \
-			   S_IUSEUNK|S_IUNKNOWN|07777))
+#define	S_ISPARE	(~(S_IFMT|S_ITRANS|S_INOCACHE|S_IMMAP0    \
+			   |S_IUSEUNK|S_IUNKNOWN|07777))
 #endif
 
-/* Default file creation mask (umask).  */
 #ifdef	__USE_MISC
+/* Default file creation mask (umask).  */
 # define CMASK		0022
+
+/* Definitions of flags stored in file flags word.  */
+
+/* Super-user and owner changeable flags.  */
+# define UF_SETTABLE	0x0000ffff	/* mask of owner changeable flags */
+# define UF_NODUMP	0x00000001	/* do not dump file */
+# define UF_IMMUTABLE	0x00000002	/* file may not be changed */
+# define UF_APPEND	0x00000004	/* writes to file may only append */
+# define UF_OPAQUE	0x00000008	/* directory is opaque wrt. union */
+# define UF_NOUNLINK	0x00000010	/* file may not be removed or renamed */
+
+/* Super-user changeable flags.  */
+# define SF_SETTABLE	0xffff0000	/* mask of superuser changeable flags */
+# define SF_ARCHIVED	0x00010000	/* file is archived */
+# define SF_IMMUTABLE	0x00020000	/* file may not be changed */
+# define SF_APPEND	0x00040000	/* writes to file may only append */
+# define SF_NOUNLINK	0x00100000	/* file may not be removed or renamed */
+# define SF_SNAPSHOT	0x00200000	/* snapshot inode */
+
+__BEGIN_DECLS
+
+/* Set file flags for FILE to FLAGS.  */
+extern int chflags (__const char *__file, unsigned long int __flags) __THROW;
+
+/* Set file flags of the file referred to by FD to FLAGS.  */
+extern int fchflags (int __fd, unsigned long int __flags) __THROW;
+
+__END_DECLS
+#endif
+
+#ifdef __USE_ATFILE
+# define UTIME_NOW  -1 /* corresponds to the current time */
+# define UTIME_OMIT -2 /* target time is omitted */
 #endif
 
 #endif	/* bits/stat.h */

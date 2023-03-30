@@ -1,5 +1,5 @@
 /* Get the symbol address.  Generic version.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ldsodefs.h>
 #include <dl-fptr.h>
@@ -22,7 +22,7 @@
 void *
 _dl_symbol_address (struct link_map *map, const ElfW(Sym) *ref)
 {
-  ElfW(Addr) value = (map ? map->l_addr : 0) + ref->st_value;
+  ElfW(Addr) value = SYMBOL_ADDRESS (map, ref, false);
 
   /* Return the pointer to function descriptor. */
   if (ELFW(ST_TYPE) (ref->st_info) == STT_FUNC)
@@ -30,3 +30,4 @@ _dl_symbol_address (struct link_map *map, const ElfW(Sym) *ref)
   else
     return (void *) value;
 }
+rtld_hidden_def (_dl_symbol_address)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <hurd.h>
@@ -26,11 +26,7 @@
    than LEN bytes of BUF.  The contents are not null-terminated.
    Returns the number of characters read, or -1 for errors.  */
 ssize_t
-readlinkat (fd, file_name, buf, len)
-     int fd;
-     const char *file_name;
-     char *buf;
-     size_t len;
+readlinkat (int fd, const char *file_name, char *buf, size_t len)
 {
   error_t err;
   file_t file;

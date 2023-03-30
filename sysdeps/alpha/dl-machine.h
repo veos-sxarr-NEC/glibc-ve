@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  Alpha version.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Richard Henderson <rth@tamu.edu>.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This was written in the absence of an ABI -- don't expect
    it to remain unchanged.  */
@@ -227,7 +227,7 @@ $fixup_stack:							\n\
    or TLS variables, so undefined references should not be allowed
    to define the value.
 
-   ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve
+   ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve
    to one of the main executable's symbols, as for a COPY reloc.
    This is unused on Alpha.  */
 
@@ -260,6 +260,7 @@ dl_platform_init (void)
    rather than the dynamic linker.  */
 static inline Elf64_Addr
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf64_Rela *reloc,
 		       Elf64_Addr *got_addr, Elf64_Addr value)
 {
@@ -418,7 +419,7 @@ elf_machine_rela (struct link_map *map,
       if (sym_map)
 	{
 	  sym_raw_value += sym->st_value;
-	  sym_value = sym_raw_value + sym_map->l_addr;
+	  sym_value += SYMBOL_ADDRESS (sym_map, sym, true);
 	}
 
       if (r_type == R_ALPHA_GLOB_DAT)
@@ -434,11 +435,11 @@ elf_machine_rela (struct link_map *map,
 	  RESOLVE_CONFLICT_FIND_MAP (map, reloc_addr);
 	  reloc = ((const Elf64_Rela *) D_PTR (map, l_info[DT_JMPREL]))
 		  + (r_type >> 8);
-	  elf_machine_fixup_plt (map, 0, reloc, reloc_addr, sym_value);
+	  elf_machine_fixup_plt (map, 0, 0, 0, reloc, reloc_addr, sym_value);
 	}
 #else
       else if (r_type == R_ALPHA_JMP_SLOT)
-	elf_machine_fixup_plt (map, 0, reloc, reloc_addr, sym_value);
+	elf_machine_fixup_plt (map, 0, 0, 0, reloc, reloc_addr, sym_value);
 #endif
 #ifndef RTLD_BOOTSTRAP
       else if (r_type == R_ALPHA_REFQUAD)

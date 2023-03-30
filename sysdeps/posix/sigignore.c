@@ -1,5 +1,5 @@
 /* Set the disposition of SIG to SIG_IGN.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,24 +15,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #define __need_NULL
 #include <stddef.h>
 #include <signal.h>
 #include <string.h>	/* For the real memset prototype.  */
-
+#include <sigsetops.h>
 
 int
-sigignore (sig)
-     int sig;
+sigignore (int sig)
 {
   struct sigaction act;
 
   act.sa_handler = SIG_IGN;
-  if (__sigemptyset (&act.sa_mask) < 0)
-    return -1;
+  __sigemptyset (&act.sa_mask);
   act.sa_flags = 0;
 
   return __sigaction (sig, &act, NULL);

@@ -3,7 +3,7 @@
  * Server side for UDP/IP based RPC.  (Does some caching in the hopes of
  * achieving execute-at-most-once semantics.)
  *
- * Copyright (C) 2012-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2012-2020 Free Software Foundation, Inc.
  * This file is part of the GNU C Library.
  *
  * The GNU C Library is free software; you can redistribute it and/or
@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with the GNU C Library; if not, see
- * <http://www.gnu.org/licenses/>.
+ * <https://www.gnu.org/licenses/>.
  *
  * Copyright (c) 2010, Oracle America, Inc.
  *
@@ -64,6 +64,7 @@
 
 #include <wchar.h>
 #include <libio/iolibio.h>
+#include <shlib-compat.h>
 
 #define rpc_buffer(xprt) ((xprt)->xp_p1)
 #ifndef MAX
@@ -118,9 +119,7 @@ struct svcudp_data
  * The routines returns NULL if a problem occurred.
  */
 SVCXPRT *
-svcudp_bufcreate (sock, sendsz, recvsz)
-     int sock;
-     u_int sendsz, recvsz;
+svcudp_bufcreate (int sock, u_int sendsz, u_int recvsz)
 {
   bool_t madesock = FALSE;
   SVCXPRT *xprt;
@@ -139,7 +138,7 @@ svcudp_bufcreate (sock, sendsz, recvsz)
 	}
       madesock = TRUE;
     }
-  __bzero ((char *) &addr, sizeof (addr));
+  memset ((char *) &addr, 0, sizeof (addr));
   addr.sin_family = AF_INET;
   if (bindresvport (sock, &addr))
     {
@@ -205,8 +204,7 @@ libc_hidden_nolink_sunrpc (svcudp_bufcreate, GLIBC_2_0)
 #endif
 
 SVCXPRT *
-svcudp_create (sock)
-     int sock;
+svcudp_create (int sock)
 {
   return svcudp_bufcreate (sock, UDPMSGSIZE, UDPMSGSIZE);
 }
@@ -217,17 +215,14 @@ libc_hidden_nolink_sunrpc (svcudp_create, GLIBC_2_0)
 #endif
 
 static enum xprt_stat
-svcudp_stat (xprt)
-     SVCXPRT *xprt;
+svcudp_stat (SVCXPRT *xprt)
 {
 
   return XPRT_IDLE;
 }
 
 static bool_t
-svcudp_recv (xprt, msg)
-     SVCXPRT *xprt;
-     struct rpc_msg *msg;
+svcudp_recv (SVCXPRT *xprt, struct rpc_msg *msg)
 {
   struct svcudp_data *su = su_data (xprt);
   XDR *xdrs = &(su->su_xdrs);
@@ -329,9 +324,7 @@ again:
 }
 
 static bool_t
-svcudp_reply (xprt, msg)
-     SVCXPRT *xprt;
-     struct rpc_msg *msg;
+svcudp_reply (SVCXPRT *xprt, struct rpc_msg *msg)
 {
   struct svcudp_data *su = su_data (xprt);
   XDR *xdrs = &(su->su_xdrs);
@@ -375,20 +368,14 @@ svcudp_reply (xprt, msg)
 }
 
 static bool_t
-svcudp_getargs (xprt, xdr_args, args_ptr)
-     SVCXPRT *xprt;
-     xdrproc_t xdr_args;
-     caddr_t args_ptr;
+svcudp_getargs (SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 
   return (*xdr_args) (&(su_data (xprt)->su_xdrs), args_ptr);
 }
 
 static bool_t
-svcudp_freeargs (xprt, xdr_args, args_ptr)
-     SVCXPRT *xprt;
-     xdrproc_t xdr_args;
-     caddr_t args_ptr;
+svcudp_freeargs (SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
   XDR *xdrs = &(su_data (xprt)->su_xdrs);
 
@@ -397,8 +384,7 @@ svcudp_freeargs (xprt, xdr_args, args_ptr)
 }
 
 static void
-svcudp_destroy (xprt)
-     SVCXPRT *xprt;
+svcudp_destroy (SVCXPRT *xprt)
 {
   struct svcudp_data *su = su_data (xprt);
 
@@ -598,11 +584,8 @@ cache_set (SVCXPRT *xprt, u_long replylen)
  * return 1 if found, 0 if not found
  */
 static int
-cache_get (xprt, msg, replyp, replylenp)
-     SVCXPRT *xprt;
-     struct rpc_msg *msg;
-     char **replyp;
-     u_long *replylenp;
+cache_get (SVCXPRT *xprt, struct rpc_msg *msg, char **replyp,
+	   u_long *replylenp)
 {
   u_int loc;
   cache_ptr ent;

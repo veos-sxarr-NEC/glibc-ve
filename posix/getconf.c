@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    This program is free software; you can redistribute it and/or modify
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <errno.h>
@@ -28,6 +28,23 @@
 
 #define NEED_SPEC_ARRAY 1
 #include <posix-conf-vars.h>
+
+/* If all of the environments are defined in environments.h, then we don't need
+   to bother with doing a runtime check for a specific environment.  */
+#if (defined _SC_V6_ILP32_OFF32 \
+     && defined _SC_V7_LPBIG_OFFBIG \
+     && defined _SC_XBS5_LP64_OFF64 \
+     && defined _SC_V6_LP64_OFF64 \
+     && defined _SC_V7_ILP32_OFFBIG \
+     && defined _SC_V6_LPBIG_OFFBIG \
+     && defined _SC_V7_LP64_OFF64 \
+     && defined _SC_V7_ILP32_OFF32 \
+     && defined _SC_XBS5_LPBIG_OFFBIG \
+     && defined _SC_XBS5_ILP32_OFFBIG \
+     && defined _SC_V6_ILP32_OFFBIG \
+     && defined _SC_XBS5_ILP32_OFF32)
+# define ALL_ENVIRONMENTS_DEFINED 1
+#endif
 
 struct conf
   {
@@ -469,7 +486,7 @@ main (int argc, char *argv[])
 Copyright (C) %s Free Software Foundation, Inc.\n\
 This is free software; see the source for copying conditions.  There is NO\n\
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\
-"), "2015");
+"), "2020");
       printf (gettext ("Written by %s.\n"), "Roland McGrath");
       return 0;
     }
@@ -488,6 +505,24 @@ environment SPEC.\n\n"));
       return 0;
     }
 
+#ifdef ALL_ENVIRONMENTS_DEFINED
+  if (argc > 1 && strncmp (argv[1], "-v", 2) == 0)
+    {
+      if (argv[1][2] == '\0')
+	{
+	  if (argc < 3)
+	    usage ();
+
+	  argv += 2;
+	  argc -= 2;
+	}
+      else
+	{
+	  argv += 1;
+	  argc += 1;
+	}
+    }
+#else
 #ifdef __ve__
   const char *getconf_dir = getenv ("VE_GETCONF_DIR") ?: GETCONF_DIR;
 #else
@@ -542,42 +577,42 @@ environment SPEC.\n\n"));
 
       switch (specs[i].num)
 	{
-#ifndef _XBS5_ILP32_OFF32
+# ifndef _XBS5_ILP32_OFF32
 	  case _SC_XBS5_ILP32_OFF32:
-#endif
-#ifndef _XBS5_ILP32_OFFBIG
+# endif
+# ifndef _XBS5_ILP32_OFFBIG
 	  case _SC_XBS5_ILP32_OFFBIG:
-#endif
-#ifndef _XBS5_LP64_OFF64
+# endif
+# ifndef _XBS5_LP64_OFF64
 	  case _SC_XBS5_LP64_OFF64:
-#endif
-#ifndef _XBS5_LPBIG_OFFBIG
+# endif
+# ifndef _XBS5_LPBIG_OFFBIG
 	  case _SC_XBS5_LPBIG_OFFBIG:
-#endif
-#ifndef _POSIX_V6_ILP32_OFF32
+# endif
+# ifndef _POSIX_V6_ILP32_OFF32
 	  case _SC_V6_ILP32_OFF32:
-#endif
-#ifndef _POSIX_V6_ILP32_OFFBIG
+# endif
+# ifndef _POSIX_V6_ILP32_OFFBIG
 	  case _SC_V6_ILP32_OFFBIG:
-#endif
-#ifndef _POSIX_V6_LP64_OFF64
+# endif
+# ifndef _POSIX_V6_LP64_OFF64
 	  case _SC_V6_LP64_OFF64:
-#endif
-#ifndef _POSIX_V6_LPBIG_OFFBIG
+# endif
+# ifndef _POSIX_V6_LPBIG_OFFBIG
 	  case _SC_V6_LPBIG_OFFBIG:
-#endif
-#ifndef _POSIX_V7_ILP32_OFF32
+# endif
+# ifndef _POSIX_V7_ILP32_OFF32
 	  case _SC_V7_ILP32_OFF32:
-#endif
-#ifndef _POSIX_V7_ILP32_OFFBIG
+# endif
+# ifndef _POSIX_V7_ILP32_OFFBIG
 	  case _SC_V7_ILP32_OFFBIG:
-#endif
-#ifndef _POSIX_V7_LP64_OFF64
+# endif
+# ifndef _POSIX_V7_LP64_OFF64
 	  case _SC_V7_LP64_OFF64:
-#endif
-#ifndef _POSIX_V7_LPBIG_OFFBIG
+# endif
+# ifndef _POSIX_V7_LPBIG_OFFBIG
 	  case _SC_V7_LPBIG_OFFBIG:
-#endif
+# endif
 	    {
 	      const char *args[argc + 3];
 	      size_t spec_len = strlen (spec);
@@ -596,6 +631,7 @@ environment SPEC.\n\n"));
 	    break;
 	}
     }
+#endif
 
   if (argc > 1 && strcmp (argv[1], "-a") == 0)
     {

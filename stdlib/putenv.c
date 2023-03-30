@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if defined _AIX && !defined __GNUC__
  #pragma alloca
@@ -49,8 +49,7 @@ extern char *alloca ();
 
 /* Put STRING, which is of the form "NAME=VALUE", in the environment.  */
 int
-putenv (string)
-     char *string;
+putenv (char *string)
 {
   const char *const name_end = strchr (string, '=');
 
@@ -61,7 +60,7 @@ putenv (string)
       int use_malloc = !__libc_use_alloca (name_end - string + 1);
       if (__builtin_expect (use_malloc, 0))
 	{
-	  name = strndup (string, name_end - string);
+	  name = __strndup (string, name_end - string);
 	  if (name == NULL)
 	    return -1;
 	}

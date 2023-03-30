@@ -1,5 +1,5 @@
 /* Special .init and .fini section support for AArch64.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -32,13 +32,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* crti.S puts a function prologue at the beginning of the .init and
    .fini sections and defines global symbols for those addresses, so
    they can be called as functions.  The symbols _init and _fini are
    magic and cause the linker to emit DT_INIT and DT_FINI.  */
 
+#include <sysdep.h>
 #include <libc-symbols.h>
 
 #ifndef PREINIT_FUNCTION
@@ -60,7 +61,7 @@
 	.type	call_weak_fn, %function
 call_weak_fn:
 	adrp	x0, :got:PREINIT_FUNCTION
-	ldr	x0, [x0, #:got_lo12:PREINIT_FUNCTION]
+	ldr	PTR_REG (0), [x0, #:got_lo12:PREINIT_FUNCTION]
 	cbz	x0, 1f
 	b	PREINIT_FUNCTION
 1:
@@ -71,6 +72,7 @@ call_weak_fn:
 	.section .init,"ax",%progbits
 	.align	2
 	.global	_init
+	.hidden	_init
 	.type	_init, %function
 _init:
 	stp	x29, x30, [sp, -16]!
@@ -84,6 +86,7 @@ _init:
 	.section	.fini,"ax",%progbits
 	.align	2
 	.global	_fini
+	.hidden	_fini
 	.type	_fini, %function
 _fini:
 	stp	x29, x30, [sp, -16]!

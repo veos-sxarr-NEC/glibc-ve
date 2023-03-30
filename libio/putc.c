@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "libioP.h"
 #include "stdio.h"
@@ -21,12 +21,12 @@
 #undef _IO_putc
 
 int
-_IO_putc (c, fp)
-     int c;
-     _IO_FILE *fp;
+_IO_putc (int c, FILE *fp)
 {
   int result;
   CHECK_FILE (fp, EOF);
+  if (!_IO_need_lock (fp))
+    return _IO_putc_unlocked (c, fp);
   _IO_acquire_lock (fp);
   result = _IO_putc_unlocked (c, fp);
   _IO_release_lock (fp);
@@ -36,11 +36,9 @@ libc_hidden_def (_IO_putc)
 
 #undef putc
 
-#ifdef weak_alias
 weak_alias (_IO_putc, putc)
 
 #ifndef _IO_MTSAFE_IO
 #undef putc_unlocked
 weak_alias (_IO_putc, putc_unlocked)
-#endif
 #endif

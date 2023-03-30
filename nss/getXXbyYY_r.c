@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <atomic.h>
@@ -25,11 +25,8 @@
 #ifdef USE_NSCD
 # include <nscd/nscd_proto.h>
 #endif
-#ifdef NEED__RES_HCONF
-# include <resolv/res_hconf.h>
-#endif
 #ifdef NEED__RES
-# include <resolv.h>
+# include <resolv/resolv_context.h>
 #endif
 /*******************************************************************\
 |* Here we assume several symbols to be defined:		   *|
@@ -56,8 +53,7 @@
 |* NEED_H_ERRNO  - an extra parameter will be passed to point to   *|
 |*		   the global `h_errno' variable.		   *|
 |*								   *|
-|* NEED__RES     - the global _res variable might be used so we	   *|
-|*		   will have to initialize it if necessary	   *|
+|* NEED__RES     - obtain a struct resolv_context resolver context *|
 |*								   *|
 |* PREPROCESS    - code run before anything else		   *|
 |*								   *|
@@ -131,6 +127,52 @@
 # define AF_VAL AF_INET
 #endif
 
+
+/* Set defaults for merge functions that haven't been defined.  */
+#ifndef DEEPCOPY_FN
+static inline int
+__copy_einval (LOOKUP_TYPE a,
+	       const size_t b,
+	       LOOKUP_TYPE *c,
+	       char *d,
+	       char **e)
+{
+  return EINVAL;
+}
+# define DEEPCOPY_FN __copy_einval
+#endif
+
+#ifndef MERGE_FN
+static inline int
+__merge_einval (LOOKUP_TYPE *a,
+		char *b,
+		char *c,
+		size_t d,
+		LOOKUP_TYPE *e,
+		char *f)
+{
+  return EINVAL;
+}
+# define MERGE_FN __merge_einval
+#endif
+
+#define CHECK_MERGE(err, status)		\
+  ({						\
+    do						\
+      {						\
+	if (err)				\
+	  {					\
+	    __set_errno (err);			\
+	    if (err == ERANGE)			\
+	      status = NSS_STATUS_TRYAGAIN;	\
+	    else				\
+	      status = NSS_STATUS_UNAVAIL;	\
+	    break;				\
+	  }					\
+      }						\
+    while (0);					\
+  })
+
 /* Type of the lookup function we need here.  */
 typedef enum nss_status (*lookup_function) (ADD_PARAMS, LOOKUP_TYPE *, char *,
 					    size_t, int * H_ERRNO_PARM
@@ -138,8 +180,7 @@ typedef enum nss_status (*lookup_function) (ADD_PARAMS, LOOKUP_TYPE *, char *,
 
 /* The lookup function for the first entry of this service.  */
 extern int DB_LOOKUP_FCT (service_user **nip, const char *name,
-			  const char *name2, void **fctp)
-     internal_function;
+			  const char *name2, void **fctp);
 libc_hidden_proto (DB_LOOKUP_FCT)
 
 
@@ -152,13 +193,16 @@ INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf, char *buffer,
   static service_user *startp;
   static lookup_function start_fct;
   service_user *nip;
+  int do_merge = 0;
+  LOOKUP_TYPE mergegrp;
+  char *mergebuf = NULL;
+  char *endptr = NULL;
   union
   {
     lookup_function l;
     void *ptr;
   } fct;
-
-  int no_more;
+  int no_more, err;
   enum nss_status status = NSS_STATUS_UNAVAIL;
 #ifdef USE_NSCD
   int nscd_status;
@@ -166,6 +210,18 @@ INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf, char *buffer,
 #ifdef NEED_H_ERRNO
   bool any_service = false;
 #endif
+
+#ifdef NEED__RES
+  /* The HANDLE_DIGITS_DOTS case below already needs the resolver
+     configuration, so this has to happen early.  */
+  struct resolv_context *res_ctx = __resolv_context_get ();
+  if (res_ctx == NULL)
+    {
+      *h_errnop = NETDB_INTERNAL;
+      *result = NULL;
+      return errno;
+    }
+#endif /* NEED__RES */
 
 #ifdef PREPROCESS
   PREPROCESS;
@@ -177,6 +233,9 @@ INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf, char *buffer,
 				      H_ERRNO_VAR_P))
     {
     case -1:
+# ifdef NEED__RES
+      __resolv_context_put (res_ctx);
+# endif
       return errno;
     case 1:
 #ifdef NEED_H_ERRNO
@@ -196,7 +255,12 @@ INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf, char *buffer,
       nscd_status = NSCD_NAME (ADD_VARIABLES, resbuf, buffer, buflen, result
 			       H_ERRNO_VAR);
       if (nscd_status >= 0)
-	return nscd_status;
+	{
+# ifdef NEED__RES
+	  __resolv_context_put (res_ctx);
+# endif
+	  return nscd_status;
+	}
     }
 #endif
 
@@ -214,21 +278,6 @@ INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf, char *buffer,
 	}
       else
 	{
-#ifdef NEED__RES
-	  /* The resolver code will really be used so we have to
-	     initialize it.  */
-	  if (__res_maybe_init (&_res, 0) == -1)
-	    {
-	      *h_errnop = NETDB_INTERNAL;
-	      *result = NULL;
-	      return errno;
-	    }
-#endif /* need _res */
-#ifdef NEED__RES_HCONF
-	  if (!_res_hconf.initialized)
-	    _res_hconf_init ();
-#endif /* need _res_hconf */
-
 	  void *tmp_ptr = fct.l;
 #ifdef PTR_MANGLE
 	  PTR_MANGLE (tmp_ptr);
@@ -278,9 +327,66 @@ INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf, char *buffer,
 	  && errno == ERANGE)
 	break;
 
+      if (do_merge)
+	{
+
+	  if (status == NSS_STATUS_SUCCESS)
+	    {
+	      /* The previous loop saved a buffer for merging.
+		 Perform the merge now.  */
+	      err = MERGE_FN (&mergegrp, mergebuf, endptr, buflen, resbuf,
+			      buffer);
+	      CHECK_MERGE (err,status);
+	      do_merge = 0;
+	    }
+	  else
+	    {
+	      /* If the result wasn't SUCCESS, copy the saved buffer back
+	         into the result buffer and set the status back to
+	         NSS_STATUS_SUCCESS to match the previous pass through the
+	         loop.
+	          * If the next action is CONTINUE, it will overwrite the value
+	            currently in the buffer and return the new value.
+	          * If the next action is RETURN, we'll return the previously-
+	            acquired values.
+	          * If the next action is MERGE, then it will be added to the
+	            buffer saved from the previous source.  */
+	      err = DEEPCOPY_FN (mergegrp, buflen, resbuf, buffer, NULL);
+	      CHECK_MERGE (err, status);
+	      status = NSS_STATUS_SUCCESS;
+	    }
+	}
+
+      /* If we were are configured to merge this value with the next one,
+         save the current value of the group struct.  */
+      if (nss_next_action (nip, status) == NSS_ACTION_MERGE
+	  && status == NSS_STATUS_SUCCESS)
+	{
+	  /* Copy the current values into a buffer to be merged with the next
+	     set of retrieved values.  */
+	  if (mergebuf == NULL)
+	    {
+	      /* Only allocate once and reuse it for as many merges as we need
+	         to perform.  */
+	      mergebuf = malloc (buflen);
+	      if (mergebuf == NULL)
+		{
+		  __set_errno (ENOMEM);
+		  status = NSS_STATUS_UNAVAIL;
+		  break;
+		}
+	    }
+
+	  err = DEEPCOPY_FN (*resbuf, buflen, &mergegrp, mergebuf, &endptr);
+	  CHECK_MERGE (err, status);
+	  do_merge = 1;
+	}
+
       no_more = __nss_next2 (&nip, REENTRANT_NAME_STRING,
 			     REENTRANT2_NAME_STRING, &fct.ptr, status, 0);
     }
+  free (mergebuf);
+  mergebuf = NULL;
 
 #ifdef HANDLE_DIGITS_DOTS
 done:
@@ -299,6 +405,12 @@ done:
 #ifdef POSTPROCESS
   POSTPROCESS;
 #endif
+
+#ifdef NEED__RES
+  /* This has to happen late because the POSTPROCESS stage above might
+     need the resolver context.  */
+  __resolv_context_put (res_ctx);
+#endif /* NEED__RES */
 
   int res;
   if (status == NSS_STATUS_SUCCESS || status == NSS_STATUS_NOTFOUND)

@@ -1,4 +1,4 @@
-/* Copyright (c) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@suse.de>, 1997.
 
@@ -14,11 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <string.h>
 #include <rpcsvc/nis.h>
+#include <libc-diag.h>
+#include <shlib-compat.h>
 
 #include "nis_xdr.h"
 #include "nis_intern.h"
@@ -126,7 +128,7 @@ __create_ib_request (const_nis_name name, unsigned int flags)
 
   return ibreq;
 }
-libnsl_hidden_def (__create_ib_request)
+libnsl_hidden_nolink_def (__create_ib_request, GLIBC_PRIVATE)
 
 static const struct timeval RPCTIMEOUT = {10, 0};
 
@@ -175,12 +177,20 @@ __follow_path (char **tablepath, char **tableptr, struct ib_request *ibreq,
 
       *tableptr = *tablepath;
     }
+
+  /* Since tableptr is only set here, and it's set when tablepath is NULL,
+     which it is initially defined as, we know it will always be set here.  */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_NEEDS_COMMENT (4.7, "-Wmaybe-uninitialized");
+
   if (*tableptr == NULL)
     return NIS_NOTFOUND;
 
   char *newname = strsep (tableptr, ":");
   if (newname[0] == '\0')
     return NIS_NOTFOUND;
+
+  DIAG_POP_NEEDS_COMMENT;
 
   newname = strdup (newname);
   if (newname == NULL)
@@ -191,7 +201,7 @@ __follow_path (char **tablepath, char **tableptr, struct ib_request *ibreq,
 
   return NIS_SUCCESS;
 }
-libnsl_hidden_def (__follow_path)
+libnsl_hidden_nolink_def (__follow_path, GLIBC_PRIVATE)
 
 
 nis_result *
@@ -543,7 +553,7 @@ nis_list (const_nis_name name, unsigned int flags,
 
   return res;
 }
-libnsl_hidden_def (nis_list)
+libnsl_hidden_nolink_def (nis_list, GLIBC_2_1)
 
 nis_result *
 nis_add_entry (const_nis_name name, const nis_object *obj2, unsigned int flags)
@@ -604,6 +614,7 @@ nis_add_entry (const_nis_name name, const nis_object *obj2, unsigned int flags)
 
   return res;
 }
+libnsl_hidden_nolink_def (nis_add_entry, GLIBC_2_1)
 
 nis_result *
 nis_modify_entry (const_nis_name name, const nis_object *obj2,
@@ -661,6 +672,7 @@ nis_modify_entry (const_nis_name name, const nis_object *obj2,
 
   return res;
 }
+libnsl_hidden_nolink_def (nis_modify_entry, GLIBC_2_1)
 
 nis_result *
 nis_remove_entry (const_nis_name name, const nis_object *obj,
@@ -709,6 +721,7 @@ nis_remove_entry (const_nis_name name, const nis_object *obj,
 
   return res;
 }
+libnsl_hidden_nolink_def (nis_remove_entry, GLIBC_2_1)
 
 nis_result *
 nis_first_entry (const_nis_name name)
@@ -746,6 +759,7 @@ nis_first_entry (const_nis_name name)
 
   return res;
 }
+libnsl_hidden_nolink_def (nis_first_entry, GLIBC_2_1)
 
 nis_result *
 nis_next_entry (const_nis_name name, const netobj *cookie)
@@ -796,3 +810,4 @@ nis_next_entry (const_nis_name name, const netobj *cookie)
 
   return res;
 }
+libnsl_hidden_nolink_def (nis_next_entry, GLIBC_2_1)

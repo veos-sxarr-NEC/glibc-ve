@@ -26,6 +26,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const double
   one = 1.0,
@@ -36,7 +37,7 @@ __ieee754_acosh (double x)
 {
   double t;
   int32_t hx;
-  u_int32_t lx;
+  uint32_t lx;
   EXTRACT_WORDS (hx, lx, x);
   if (hx < 0x3ff00000)                  /* x < 1 */
     {
@@ -58,12 +59,12 @@ __ieee754_acosh (double x)
   else if (hx > 0x40000000)             /* 2**28 > x > 2 */
     {
       t = x * x;
-      return __ieee754_log (2.0 * x - one / (x + __ieee754_sqrt (t - one)));
+      return __ieee754_log (2.0 * x - one / (x + sqrt (t - one)));
     }
   else                                  /* 1<x<2 */
     {
       t = x - one;
-      return __log1p (t + __ieee754_sqrt (2.0 * t + t * t));
+      return __log1p (t + sqrt (2.0 * t + t * t));
     }
 }
-strong_alias (__ieee754_acosh, __acosh_finite)
+libm_alias_finite (__ieee754_acosh, __acosh)

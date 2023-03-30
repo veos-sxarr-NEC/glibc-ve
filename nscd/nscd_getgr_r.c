@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@uni-paderborn.de>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <assert.h>
@@ -31,6 +31,7 @@
 #include <sys/un.h>
 #include <not-cancel.h>
 #include <_itoa.h>
+#include <scratch_buffer.h>
 
 #include "nscd-client.h"
 #include "nscd_proto.h"
@@ -39,8 +40,7 @@ int __nss_not_use_nscd_group;
 
 static int nscd_getgr_r (const char *key, size_t keylen, request_type type,
 			 struct group *resultbuf, char *buffer,
-			 size_t buflen, struct group **result)
-     internal_function;
+			 size_t buflen, struct group **result);
 
 
 int
@@ -81,7 +81,6 @@ libc_freeres_fn (gr_map_free)
 
 
 static int
-internal_function
 nscd_getgr_r (const char *key, size_t keylen, request_type type,
 	      struct group *resultbuf, char *buffer, size_t buflen,
 	      struct group **result)
@@ -89,7 +88,8 @@ nscd_getgr_r (const char *key, size_t keylen, request_type type,
   int gc_cycle;
   int nretries = 0;
   const uint32_t *len = NULL;
-  size_t lensize = 0;
+  struct scratch_buffer lenbuf;
+  scratch_buffer_init (&lenbuf);
 
   /* If the mapping is available, try to search there instead of
      communicating with the nscd.  */
@@ -200,14 +200,10 @@ nscd_getgr_r (const char *key, size_t keylen, request_type type,
 	  else
 	    {
 	      /* Allocate array to store lengths.  */
-	      if (lensize == 0)
-		{
-		  lensize = gr_resp.gr_mem_cnt * sizeof (uint32_t);
-		  len = (uint32_t *) alloca (lensize);
-		}
-	      else if (gr_resp.gr_mem_cnt * sizeof (uint32_t) > lensize)
-		len = extend_alloca (len, lensize,
-				     gr_resp.gr_mem_cnt * sizeof (uint32_t));
+	      if (!scratch_buffer_set_array_size
+		  (&lenbuf, gr_resp.gr_mem_cnt, sizeof (uint32_t)))
+		goto out_close;
+	      len = lenbuf.data;
 
 	      vec[0].iov_base = (void *) len;
 	      vec[0].iov_len = gr_resp.gr_mem_cnt * sizeof (uint32_t);
@@ -307,7 +303,7 @@ nscd_getgr_r (const char *key, size_t keylen, request_type type,
 
  out_close:
   if (sock != -1)
-    close_not_cancel_no_status (sock);
+    __close_nocancel_nostatus (sock);
  out:
   if (__nscd_drop_map_ref (mapped, &gc_cycle) != 0)
     {
@@ -325,6 +321,8 @@ nscd_getgr_r (const char *key, size_t keylen, request_type type,
       if (retval != -1)
 	goto retry;
     }
+
+  scratch_buffer_free (&lenbuf);
 
   return retval;
 }

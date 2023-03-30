@@ -3,10 +3,6 @@ long-double-fcts = yes
 
 pie-ccflag = -fPIE
 
-ifeq ($(subdir),debug)
-CFLAGS-backtrace.c += -funwind-tables
-endif
-
 ifeq ($(subdir),gmon)
 sysdep_routines += sparc-mcount
 endif
@@ -18,6 +14,15 @@ endif
 ifeq ($(subdir),csu)
 CPPFLAGS-crti.S += -fPIC
 CPPFLAGS-crtn.S += -fPIC
+endif
+
+# nscd uses atomic_spin_nop which in turn requires cpu_relax
+ifeq ($(subdir),nscd)
+routines += cpu_relax
+endif
+
+ifeq ($(subdir), nptl)
+libpthread-routines += cpu_relax
 endif
 
 # The assembler on SPARC needs the -fPIC flag even when it's assembler code.

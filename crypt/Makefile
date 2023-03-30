@@ -1,4 +1,4 @@
-# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for crypt() portion of the library.
@@ -32,14 +32,12 @@ libcrypt-routines := crypt-entry md5-crypt sha256-crypt sha512-crypt crypt \
 
 tests := cert md5c-test sha256c-test sha512c-test badsalttest
 
-ifeq ($(crypt-in-libc),yes)
-routines += $(libcrypt-routines)
-endif
-
 ifeq ($(nss-crypt),yes)
-CPPFLAGS-sha256-crypt.c = -DUSE_NSS -I$(shell nss-config --includedir)
-CPPFLAGS-sha512-crypt.c = -DUSE_NSS -I$(shell nss-config --includedir)
-CPPFLAGS-md5-crypt.c = -DUSE_NSS -I$(shell nss-config --includedir)
+nss-cpp-flags := -DUSE_NSS \
+  -I$(shell nss-config --includedir) -I$(shell nspr-config --includedir)
+CPPFLAGS-sha256-crypt.c += $(nss-cpp-flags)
+CPPFLAGS-sha512-crypt.c += $(nss-cpp-flags)
+CPPFLAGS-md5-crypt.c += $(nss-cpp-flags)
 LDLIBS-crypt.so = -lfreebl3
 else
 libcrypt-routines += md5 sha256 sha512

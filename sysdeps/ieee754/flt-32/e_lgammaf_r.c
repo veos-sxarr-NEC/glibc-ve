@@ -14,7 +14,10 @@
  */
 
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <libc-diag.h>
+#include <libm-alias-finite.h>
 
 static const float
 two23=  8.3886080000e+06, /* 0x4b000000 */
@@ -95,17 +98,17 @@ sin_pif(float x)
 	GET_FLOAT_WORD(ix,x);
 	ix &= 0x7fffffff;
 
-	if(ix<0x3e800000) return __kernel_sinf(pi*x,zero,0);
+	if(ix<0x3e800000) return __sinf (pi*x);
 	y = -x;		/* x is assume negative */
 
     /*
      * argument reduction, make sure inexact flag not raised if input
      * is an integer
      */
-	z = __floorf(y);
+	z = floorf(y);
 	if(z!=y) {				/* inexact anyway */
 	    y  *= (float)0.5;
-	    y   = (float)2.0*(y - __floorf(y));	/* y = |x| mod 2.0 */
+	    y   = (float)2.0*(y - floorf(y));	/* y = |x| mod 2.0 */
 	    n   = (int) (y*(float)4.0);
 	} else {
 	    if(ix>=0x4b800000) {
@@ -119,14 +122,14 @@ sin_pif(float x)
 	    }
 	}
 	switch (n) {
-	    case 0:   y =  __kernel_sinf(pi*y,zero,0); break;
+	    case 0:   y =  __sinf (pi*y); break;
 	    case 1:
-	    case 2:   y =  __kernel_cosf(pi*((float)0.5-y),zero); break;
+	    case 2:   y =  __cosf (pi*((float)0.5-y)); break;
 	    case 3:
-	    case 4:   y =  __kernel_sinf(pi*(one-y),zero,0); break;
+	    case 4:   y =  __sinf (pi*(one-y)); break;
 	    case 5:
-	    case 6:   y = -__kernel_cosf(pi*(y-(float)1.5),zero); break;
-	    default:  y =  __kernel_sinf(pi*(y-(float)2.0),zero,0); break;
+	    case 6:   y = -__cosf (pi*(y-(float)1.5)); break;
+	    default:  y =  __sinf (pi*(y-(float)2.0)); break;
 	    }
 	return -y;
 }
@@ -159,7 +162,10 @@ __ieee754_lgammaf_r(float x, int *signgamp)
 	}
 	if(hx<0) {
 	    if(ix>=0x4b000000)	/* |x|>=2**23, must be -integer */
-		return x/zero;
+		return fabsf (x)/zero;
+	    if (ix > 0x40000000 /* X < 2.0f.  */
+		&& ix < 0x41700000 /* X > -15.0f.  */)
+		return __lgamma_negf (x, signgamp);
 	    t = sin_pif(x);
 	    if(t==zero) return one/fabsf(t); /* -integer */
 	    nadj = __ieee754_logf(pi/fabsf(t*x));
@@ -219,17 +225,24 @@ __ieee754_lgammaf_r(float x, int *signgamp)
 	    case 3: z *= (y+(float)2.0);	/* FALLTHRU */
 		    r += __ieee754_logf(z); break;
 	    }
-    /* 8.0 <= x < 2**58 */
-	} else if (ix < 0x5c800000) {
+    /* 8.0 <= x < 2**26 */
+	} else if (ix < 0x4c800000) {
 	    t = __ieee754_logf(x);
 	    z = one/x;
 	    y = z*z;
 	    w = w0+z*(w1+y*(w2+y*(w3+y*(w4+y*(w5+y*w6)))));
 	    r = (x-half)*(t-one)+w;
 	} else
-    /* 2**58 <= x <= inf */
-	    r =  x*(__ieee754_logf(x)-one);
+    /* 2**26 <= x <= inf */
+	    r =  math_narrow_eval (x*(__ieee754_logf(x)-one));
+	/* NADJ is set for negative arguments but not otherwise,
+	   resulting in warnings that it may be used uninitialized
+	   although in the cases where it is used it has always been
+	   set.  */
+	DIAG_PUSH_NEEDS_COMMENT;
+	DIAG_IGNORE_NEEDS_COMMENT (4.9, "-Wmaybe-uninitialized");
 	if(hx<0) r = nadj - r;
+	DIAG_POP_NEEDS_COMMENT;
 	return r;
 }
-strong_alias (__ieee754_lgammaf_r, __lgammaf_r_finite)
+libm_alias_finite (__ieee754_lgammaf_r, __lgammaf_r)

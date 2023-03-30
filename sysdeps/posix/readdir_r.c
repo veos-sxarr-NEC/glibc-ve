@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <limits.h>
@@ -152,3 +152,8 @@ __READDIR_R (DIR *dirp, DIRENT_TYPE *entry, DIRENT_TYPE **result)
 #ifdef __READDIR_R_ALIAS
 weak_alias (__readdir_r, readdir_r)
 #endif
+
+#undef __READDIR_R
+#undef __GETDENTS
+#undef DIRENT_TYPE
+#undef __READDIR_R_ALIAS

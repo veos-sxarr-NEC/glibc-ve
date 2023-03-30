@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sigsetops.h>
 
 /* Try to get a machine dependent instruction which will make the
    program crash.  This is used in case everything else fails.  */
@@ -29,9 +30,6 @@
 /* No such instruction is available.  */
 # define ABORT_INSTRUCTION
 #endif
-
-#include <libio/libioP.h>
-#define fflush(s) _IO_flush_all_lockp (0)
 
 /* Exported variable to locate abort message in core files etc.  */
 struct abort_msg_s *__abort_msg __attribute__ ((nocommon));
@@ -57,25 +55,17 @@ abort (void)
 
   /* Now it's for sure we are alone.  But recursive calls are possible.  */
 
-  /* Unlock SIGABRT.  */
+  /* Unblock SIGABRT.  */
   if (stage == 0)
     {
       ++stage;
-      if (__sigemptyset (&sigs) == 0 &&
-	  __sigaddset (&sigs, SIGABRT) == 0)
-	__sigprocmask (SIG_UNBLOCK, &sigs, (sigset_t *) NULL);
-    }
-
-  /* Flush all streams.  We cannot close them now because the user
-     might have registered a handler for SIGABRT.  */
-  if (stage == 1)
-    {
-      ++stage;
-      fflush (NULL);
+      __sigemptyset (&sigs);
+      __sigaddset (&sigs, SIGABRT);
+      __sigprocmask (SIG_UNBLOCK, &sigs, 0);
     }
 
   /* Send signal which possibly calls a user handler.  */
-  if (stage == 2)
+  if (stage == 1)
     {
       /* This stage is special: we must allow repeated calls of
 	 `abort' when a user defined handler for SIGABRT is installed.
@@ -93,7 +83,7 @@ abort (void)
     }
 
   /* There was a handler installed.  Now remove it.  */
-  if (stage == 3)
+  if (stage == 2)
     {
       ++stage;
       memset (&act, '\0', sizeof (struct sigaction));
@@ -103,30 +93,22 @@ abort (void)
       __sigaction (SIGABRT, &act, NULL);
     }
 
-  /* Now close the streams which also flushes the output the user
-     defined handler might has produced.  */
-  if (stage == 4)
-    {
-      ++stage;
-      __fcloseall ();
-    }
-
   /* Try again.  */
-  if (stage == 5)
+  if (stage == 3)
     {
       ++stage;
       raise (SIGABRT);
     }
 
   /* Now try to abort using the system specific command.  */
-  if (stage == 6)
+  if (stage == 4)
     {
       ++stage;
       ABORT_INSTRUCTION;
     }
 
   /* If we can't signal ourselves and the abort instruction failed, exit.  */
-  if (stage == 7)
+  if (stage == 5)
     {
       ++stage;
       _exit (127);

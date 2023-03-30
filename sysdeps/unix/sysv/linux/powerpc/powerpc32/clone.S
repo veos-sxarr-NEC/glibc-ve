@@ -1,5 +1,5 @@
 /* Wrapper around clone system call.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,15 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #define _ERRNO_H	1
 #include <bits/errno.h>
-
-#define CLONE_VM	0x00000100
-#define CLONE_THREAD	0x00010000
-
 
 /* This is the only really unusual system call in PPC linux, but not
    because of any weirdness in the system call itself; because of
@@ -76,23 +72,11 @@ ENTRY (__clone)
 	crandc	cr1*4+eq,cr1*4+eq,cr0*4+so
 	bne-	cr1,L(parent)		/* The '-' is to minimise the race.  */
 
-	andis.	r0,r28,CLONE_THREAD>>16
-	bne+	r0,L(oldpid)
-	andi.	r0,r28,CLONE_VM
-	li	r3,-1
-	bne-	r0,L(nomoregetpid)
-	DO_CALL(SYS_ify(getpid))
-L(nomoregetpid):
-	stw	r3,TID(r2)
-	stw	r3,PID(r2)
-L(oldpid):
-
 	/* Call procedure.  */
 	mtctr	r30
 	mr	r3,r31
 	bctrl
-	/* Call _exit with result from procedure.  */
-	b	HIDDEN_JUMPTARGET(_exit)
+	DO_CALL(SYS_ify(exit))
 
 L(parent):
 	/* Parent.  Restore registers & return.  */
@@ -108,4 +92,5 @@ L(badargs):
 	cfi_startproc
 END (__clone)
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

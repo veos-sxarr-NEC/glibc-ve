@@ -50,7 +50,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 
 #include <math.h>
@@ -117,8 +117,6 @@ static const long double C2 = 1.428606820309417232121458176568075500134E-6L;
 
 static const long double sqrth = 0.7071067811865475244008443621048490392848L;
 /* ln (2^16384 * (1 - 2^-113)) */
-static const long double maxlog = 1.1356523406294143949491931077970764891253E4L;
-static const long double big = 2e300L;
 static const long double zero = 0.0L;
 
 
@@ -133,8 +131,8 @@ __log1pl (long double xm1)
   /* Test for NaN or infinity input. */
   xhi = ldbl_high (xm1);
   EXTRACT_WORDS (hx, lx, xhi);
-  if (hx >= 0x7ff00000)
-    return xm1;
+  if ((hx & 0x7fffffff) >= 0x7ff00000)
+    return xm1 + xm1 * xm1;
 
   /* log1p(+- 0) = +- 0.  */
   if (((hx & 0x7fffffff) | lx) == 0)
@@ -149,7 +147,7 @@ __log1pl (long double xm1)
   if (x <= 0.0L)
     {
       if (x == 0.0L)
-	return (-1.0L / (x - x));
+	return (-1.0L / 0.0L);
       else
 	return (zero / (x - x));
     }
@@ -249,5 +247,3 @@ __log1pl (long double xm1)
   z = z + e * C1;
   return (z);
 }
-
-long_double_symbol (libm, __log1pl, log1pl);

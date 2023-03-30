@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Makefile for locales.
@@ -22,7 +22,8 @@ subdir	:= locale
 
 include ../Makeconfig
 
-headers		= locale.h bits/locale.h langinfo.h xlocale.h
+headers		= langinfo.h locale.h bits/locale.h \
+		  bits/types/locale_t.h bits/types/__locale_t.h
 routines	= setlocale findlocale loadlocale loadarchive \
 		  localeconv nl_langinfo nl_langinfo_l mb_cur_max \
 		  newlocale duplocale freelocale uselocale
@@ -36,6 +37,8 @@ others		= localedef locale
 install-bin	= localedef locale
 extra-objs	= $(localedef-modules:=.o) $(localedef-aux:=.o) \
 		  $(locale-modules:=.o) $(lib-modules:=.o)
+generated 	+= C-translit.h
+before-compile	+= $(objpfx)C-translit.h
 
 extra-libs	= libBrokenLocale
 extra-libs-others = $(extra-libs)
@@ -52,15 +55,20 @@ localedef-modules	:= localedef $(categories:%=ld-%) \
 			   repertoire locarchive
 localedef-aux		:= md5
 locale-modules		:= locale locale-spec
-lib-modules		:= charmap-dir simple-hash xmalloc xstrdup
+lib-modules		:= charmap-dir simple-hash xmalloc xstrdup \
+			   record-status
 
 
 GPERF = gperf
 GPERFFLAGS = -acCgopt -k1,2,5,9,$$ -L ANSI-C
 
+ifeq ($(run-built-tests),yes)
+tests-special += $(objpfx)tst-locale-locpath.out
+endif
+
 include ../Rules
 
-CFLAGS-md5.c = -I../crypt
+CFLAGS-md5.c += -I../crypt
 
 programs/%-kw.h: programs/%-kw.gperf
 	cd programs \
@@ -72,17 +80,21 @@ $(objpfx)localedef: $(localedef-aux:%=$(objpfx)%.o)
 $(objpfx)locale: $(locale-modules:%=$(objpfx)%.o)
 $(objpfx)localedef $(objpfx)locale: $(lib-modules:%=$(objpfx)%.o)
 
-C-translit.h: C-translit.h.in gen-translit.pl
-	$(PERL) gen-translit.pl < $< > $@.tmp
+$(objpfx)C-translit.h: C-translit.h.in gen-translit.py
+	$(make-target-directory)
+	$(PYTHON) gen-translit.py < $< > $@.tmp
 	mv -f $@.tmp $@
 
-localepath = "$(localedir):$(i18ndir)"
+# The path to the compiled binary locale archive or compiled locales,
+# along with the parent path to the source locales and source
+# charmaps.
+localepath = "$(complocaledir):$(i18ndir)"
 
 # -Iprograms doesn't really belong here, but this gets it at the head
 # of the list instead of the tail, where CPPFLAGS-$(lib) gets added.
 # We need it before the standard -I's to see programs/config.h first.
-locale-CPPFLAGS = -DLOCALEDIR='"$(localedir)"' \
-		  -DLOCALE_ALIAS_PATH='"$(msgcatdir)"' \
+locale-CPPFLAGS = -DCOMPLOCALEDIR='"$(complocaledir)"' \
+		  -DLOCALE_ALIAS_PATH='"$(localedir)"' \
 		  -Iprograms
 
 CPPFLAGS-locale-programs = -DLOCALE_PATH='$(localepath)' \
@@ -90,12 +102,17 @@ CPPFLAGS-locale-programs = -DLOCALE_PATH='$(localepath)' \
 			   -DREPERTOIREMAP_PATH='"$(i18ndir)/repertoiremaps"' \
 			   -DLOCSRCDIR='"$(i18ndir)/locales"'
 
-CFLAGS-charmap.c = -Wno-write-strings -Wno-char-subscripts
-CFLAGS-locfile.c = -Wno-write-strings -Wno-char-subscripts
-CFLAGS-charmap-dir.c = -Wno-write-strings
+CFLAGS-charmap.c += -Wno-write-strings -Wno-char-subscripts
+CFLAGS-locfile.c += -Wno-write-strings -Wno-char-subscripts
+CFLAGS-charmap-dir.c += -Wno-write-strings
+
 CFLAGS-lc-ctype.c = -O0
 # Set libof-* for each routine.
 cpp-srcs-left := $(localedef-modules) $(localedef-aux) $(locale-modules) \
 		 $(lib-modules)
 lib := locale-programs
-include $(patsubst %,$(..)cppflags-iterator.mk,$(cpp-srcs-left))
+include $(patsubst %,$(..)libof-iterator.mk,$(cpp-srcs-left))
+
+$(objpfx)tst-locale-locpath.out : tst-locale-locpath.sh $(objpfx)locale
+	$(SHELL) $< '$(common-objpfx)' '$(test-wrapper-env)' '$(run-program-env)' > $@; \
+	$(evaluate-test)

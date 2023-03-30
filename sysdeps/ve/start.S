@@ -1,5 +1,5 @@
 /* Startup code compliant to the ELF VE ABI.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This is the canonical entry point, usually the first thing in the text
    segment.  The VE ABI says that when the entry
@@ -58,8 +58,7 @@ ENTRY (_start)
 
 	lea     %sp, -176-80(,%sp)
 	st	%s5, 176+64(, %sp)
-	lea     %s12, __setPthreadStruct@CALL_LO
-	and     %s12, %s12, (32)0
+	addi %s12,0,__setPthreadStruct@CALL_LO
 	lea.sl  %s12, __setPthreadStruct@CALL_HI(,%s12)
 	bsic    %lr, (,%s12)
 	ld	%s5, 176+64(, %sp)
@@ -84,17 +83,14 @@ ENTRY (_start)
 	lea     %s2, 0x8(%sp)   /* get the argv address, 3rd arg    */
 
 	/* Pass address of our own entry points to __libc_csu_init and __libc_csu_fini */
-	lea     %s3, __libc_csu_init@CALL_LO
-	and     %s3, %s3,(32)0
+	addi %s3,0,__libc_csu_init@CALL_LO
 	lea.sl  %s3, __libc_csu_init@CALL_HI(,%s3)
 
-	lea     %s4, __libc_csu_fini@CALL_LO
-	and     %s4, %s4,(32)0
+	addi %s4,0,__libc_csu_fini@CALL_LO
 	lea.sl  %s4, __libc_csu_fini@CALL_HI(,%s4)
 
 	/* Pass address of our own main() */
-	lea     %s0, main@CALL_LO
-	and     %s0, %s0,(32)0
+	addi %s0,0,main@CALL_LO
 	lea.sl  %s0, main@CALL_HI(,%s0)
 
 	lea     %sp, -176-80(,%sp)
@@ -112,8 +108,7 @@ ENTRY (_start)
 
 /* Call the user's main function, and exit with its value.
            But let the libc call main.    */
-	lea     %s12, __libc_start_main@CALL_LO
-	and     %s12, %s12,(32)0
+	addi %s12,0,__libc_start_main@CALL_LO
 	lea.sl  %s12, __libc_start_main@CALL_HI(,%s12)
 
 # call __libc_start_main

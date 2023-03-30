@@ -29,7 +29,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __kernel_tanl( x, y, k )
  * kernel tan function on [-pi/4, pi/4], pi/4 ~ 0.7854
@@ -56,8 +56,12 @@
  *		       = 1 - 2*(tan(y) - (tan(y)^2)/(1+tan(y)))
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libc-diag.h>
+
 static const long double
   one = 1.0L,
   pio4hi = 0xc.90fdaa22168c235p-4L,
@@ -94,8 +98,13 @@ __kernel_tanl (long double x, long double y, int iy)
 	{			/* generate inexact */
 	  if (x == 0 && iy == -1)
 	    return one / fabsl (x);
+	  else if (iy == 1)
+	    {
+	      math_check_force_underflow_nonneg (absx);
+	      return x;
+	    }
 	  else
-	    return (iy == 1) ? x : -one / x;
+	    return -one / x;
 	}
     }
   if (absx >= 0.6743316650390625L)
@@ -126,8 +135,15 @@ __kernel_tanl (long double x, long double y, int iy)
     {
       v = (long double) iy;
       w = (v - 2.0 * (x - (w * w / (w + v) - r)));
+      /* SIGN is set for arguments that reach this code, but not
+        otherwise, resulting in warnings that it may be used
+        uninitialized although in the cases where it is used it has
+        always been set.  */
+      DIAG_PUSH_NEEDS_COMMENT;
+      DIAG_IGNORE_NEEDS_COMMENT (4.8, "-Wmaybe-uninitialized");
       if (sign < 0)
 	w = -w;
+      DIAG_POP_NEEDS_COMMENT;
       return w;
     }
   if (iy == 1)

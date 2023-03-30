@@ -41,16 +41,19 @@
  *      only tanhl(0)=0 is exact for finite argument.
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-ldouble.h>
 
-static const long double one = 1.0, two = 2.0, tiny = 1.0e-4900L;
+static const _Float128 one = 1.0, two = 2.0, tiny = L(1.0e-4900);
 
-long double
-__tanhl (long double x)
+_Float128
+__tanhl (_Float128 x)
 {
-  long double t, z;
-  u_int32_t jx, ix;
+  _Float128 t, z;
+  uint32_t jx, ix;
   ieee854_long_double_shape_type u;
 
   /* Words of |x|. */
@@ -73,7 +76,10 @@ __tanhl (long double x)
       if (u.value == 0)
 	return x;		/* x == +- 0 */
       if (ix < 0x3fc60000)	/* |x| < 2^-57 */
-	return x * (one + tiny); /* tanh(small) = small */
+	{
+	  math_check_force_underflow (x);
+	  return x * (one + tiny); /* tanh(small) = small */
+	}
       u.parts32.w0 = ix;	/* Absolute value of x.  */
       if (ix >= 0x3fff0000)
 	{			/* |x| >= 1  */
@@ -93,4 +99,4 @@ __tanhl (long double x)
     }
   return (jx & 0x80000000) ? -z : z;
 }
-weak_alias (__tanhl, tanhl)
+libm_alias_ldouble (__tanh, tanh)

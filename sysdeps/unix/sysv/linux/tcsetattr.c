@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <string.h>
@@ -41,10 +41,7 @@
 
 /* Set the state of FD to *TERMIOS_P.  */
 int
-tcsetattr (fd, optional_actions, termios_p)
-     int fd;
-     int optional_actions;
-     const struct termios *termios_p;
+__tcsetattr (int fd, int optional_actions, const struct termios *termios_p)
 {
   struct __kernel_termios k_termios;
   unsigned long int cmd;
@@ -61,8 +58,7 @@ tcsetattr (fd, optional_actions, termios_p)
       cmd = TCSETSF;
       break;
     default:
-      __set_errno (EINVAL);
-      return -1;
+      return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
     }
 
   k_termios.c_iflag = termios_p->c_iflag & ~IBAUD0;
@@ -70,10 +66,10 @@ tcsetattr (fd, optional_actions, termios_p)
   k_termios.c_cflag = termios_p->c_cflag;
   k_termios.c_lflag = termios_p->c_lflag;
   k_termios.c_line = termios_p->c_line;
-#if defined _HAVE_C_ISPEED && defined _HAVE_STRUCT_TERMIOS_C_ISPEED
+#if _HAVE_C_ISPEED && _HAVE_STRUCT_TERMIOS_C_ISPEED
   k_termios.c_ispeed = termios_p->c_ispeed;
 #endif
-#if defined _HAVE_C_OSPEED && defined _HAVE_STRUCT_TERMIOS_C_OSPEED
+#if _HAVE_C_OSPEED && _HAVE_STRUCT_TERMIOS_C_OSPEED
   k_termios.c_ospeed = termios_p->c_ospeed;
 #endif
   memcpy (&k_termios.c_cc[0], &termios_p->c_cc[0],
@@ -81,4 +77,5 @@ tcsetattr (fd, optional_actions, termios_p)
 
   return INLINE_SYSCALL (ioctl, 3, fd, cmd, &k_termios);
 }
+weak_alias (__tcsetattr, tcsetattr)
 libc_hidden_def (tcsetattr)

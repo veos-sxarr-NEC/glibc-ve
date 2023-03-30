@@ -30,12 +30,10 @@
 #include <rpc/rpc.h>
 #include <shlib-compat.h>
 
-#ifdef _RPC_THREAD_SAFE_
 #undef svc_fdset
 #undef rpc_createerr
 #undef svc_pollfd
 #undef svc_max_pollfd
-#endif /* _RPC_THREAD_SAFE_ */
 
 /*
  * This file should only contain common data (global data) that is exported
@@ -46,7 +44,14 @@
    the variable is declared.  So we use the section attribute.  */
 struct opaque_auth _null_auth __attribute__ ((nocommon));
 libc_hidden_nolink_sunrpc (_null_auth, GLIBC_2_0)
-fd_set svc_fdset;
-struct rpc_createerr rpc_createerr;
-struct pollfd *svc_pollfd;
-int svc_max_pollfd;
+
+/* The variables need the nocommon attribute, so that it is possible
+   to create aliases and specify symbol versions.  */
+fd_set svc_fdset  __attribute__ ((nocommon));
+libc_hidden_nolink_sunrpc (svc_fdset, GLIBC_2_0)
+struct rpc_createerr rpc_createerr  __attribute__ ((nocommon));
+libc_hidden_nolink_sunrpc (rpc_createerr, GLIBC_2_0)
+struct pollfd *svc_pollfd  __attribute__ ((nocommon));
+libc_hidden_nolink_sunrpc (svc_pollfd, GLIBC_2_2)
+int svc_max_pollfd  __attribute__ ((nocommon));
+libc_hidden_nolink_sunrpc (svc_max_pollfd, GLIBC_2_2)

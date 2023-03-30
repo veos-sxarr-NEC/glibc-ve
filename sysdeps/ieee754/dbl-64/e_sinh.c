@@ -32,8 +32,12 @@ static char rcsid[] = "$NetBSD: e_sinh.c,v 1.7 1995/05/10 20:46:13 jtc Exp $";
  *	only sinh(0)=0 is exact for finite x.
  */
 
+#include <float.h>
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const double one = 1.0, shuge = 1.0e307;
 
@@ -42,7 +46,7 @@ __ieee754_sinh (double x)
 {
   double t, w, h;
   int32_t ix, jx;
-  u_int32_t lx;
+  uint32_t lx;
 
   /* High word of |x|. */
   GET_HIGH_WORD (jx, x);
@@ -58,10 +62,12 @@ __ieee754_sinh (double x)
   /* |x| in [0,22], return sign(x)*0.5*(E+E/(E+1))) */
   if (ix < 0x40360000)                  /* |x|<22 */
     {
-      if (__glibc_unlikely (ix < 0x3e300000))              /* |x|<2**-28 */
+      if (__glibc_unlikely (ix < 0x3e300000)) {            /* |x|<2**-28 */
+	math_check_force_underflow (x);
 	if (shuge + x > one)
 	  return x;
-      /* sinh(tiny) = tiny with inexact */
+	/* sinh(tiny) = tiny with inexact */
+      }
       t = __expm1 (fabs (x));
       if (ix < 0x3ff00000)
 	return h * (2.0 * t - t * t / (t + one));
@@ -74,7 +80,7 @@ __ieee754_sinh (double x)
 
   /* |x| in [log(maxdouble), overflowthresold] */
   GET_LOW_WORD (lx, x);
-  if (ix < 0x408633ce || ((ix == 0x408633ce) && (lx <= (u_int32_t) 0x8fb9f87d)))
+  if (ix < 0x408633ce || ((ix == 0x408633ce) && (lx <= (uint32_t) 0x8fb9f87d)))
     {
       w = __ieee754_exp (0.5 * fabs (x));
       t = h * w;
@@ -82,6 +88,6 @@ __ieee754_sinh (double x)
     }
 
   /* |x| > overflowthresold, sinh(x) overflow */
-  return x * shuge;
+  return math_narrow_eval (x * shuge);
 }
-strong_alias (__ieee754_sinh, __sinh_finite)
+libm_alias_finite (__ieee754_sinh, __sinh)

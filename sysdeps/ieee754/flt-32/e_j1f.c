@@ -14,8 +14,13 @@
  */
 
 #include <errno.h>
+#include <float.h>
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static float ponef(float), qonef(float);
 
@@ -60,16 +65,22 @@ __ieee754_j1f(float x)
 	 * j1(x) = 1/sqrt(pi) * (P(1,x)*cc - Q(1,x)*ss) / sqrt(x)
 	 * y1(x) = 1/sqrt(pi) * (P(1,x)*ss + Q(1,x)*cc) / sqrt(x)
 	 */
-		if(ix>0x48000000) z = (invsqrtpi*cc)/__ieee754_sqrtf(y);
+		if(ix>0x48000000) z = (invsqrtpi*cc)/sqrtf(y);
 		else {
 		    u = ponef(y); v = qonef(y);
-		    z = invsqrtpi*(u*cc-v*ss)/__ieee754_sqrtf(y);
+		    z = invsqrtpi*(u*cc-v*ss)/sqrtf(y);
 		}
 		if(hx<0) return -z;
 		else	 return  z;
 	}
 	if(__builtin_expect(ix<0x32000000, 0)) {	/* |x|<2**-27 */
-	    if(huge+x>one) return (float)0.5*x;/* inexact if x!=0 necessary */
+	    if(huge+x>one) {		/* inexact if x!=0 necessary */
+		float ret = math_narrow_eval ((float) 0.5 * x);
+		math_check_force_underflow (ret);
+		if (ret == 0 && x != 0)
+		  __set_errno (ERANGE);
+		return ret;
+	    }
 	}
 	z = x*x;
 	r =  z*(r00+z*(r01+z*(r02+z*r03)));
@@ -77,7 +88,7 @@ __ieee754_j1f(float x)
 	r *= x;
 	return(x*(float)0.5+r/s);
 }
-strong_alias (__ieee754_j1f, __j1f_finite)
+libm_alias_finite (__ieee754_j1f, __j1f)
 
 static const float U0[5] = {
  -1.9605709612e-01, /* 0xbe48c331 */
@@ -105,7 +116,7 @@ __ieee754_y1f(float x)
     /* if Y1(NaN) is NaN, Y1(-inf) is NaN, Y1(inf) is 0 */
 	if(__builtin_expect(ix>=0x7f800000, 0)) return  one/(x+x*x);
 	if(__builtin_expect(ix==0, 0))
-		return -HUGE_VALF+x;  /* -inf and overflow exception.  */
+		return -1/zero; /* -inf and divide by zero exception.  */
 	if(__builtin_expect(hx<0, 0)) return zero/(zero*x);
 	if(ix >= 0x40000000) {  /* |x| >= 2.0 */
 		SET_RESTORE_ROUNDF (FE_TONEAREST);
@@ -128,16 +139,16 @@ __ieee754_y1f(float x)
 	 *              sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))
 	 * to compute the worse one.
 	 */
-		if(ix>0x48000000) z = (invsqrtpi*ss)/__ieee754_sqrtf(x);
+		if(ix>0x48000000) z = (invsqrtpi*ss)/sqrtf(x);
 		else {
 		    u = ponef(x); v = qonef(x);
-		    z = invsqrtpi*(u*ss+v*cc)/__ieee754_sqrtf(x);
+		    z = invsqrtpi*(u*ss+v*cc)/sqrtf(x);
 		}
 		return z;
 	}
 	if(__builtin_expect(ix<=0x33000000, 0)) {    /* x < 2**-25 */
 	    z = -tpi / x;
-	    if (__isinff (z))
+	    if (isinf (z))
 		__set_errno (ERANGE);
 	    return z;
 	}
@@ -146,7 +157,7 @@ __ieee754_y1f(float x)
 	v = one+z*(V0[0]+z*(V0[1]+z*(V0[2]+z*(V0[3]+z*V0[4]))));
 	return(x*(u/v) + tpi*(__ieee754_j1f(x)*__ieee754_logf(x)-one/x));
 }
-strong_alias (__ieee754_y1f, __y1f_finite)
+libm_alias_finite (__ieee754_y1f, __y1f)
 
 /* For x >= 8, the asymptotic expansions of pone is
  *	1 + 15/128 s^2 - 4725/2^15 s^4 - ...,	where s = 1/x.
@@ -230,10 +241,11 @@ ponef(float x)
 	int32_t ix;
 	GET_FLOAT_WORD(ix,x);
 	ix &= 0x7fffffff;
+	/* ix >= 0x40000000 for all calls to this function.  */
 	if(ix>=0x41000000)     {p = pr8; q= ps8;}
 	else if(ix>=0x40f71c58){p = pr5; q= ps5;}
 	else if(ix>=0x4036db68){p = pr3; q= ps3;}
-	else if(ix>=0x40000000){p = pr2; q= ps2;}
+	else {p = pr2; q= ps2;}
 	z = one/(x*x);
 	r = p[0]+z*(p[1]+z*(p[2]+z*(p[3]+z*(p[4]+z*p[5]))));
 	s = one+z*(q[0]+z*(q[1]+z*(q[2]+z*(q[3]+z*q[4]))));
@@ -327,10 +339,11 @@ qonef(float x)
 	int32_t ix;
 	GET_FLOAT_WORD(ix,x);
 	ix &= 0x7fffffff;
+	/* ix >= 0x40000000 for all calls to this function.  */
 	if(ix>=0x40200000)     {p = qr8; q= qs8;}
 	else if(ix>=0x40f71c58){p = qr5; q= qs5;}
 	else if(ix>=0x4036db68){p = qr3; q= qs3;}
-	else if(ix>=0x40000000){p = qr2; q= qs2;}
+	else {p = qr2; q= qs2;}
 	z = one/(x*x);
 	r = p[0]+z*(p[1]+z*(p[2]+z*(p[3]+z*(p[4]+z*p[5]))));
 	s = one+z*(q[0]+z*(q[1]+z*(q[2]+z*(q[3]+z*(q[4]+z*q[5])))));

@@ -19,6 +19,7 @@ static char rcsid[] = "$NetBSD: e_acoshf.c,v 1.5 1995/05/12 04:57:20 jtc Exp $";
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const float
 one	= 1.0,
@@ -40,10 +41,10 @@ float __ieee754_acoshf(float x)
 	    return 0.0;			/* acosh(1) = 0 */
 	} else if (hx > 0x40000000) {	/* 2**28 > x > 2 */
 	    t=x*x;
-	    return __ieee754_logf((float)2.0*x-one/(x+__ieee754_sqrtf(t-one)));
+	    return __ieee754_logf((float)2.0*x-one/(x+sqrtf(t-one)));
 	} else {			/* 1<x<2 */
 	    t = x-one;
-	    return __log1pf(t+__ieee754_sqrtf((float)2.0*t+t*t));
+	    return __log1pf(t+sqrtf((float)2.0*t+t*t));
 	}
 }
-strong_alias (__ieee754_acoshf, __acoshf_finite)
+libm_alias_finite (__ieee754_acoshf, __acoshf)

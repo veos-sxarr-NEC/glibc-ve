@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -27,10 +27,7 @@
 #include "libioP.h"
 
 void
-_IO_setbuffer (fp, buf, size)
-     _IO_FILE *fp;
-     char *buf;
-     _IO_size_t size;
+_IO_setbuffer (FILE *fp, char *buf, size_t size)
 {
   CHECK_FILE (fp, );
   _IO_acquire_lock (fp);
@@ -45,6 +42,4 @@ _IO_setbuffer (fp, buf, size)
 }
 libc_hidden_def (_IO_setbuffer)
 
-#ifdef weak_alias
 weak_alias (_IO_setbuffer, setbuffer)
-#endif

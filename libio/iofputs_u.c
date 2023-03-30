@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -29,15 +29,15 @@
 #include <string.h>
 
 int
-fputs_unlocked (str, fp)
-      const char *str;
-      _IO_FILE *fp;
+__fputs_unlocked (const char *str, FILE *fp)
 {
-  _IO_size_t len = strlen (str);
+  size_t len = strlen (str);
   int result = EOF;
   CHECK_FILE (fp, EOF);
   if (_IO_fwide (fp, -1) == -1 && _IO_sputn (fp, str, len) == len)
     result = 1;
   return result;
 }
-libc_hidden_def (fputs_unlocked)
+libc_hidden_def (__fputs_unlocked)
+weak_alias (__fputs_unlocked, fputs_unlocked)
+libc_hidden_weak (fputs_unlocked)

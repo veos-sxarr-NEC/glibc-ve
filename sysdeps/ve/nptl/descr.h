@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef _DESCR_H
 #define _DESCR_H	1
@@ -26,18 +26,14 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <hp-timing.h>
-#define __need_list_t
-#include <list.h>
+#include <list_t.h>
 #include <lowlevellock.h>
 #include <pthreaddef.h>
 #include <dl-sysdep.h>
-#include "../nptl_db/thread_db.h"
+#include <thread_db.h>
 #include <tls.h>
-#ifdef HAVE_FORCED_UNWIND
-# include <unwind.h>
-#endif
-#define __need_res_state
-#include <resolv.h>
+#include <unwind.h>
+#include <bits/types/res_state.h>
 #include <kernel-features.h>
 
 #ifndef TCB_ALIGNMENT
@@ -150,9 +146,6 @@ struct pthread
 	 looks to cancel itself and is hence going to end anyway.  */
       int multiple_threads;
       int gscope_flag;
-# ifndef __ASSUME_PRIVATE_FUTEX
-      int private_futex;
-# endif
     } header;
 #endif
 
@@ -170,11 +163,11 @@ struct pthread
      therefore stack) used' flag.  */
   volatile pid_t tid;
 
-  /* Process ID - thread group ID in kernel speak.  */
-  pid_t pid;
+  /* Ununsed.  */
+  pid_t pid_unused;
 
   /* List of robust mutexes the thread is holding.  */
-#ifdef __PTHREAD_MUTEX_HAVE_PREV
+#if __PTHREAD_MUTEX_HAVE_PREV
   void *robust_prev;
   struct robust_list_head robust_head;
 
@@ -182,7 +175,16 @@ struct pthread
      but the pointer to the next/previous element of the list points
      in the middle of the object, the __next element.  Whenever
      casting to __pthread_list_t we need to adjust the pointer
-     first.  */
+     first.
+     These operations are effectively concurrent code in that the thread
+     can get killed at any point in time and the kernel takes over.  Thus,
+     the __next elements are a kind of concurrent list and we need to
+     enforce using compiler barriers that the individual operations happen
+     in such a way that the kernel always sees a consistent list.  The
+     backward links (ie, the __prev elements) are not used by the kernel.
+     FIXME We should use relaxed MO atomic operations here and signal fences
+     because this kind of concurrency is similar to synchronizing with a
+     signal handler.  */
 # define QUEUE_PTR_ADJUST (offsetof (__pthread_list_t, __next))
 
 # define ENQUEUE_MUTEX_BOTH(mutex, val)					      \
@@ -194,6 +196,8 @@ struct pthread
     mutex->__data.__list.__next = THREAD_GETMEM (THREAD_SELF,		      \
 						 robust_head.list);	      \
     mutex->__data.__list.__prev = (void *) &THREAD_SELF->robust_head;	      \
+    /* Ensure that the new list entry is ready before we insert it.  */	      \
+    __asm ("" ::: "memory");						      \
     THREAD_SETMEM (THREAD_SELF, robust_head.list,			      \
 		   (void *) (((uintptr_t) &mutex->__data.__list.__next)	      \
 			     | val));					      \
@@ -208,6 +212,9 @@ struct pthread
       ((char *) (((uintptr_t) mutex->__data.__list.__prev) & ~1ul)	      \
        - QUEUE_PTR_ADJUST);						      \
     prev->__next = mutex->__data.__list.__next;				      \
+    /* Ensure that we remove the entry from the list before we change the     \
+       __next pointer of the entry, which is read by the kernel.  */	      \
+    __asm ("" ::: "memory");						      \
     mutex->__data.__list.__prev = NULL;					      \
     mutex->__data.__list.__next = NULL;					      \
   } while (0)
@@ -222,6 +229,8 @@ struct pthread
   do {									      \
     mutex->__data.__list.__next						      \
       = THREAD_GETMEM (THREAD_SELF, robust_list.__next);		      \
+    /* Ensure that the new list entry is ready before we insert it.  */	      \
+    __asm ("" ::: "memory");						      \
     THREAD_SETMEM (THREAD_SELF, robust_list.__next,			      \
 		   (void *) (((uintptr_t) &mutex->__data.__list) | val));     \
   } while (0)
@@ -242,6 +251,9 @@ struct pthread
 	  }								      \
 									      \
 	runp->__next = next->__next;					      \
+	/* Ensure that we remove the entry from the list before we change the \
+	   __next pointer of the entry, which is read by the kernel.  */      \
+	    __asm ("" ::: "memory");					      \
 	mutex->__data.__list.__next = NULL;				      \
       }									      \
   } while (0)
@@ -329,10 +341,9 @@ struct pthread
   int lock;
 
   /* Lock for synchronizing setxid calls.  */
-  int setxid_futex;
+  unsigned int setxid_futex;
 
-#if HP_TIMING_AVAIL
-  /* Offset of the CPU clock at start thread start time.  */
+#if HP_TIMING_INLINE
   hp_timing_t cpuclock_offset;
 #endif
 
@@ -368,9 +379,9 @@ struct pthread
   struct _Unwind_Exception exc;
 #endif
 
-  /* If nonzero pointer to area allocated for the stack and its
-     size.  */
+  /* If nonzero, pointer to the area allocated for the stack and guard. */
   void *stackblock;
+  /* Size of the stackblock area including the guard.  */
   size_t stackblock_size;
   /* Size of the included guard area.  */
   size_t guardsize;
@@ -385,6 +396,9 @@ struct pthread
 
   void * mem; /* full memory of thread to free */
   size_t size; /* Total size of thread */
+
+  /* Indicates whether is a C11 thread created by thrd_creat.  */
+  bool c11;
 
   /* This member must be last.  */
   char end_padding[];

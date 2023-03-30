@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,13 +13,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_EXIT_H
 #define _EXIT_H 1
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <libc-lock.h>
 
 enum
 {
@@ -57,14 +58,31 @@ struct exit_function_list
     size_t idx;
     struct exit_function fns[32];
   };
+
 extern struct exit_function_list *__exit_funcs attribute_hidden;
 extern struct exit_function_list *__quick_exit_funcs attribute_hidden;
-
-extern struct exit_function *__new_exitfn (struct exit_function_list **listp);
 extern uint64_t __new_exitfn_called attribute_hidden;
 
-extern void __run_exit_handlers (int status, struct exit_function_list **listp,
-				 bool run_list_atexit)
+/* True once all registered atexit/at_quick_exit/onexit handlers have been
+   called */
+extern bool __exit_funcs_done attribute_hidden;
+
+/* This lock protects __exit_funcs, __quick_exit_funcs, __exit_funcs_done
+   and __new_exitfn_called globals against simultaneous access from
+   atexit/on_exit/at_quick_exit in multiple threads, and also from
+   simultaneous access while another thread is in the middle of calling
+   exit handlers.  See BZ#14333.  Note: for lists, the entire list, and
+   each associated entry in the list, is protected for all access by this
+   lock.  */
+__libc_lock_define (extern, __exit_funcs_lock);
+
+
+extern struct exit_function *__new_exitfn (struct exit_function_list **listp)
+  attribute_hidden;
+
+extern void __run_exit_handlers (int status,
+				 struct exit_function_list **listp,
+				 bool run_list_atexit, bool run_dtors)
   attribute_hidden __attribute__ ((__noreturn__));
 
 extern int __internal_atexit (void (*func) (void *), void *arg, void *d,

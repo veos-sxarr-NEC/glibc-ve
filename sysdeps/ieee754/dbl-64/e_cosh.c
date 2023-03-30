@@ -32,7 +32,9 @@
  */
 
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const double one = 1.0, half = 0.5, huge = 1.0e300;
 
@@ -41,7 +43,7 @@ __ieee754_cosh (double x)
 {
   double t, w;
   int32_t ix;
-  u_int32_t lx;
+  uint32_t lx;
 
   /* High word of |x|. */
   GET_HIGH_WORD (ix, x);
@@ -71,7 +73,7 @@ __ieee754_cosh (double x)
 
   /* |x| in [log(maxdouble), overflowthresold] */
   GET_LOW_WORD (lx, x);
-  if (ix < 0x408633ce || ((ix == 0x408633ce) && (lx <= (u_int32_t) 0x8fb9f87d)))
+  if (ix < 0x408633ce || ((ix == 0x408633ce) && (lx <= (uint32_t) 0x8fb9f87d)))
     {
       w = __ieee754_exp (half * fabs (x));
       t = half * w;
@@ -83,6 +85,6 @@ __ieee754_cosh (double x)
     return x * x;
 
   /* |x| > overflowthresold, cosh(x) overflow */
-  return huge * huge;
+  return math_narrow_eval (huge * huge);
 }
-strong_alias (__ieee754_cosh, __cosh_finite)
+libm_alias_finite (__ieee754_cosh, __cosh)

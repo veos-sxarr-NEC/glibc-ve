@@ -1,6 +1,6 @@
 /* Test glob memory management.
    for the filesystem access functions.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <error.h>
@@ -40,6 +40,17 @@
 # define PRINTF(fmt, args...)
 #endif
 
+#define LONG_NAME \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 static struct
 {
@@ -58,6 +69,7 @@ static struct
       { ".", 3, DT_DIR, 0755 },
       { "..", 3, DT_DIR, 0755 },
       { "a", 3, DT_REG, 0644 },
+      { LONG_NAME, 3, DT_REG, 0644 },
     { "unreadable", 2, DT_DIR, 0111 },
       { ".", 3, DT_DIR, 0111 },
       { "..", 3, DT_DIR, 0755 },
@@ -75,7 +87,7 @@ typedef struct
   int level;
   int idx;
   struct dirent d;
-  char room_for_dirent[NAME_MAX];
+  char room_for_dirent[sizeof (LONG_NAME)];
 } my_DIR;
 
 
@@ -193,23 +205,15 @@ my_readdir (void *gdir)
       return NULL;
     }
 
-  dir->d.d_ino = dir->idx;
+  dir->d.d_ino = 1;		/* glob should not skip this entry.  */
 
-#ifdef _DIRENT_HAVE_D_TYPE
   dir->d.d_type = filesystem[dir->idx].type;
-#endif
 
   strcpy (dir->d.d_name, filesystem[dir->idx].name);
 
-#ifdef _DIRENT_HAVE_D_TYPE
   PRINTF ("my_readdir ({ level: %d, idx: %ld }) = { d_ino: %ld, d_type: %d, d_name: \"%s\" }\n",
 	  dir->level, (long int) dir->idx, dir->d.d_ino, dir->d.d_type,
 	  dir->d.d_name);
-#else
-  PRINTF ("my_readdir ({ level: %d, idx: %ld }) = { d_ino: %ld, d_name: \"%s\" }\n",
-	  dir->level, (long int) dir->idx, dir->d.d_ino,
-	  dir->d.d_name);
-#endif
 
   ++dir->idx;
 

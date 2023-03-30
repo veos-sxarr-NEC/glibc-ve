@@ -15,6 +15,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const float zero = 0.0;
 
@@ -23,7 +24,7 @@ float
 __ieee754_remainderf(float x, float p)
 {
 	int32_t hx,hp;
-	u_int32_t sx;
+	uint32_t sx;
 	float p_half;
 
 	GET_FLOAT_WORD(hx,x);
@@ -59,4 +60,4 @@ __ieee754_remainderf(float x, float p)
 	SET_FLOAT_WORD(x,hx^sx);
 	return x;
 }
-strong_alias (__ieee754_remainderf, __remainderf_finite)
+libm_alias_finite (__ieee754_remainderf, __remainderf)

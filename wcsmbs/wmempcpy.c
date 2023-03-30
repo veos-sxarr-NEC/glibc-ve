@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1999.
 
@@ -14,17 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <wchar.h>
 #include <string.h>
 
 
 wchar_t *
-__wmempcpy (s1, s2, n)
-     wchar_t *s1;
-     const wchar_t *s2;
-     size_t n;
+__wmempcpy (wchar_t *s1, const wchar_t *s2, size_t n)
 {
   return (wchar_t *) __mempcpy ((char *) s1, (char *) s2,
 				n * sizeof (wchar_t));

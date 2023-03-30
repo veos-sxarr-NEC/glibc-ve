@@ -1,5 +1,5 @@
 /* Find network interface names and index numbers.  Hurd version.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <error.h>
 #include <net/if.h>
@@ -36,6 +36,12 @@ __if_nametoindex (const char *ifname)
 
   if (fd < 0)
     return 0;
+
+  if (strlen (ifname) >= IFNAMSIZ)
+    {
+      __set_errno (ENODEV);
+      return 0;
+    }
 
   strncpy (ifr.ifr_name, ifname, IFNAMSIZ);
   if (__ioctl (fd, SIOCGIFINDEX, &ifr) < 0)
@@ -65,7 +71,9 @@ __if_freenameindex (struct if_nameindex *ifn)
     }
   free (ifn);
 }
+libc_hidden_def (__if_freenameindex)
 weak_alias (__if_freenameindex, if_freenameindex)
+libc_hidden_weak (if_freenameindex)
 
 /* Return an array of if_nameindex structures, one for each network
    interface present, plus one indicating the end of the array.  On
@@ -152,6 +160,7 @@ __if_nameindex (void)
   return idx;
 }
 weak_alias (__if_nameindex, if_nameindex)
+libc_hidden_weak (if_nameindex)
 
 /* Store the name of the interface corresponding to index IFINDEX in
    IFNAME (which has space for at least IFNAMSIZ characters).  Return
@@ -184,7 +193,6 @@ libc_hidden_weak (if_indextoname)
 
 #if 0
 void
-internal_function
 __protocol_available (int *have_inet, int *have_inet6)
 {
   *have_inet = _hurd_socket_server (PF_INET, 0) != MACH_PORT_NULL;

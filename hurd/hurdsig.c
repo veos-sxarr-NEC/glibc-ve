@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,15 +13,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <cthreads.h>		/* For `struct mutex'.  */
+#include <pthreadP.h>
 #include <mach.h>
 #include <mach/thread_switch.h>
+#include <mach/mig_support.h>
 
 #include <hurd.h>
 #include <hurd/id.h>
@@ -30,6 +32,8 @@
 #include "hurdfault.h"
 #include "hurdmalloc.h"		/* XXX */
 #include "../locale/localeinfo.h"
+
+#include <libc-diag.h>
 
 const char *_hurdsig_getenv (const char *);
 
@@ -42,19 +46,18 @@ mach_port_t _hurd_msgport;
 /* Thread listening on it.  */
 thread_t _hurd_msgport_thread;
 
-/* Thread which receives task-global signals.  */
-thread_t _hurd_sigthread;
-
 /* These are set up by _hurdsig_init.  */
 unsigned long int __hurd_sigthread_stack_base;
 unsigned long int __hurd_sigthread_stack_end;
-unsigned long int *__hurd_sigthread_variables;
 
 /* Linked-list of per-thread signal state.  */
 struct hurd_sigstate *_hurd_sigstates;
 
+/* Sigstate for the task-global signals.  */
+struct hurd_sigstate *_hurd_global_sigstate;
+
 /* Timeout for RPC's after interrupt_operation. */
-mach_msg_timeout_t _hurd_interrupted_rpc_timeout = 3000;
+mach_msg_timeout_t _hurd_interrupted_rpc_timeout = 60000;
 
 static void
 default_sigaction (struct sigaction actions[NSIG])
@@ -81,7 +84,7 @@ _hurd_thread_sigstate (thread_t thread)
     {
       ss = malloc (sizeof (*ss));
       if (ss == NULL)
-	__libc_fatal ("hurd: Can't allocate thread sigstate\n");
+	__libc_fatal ("hurd: Can't allocate sigstate\n");
       ss->thread = thread;
       __spin_lock_init (&ss->lock);
 
@@ -89,21 +92,25 @@ _hurd_thread_sigstate (thread_t thread)
       __sigemptyset (&ss->blocked);
       __sigemptyset (&ss->pending);
       memset (&ss->sigaltstack, 0, sizeof (ss->sigaltstack));
+      ss->sigaltstack.ss_flags |= SS_DISABLE;
       ss->preemptors = NULL;
       ss->suspended = MACH_PORT_NULL;
       ss->intr_port = MACH_PORT_NULL;
       ss->context = NULL;
 
-      /* Initialize the sigaction vector from the default signal receiving
-	 thread's state, and its from the system defaults.  */
-      if (thread == _hurd_sigthread)
-	default_sigaction (ss->actions);
+      if (thread == MACH_PORT_NULL)
+	{
+	  /* Process-wide sigstate, use the system defaults.  */
+	  default_sigaction (ss->actions);
+
+	  /* The global sigstate is not added to the _hurd_sigstates list.
+	     It is created with _hurd_thread_sigstate (MACH_PORT_NULL)
+	     but should be accessed through _hurd_global_sigstate.  */
+	}
       else
 	{
-	  struct hurd_sigstate *s;
-	  for (s = _hurd_sigstates; s != NULL; s = s->next)
-	    if (s->thread == _hurd_sigthread)
-	      break;
+	  /* Use the global actions as a default for new threads.  */
+	  struct hurd_sigstate *s = _hurd_global_sigstate;
 	  if (s)
 	    {
 	      __spin_lock (&s->lock);
@@ -112,14 +119,115 @@ _hurd_thread_sigstate (thread_t thread)
 	    }
 	  else
 	    default_sigaction (ss->actions);
-	}
 
-      ss->next = _hurd_sigstates;
-      _hurd_sigstates = ss;
+	  ss->next = _hurd_sigstates;
+	  _hurd_sigstates = ss;
+	}
     }
   __mutex_unlock (&_hurd_siglock);
   return ss;
 }
+libc_hidden_def (_hurd_thread_sigstate)
+
+/* Destroy a sigstate structure.  Called by libpthread just before the
+ * corresponding thread is terminated (the kernel thread port must remain valid
+ * until this function is called.) */
+void
+_hurd_sigstate_delete (thread_t thread)
+{
+  struct hurd_sigstate **ssp, *ss;
+
+  __mutex_lock (&_hurd_siglock);
+  for (ssp = &_hurd_sigstates; *ssp; ssp = &(*ssp)->next)
+    if ((*ssp)->thread == thread)
+      break;
+
+  ss = *ssp;
+  if (ss)
+    *ssp = ss->next;
+
+  __mutex_unlock (&_hurd_siglock);
+  if (ss)
+    free (ss);
+}
+
+/* Make SS a global receiver, with pthread signal semantics.  */
+void
+_hurd_sigstate_set_global_rcv (struct hurd_sigstate *ss)
+{
+  assert (ss->thread != MACH_PORT_NULL);
+  ss->actions[0].sa_handler = SIG_IGN;
+}
+
+/* Check whether SS is a global receiver.  */
+static int
+sigstate_is_global_rcv (const struct hurd_sigstate *ss)
+{
+  return (_hurd_global_sigstate != NULL)
+	 && (ss->actions[0].sa_handler == SIG_IGN);
+}
+libc_hidden_def (_hurd_sigstate_delete)
+
+/* Lock/unlock a hurd_sigstate structure.  If the accessors below require
+   it, the global sigstate will be locked as well.  */
+void
+_hurd_sigstate_lock (struct hurd_sigstate *ss)
+{
+  if (sigstate_is_global_rcv (ss))
+    __spin_lock (&_hurd_global_sigstate->lock);
+  __spin_lock (&ss->lock);
+}
+void
+_hurd_sigstate_unlock (struct hurd_sigstate *ss)
+{
+  __spin_unlock (&ss->lock);
+  if (sigstate_is_global_rcv (ss))
+    __spin_unlock (&_hurd_global_sigstate->lock);
+}
+libc_hidden_def (_hurd_sigstate_set_global_rcv)
+
+/* Retreive a thread's full set of pending signals, including the global
+   ones if appropriate.  SS must be locked.  */
+sigset_t
+_hurd_sigstate_pending (const struct hurd_sigstate *ss)
+{
+  sigset_t pending = ss->pending;
+  if (sigstate_is_global_rcv (ss))
+    __sigorset (&pending, &pending, &_hurd_global_sigstate->pending);
+  return pending;
+}
+
+/* Clear a pending signal and return the associated detailed
+   signal information. SS must be locked, and must have signal SIGNO
+   pending, either directly or through the global sigstate.  */
+static struct hurd_signal_detail
+sigstate_clear_pending (struct hurd_sigstate *ss, int signo)
+{
+  if (sigstate_is_global_rcv (ss)
+      && __sigismember (&_hurd_global_sigstate->pending, signo))
+    {
+      __sigdelset (&_hurd_global_sigstate->pending, signo);
+      return _hurd_global_sigstate->pending_data[signo];
+    }
+
+  assert (__sigismember (&ss->pending, signo));
+  __sigdelset (&ss->pending, signo);
+  return ss->pending_data[signo];
+}
+libc_hidden_def (_hurd_sigstate_lock)
+libc_hidden_def (_hurd_sigstate_unlock)
+
+/* Retreive a thread's action vector.  SS must be locked.  */
+struct sigaction *
+_hurd_sigstate_actions (struct hurd_sigstate *ss)
+{
+  if (sigstate_is_global_rcv (ss))
+    return _hurd_global_sigstate->actions;
+  else
+    return ss->actions;
+}
+libc_hidden_def (_hurd_sigstate_pending)
+
 
 /* Signal delivery itself is on this page.  */
 
@@ -214,6 +322,8 @@ static void
 abort_thread (struct hurd_sigstate *ss, struct machine_thread_all_state *state,
 	      void (*reply) (void))
 {
+  assert (ss->thread != MACH_PORT_NULL);
+
   if (!(state->set & THREAD_ABORTED))
     {
       error_t err = __thread_abort (ss->thread);
@@ -234,18 +344,24 @@ abort_thread (struct hurd_sigstate *ss, struct machine_thread_all_state *state,
    that this location can be set without faulting, or else return NULL.  */
 
 static mach_port_t *
-interrupted_reply_port_location (struct machine_thread_all_state *thread_state,
+interrupted_reply_port_location (thread_t thread,
+				 struct machine_thread_all_state *thread_state,
 				 int sigthread)
 {
-  mach_port_t *portloc = (mach_port_t *) __hurd_threadvar_location_from_sp
-    (_HURD_THREADVAR_MIG_REPLY, (void *) thread_state->basic.SP);
+  mach_port_t *portloc = &THREAD_TCB(thread, thread_state)->reply_port;
 
   if (sigthread && _hurdsig_catch_memory_fault (portloc))
-    /* Faulted trying to read the stack.  */
+    /* Faulted trying to read the TCB.  */
     return NULL;
 
+  DIAG_PUSH_NEEDS_COMMENT;
+  /* GCC 6 and before seem to be confused by the setjmp call inside
+     _hurdsig_catch_memory_fault and think that we may be returning a second
+     time to here with portloc uninitialized (but we never do). */
+  DIAG_IGNORE_NEEDS_COMMENT (6, "-Wmaybe-uninitialized");
   /* Fault now if this pointer is bogus.  */
   *(volatile mach_port_t *) portloc = *portloc;
+  DIAG_POP_NEEDS_COMMENT;
 
   if (sigthread)
     _hurdsig_end_catch_fault ();
@@ -282,6 +398,7 @@ _hurdsig_abort_rpcs (struct hurd_sigstate *ss, int signo, int sigthread,
 		     struct machine_thread_all_state *state, int *state_change,
 		     void (*reply) (void))
 {
+  extern const void _hurd_intr_rpc_msg_about_to;
   extern const void _hurd_intr_rpc_msg_in_trap;
   mach_port_t rcv_port = MACH_PORT_NULL;
   mach_port_t intr_port;
@@ -297,7 +414,8 @@ _hurdsig_abort_rpcs (struct hurd_sigstate *ss, int signo, int sigthread,
      receive completes immediately or aborts.  */
   abort_thread (ss, state, reply);
 
-  if (state->basic.PC < (natural_t) &_hurd_intr_rpc_msg_in_trap)
+  if (state->basic.PC >= (natural_t) &_hurd_intr_rpc_msg_about_to
+      && state->basic.PC < (natural_t) &_hurd_intr_rpc_msg_in_trap)
     {
       /* The thread is about to do the RPC, but hasn't yet entered
 	 mach_msg.  Mutate the thread's state so it knows not to try
@@ -308,11 +426,11 @@ _hurdsig_abort_rpcs (struct hurd_sigstate *ss, int signo, int sigthread,
       state->basic.SYSRETURN = MACH_SEND_INTERRUPTED;
       *state_change = 1;
     }
-  else if (state->basic.PC == (natural_t) &_hurd_intr_rpc_msg_in_trap &&
+  else if (state->basic.PC == (natural_t) &_hurd_intr_rpc_msg_in_trap
 	   /* The thread was blocked in the system call.  After thread_abort,
 	      the return value register indicates what state the RPC was in
 	      when interrupted.  */
-	   state->basic.SYSRETURN == MACH_RCV_INTERRUPTED)
+	   && state->basic.SYSRETURN == MACH_RCV_INTERRUPTED)
       {
 	/* The RPC request message was sent and the thread was waiting for
 	   the reply message; now the message receive has been aborted, so
@@ -323,7 +441,8 @@ _hurdsig_abort_rpcs (struct hurd_sigstate *ss, int signo, int sigthread,
 	   our nonzero return tells the trampoline code to finish the message
 	   receive operation before running the handler.  */
 
-	mach_port_t *reply = interrupted_reply_port_location (state,
+	mach_port_t *reply = interrupted_reply_port_location (ss->thread,
+							      state,
 							      sigthread);
 	error_t err = __interrupt_operation (intr_port, _hurdsig_interrupt_timeout);
 
@@ -353,7 +472,7 @@ _hurdsig_abort_rpcs (struct hurd_sigstate *ss, int signo, int sigthread,
 	   call above will retry their RPCs unless we clear SS->intr_port.
 	   So we clear it for the thread taking a signal when SA_RESTART is
 	   clear, so that its call returns EINTR.  */
-	if (! signo || !(ss->actions[signo].sa_flags & SA_RESTART))
+	if (! signo || !(_hurd_sigstate_actions (ss) [signo].sa_flags & SA_RESTART))
 	  ss->intr_port = MACH_PORT_NULL;
       }
 
@@ -441,6 +560,30 @@ abort_all_rpcs (int signo, struct machine_thread_all_state *state, int live)
       }
 }
 
+/* Wake up any sigsuspend call that is blocking SS->thread.  SS must be
+   locked.  */
+static void
+wake_sigsuspend (struct hurd_sigstate *ss)
+{
+  error_t err;
+  mach_msg_header_t msg;
+
+  if (ss->suspended == MACH_PORT_NULL)
+    return;
+
+  /* There is a sigsuspend waiting.  Tell it to wake up.  */
+  msg.msgh_bits = MACH_MSGH_BITS (MACH_MSG_TYPE_MAKE_SEND, 0);
+  msg.msgh_remote_port = ss->suspended;
+  msg.msgh_local_port = MACH_PORT_NULL;
+  /* These values do not matter.  */
+  msg.msgh_id = 8675309; /* Jenny, Jenny.  */
+  ss->suspended = MACH_PORT_NULL;
+  err = __mach_msg (&msg, MACH_SEND_MSG, sizeof msg, 0,
+      MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE,
+      MACH_PORT_NULL);
+  assert_perror (err);
+}
+
 struct hurd_signal_preemptor *_hurdsig_preemptors = 0;
 sigset_t _hurdsig_preempted_set;
 
@@ -448,37 +591,22 @@ sigset_t _hurdsig_preempted_set;
 weak_alias (_hurdsig_preemptors, _hurdsig_preempters)
 
 /* Mask of stop signals.  */
-#define STOPSIGS (sigmask (SIGTTIN) | sigmask (SIGTTOU) | \
-		  sigmask (SIGSTOP) | sigmask (SIGTSTP))
+#define STOPSIGS (sigmask (SIGTTIN) | sigmask (SIGTTOU) \
+		  | sigmask (SIGSTOP) | sigmask (SIGTSTP))
 
-/* Deliver a signal.  SS is not locked.  */
-void
-_hurd_internal_post_signal (struct hurd_sigstate *ss,
-			    int signo, struct hurd_signal_detail *detail,
-			    mach_port_t reply_port,
-			    mach_msg_type_name_t reply_port_type,
-			    int untraced)
+/* Actual delivery of a single signal.  Called with SS unlocked.  When
+   the signal is delivered, return SS, locked (or, if SS was originally
+   _hurd_global_sigstate, the sigstate of the actual thread the signal
+   was delivered to).  If the signal is being traced, return NULL with
+   SS unlocked.   */
+static struct hurd_sigstate *
+post_signal (struct hurd_sigstate *ss,
+	     int signo, struct hurd_signal_detail *detail,
+	     int untraced, void (*reply) (void))
 {
-  error_t err;
   struct machine_thread_all_state thread_state;
   enum { stop, ignore, core, term, handle } act;
-  sighandler_t handler;
-  sigset_t pending;
   int ss_suspended;
-
-  /* Reply to this sig_post message.  */
-  __typeof (__msg_sig_post_reply) *reply_rpc
-    = (untraced ? __msg_sig_post_untraced_reply : __msg_sig_post_reply);
-  void reply (void)
-    {
-      error_t err;
-      if (reply_port == MACH_PORT_NULL)
-	return;
-      err = (*reply_rpc) (reply_port, reply_port_type, 0);
-      reply_port = MACH_PORT_NULL;
-      if (err != MACH_SEND_INVALID_DEST) /* Ignore dead reply port.  */
-	assert_perror (err);
-    }
 
   /* Mark the signal as pending.  */
   void mark_pending (void)
@@ -524,8 +652,12 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
       assert_perror (err);
       for (i = 0; i < nthreads; ++i)
 	{
-	  if (threads[i] != _hurd_msgport_thread &&
-	      (act != handle || threads[i] != ss->thread))
+	  if (act == handle && threads[i] == ss->thread)
+	    {
+	      /* The thread that will run the handler is kept suspended.  */
+	      ss_suspended = 1;
+	    }
+	  else if (threads[i] != _hurd_msgport_thread)
 	    {
 	      err = __thread_resume (threads[i]);
 	      assert_perror (err);
@@ -538,27 +670,58 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 		       (vm_address_t) threads,
 		       nthreads * sizeof *threads);
       _hurd_stopped = 0;
-      if (act == handle)
-	/* The thread that will run the handler is already suspended.  */
-	ss_suspended = 1;
     }
+
+  error_t err;
+  sighandler_t handler;
 
   if (signo == 0)
     {
       if (untraced)
-	/* This is PTRACE_CONTINUE.  */
-	resume ();
+	{
+	  /* This is PTRACE_CONTINUE.  */
+	  act = ignore;
+	  resume ();
+	}
 
       /* This call is just to check for pending signals.  */
-      __spin_lock (&ss->lock);
-      goto check_pending_signals;
+      _hurd_sigstate_lock (ss);
+      return ss;
     }
-
- post_signal:
 
   thread_state.set = 0;		/* We know nothing.  */
 
-  __spin_lock (&ss->lock);
+  _hurd_sigstate_lock (ss);
+
+  /* If this is a global signal, try to find a thread ready to accept
+     it right away.  This is especially important for untraced signals,
+     since going through the global pending mask would de-untrace them.  */
+  if (ss->thread == MACH_PORT_NULL)
+  {
+    struct hurd_sigstate *rss;
+
+    __mutex_lock (&_hurd_siglock);
+    for (rss = _hurd_sigstates; rss != NULL; rss = rss->next)
+      {
+	if (! sigstate_is_global_rcv (rss))
+	  continue;
+
+	/* The global sigstate is already locked.  */
+	__spin_lock (&rss->lock);
+	if (! __sigismember (&rss->blocked, signo))
+	  {
+	    ss = rss;
+	    break;
+	  }
+	__spin_unlock (&rss->lock);
+      }
+    __mutex_unlock (&_hurd_siglock);
+  }
+
+  /* We want the preemptors to be able to update the blocking mask
+     without affecting the delivery of this signal, so we save the
+     current value to test against later.  */
+  sigset_t blocked = ss->blocked;
 
   /* Check for a preempted signal.  Preempted signals can arrive during
      critical sections.  */
@@ -616,12 +779,12 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 	    mark_pending ();
 	  else
 	    suspend ();
-	  __spin_unlock (&ss->lock);
+	  _hurd_sigstate_unlock (ss);
 	  reply ();
-	  return;
+	  return NULL;
 	}
 
-      handler = ss->actions[signo].sa_handler;
+      handler = _hurd_sigstate_actions (ss) [signo].sa_handler;
 
       if (handler == SIG_DFL)
 	/* Figure out the default action for this signal.  */
@@ -701,9 +864,9 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 	}
     }
 
-  if (_hurd_orphaned && act == stop &&
-      (__sigmask (signo) & (__sigmask (SIGTTIN) | __sigmask (SIGTTOU) |
-			    __sigmask (SIGTSTP))))
+  if (_hurd_orphaned && act == stop
+      && (__sigmask (signo) & (__sigmask (SIGTTIN) | __sigmask (SIGTTOU)
+			       | __sigmask (SIGTSTP))))
     {
       /* If we would ordinarily stop for a job control signal, but we are
 	 orphaned so noone would ever notice and continue us again, we just
@@ -714,9 +877,7 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
     }
 
   /* Handle receipt of a blocked signal, or any signal while stopped.  */
-  if (act != ignore &&		/* Signals ignored now are forgotten now.  */
-      __sigismember (&ss->blocked, signo) ||
-      (signo != SIGKILL && _hurd_stopped))
+  if (__sigismember (&blocked, signo) || (signo != SIGKILL && _hurd_stopped))
     {
       mark_pending ();
       act = ignore;
@@ -751,6 +912,7 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 	 now's the time to set it going. */
       if (ss_suspended)
 	{
+	  assert (ss->thread != MACH_PORT_NULL);
 	  err = __thread_resume (ss->thread);
 	  assert_perror (err);
 	  ss_suspended = 0;
@@ -795,6 +957,8 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 	struct sigcontext *scp, ocontext;
 	int wait_for_reply, state_changed;
 
+	assert (ss->thread != MACH_PORT_NULL);
+
 	/* Stop the thread and abort its pending RPC operations.  */
 	if (! ss_suspended)
 	  {
@@ -835,7 +999,8 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 
 	    if (! machine_get_basic_state (ss->thread, &thread_state))
 	      goto sigbomb;
-	    loc = interrupted_reply_port_location (&thread_state, 1);
+	    loc = interrupted_reply_port_location (ss->thread,
+						   &thread_state, 1);
 	    if (loc && *loc != MACH_PORT_NULL)
 	      /* This is the reply port for the context which called
 		 sigreturn.  Since we are abandoning that context entirely
@@ -861,7 +1026,7 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 					 as a unit.  */
 				      crit ? 0 : signo, 1,
 				      &thread_state, &state_changed,
-				      &reply)
+				      reply)
 		 != MACH_PORT_NULL);
 
 	    if (crit)
@@ -901,7 +1066,8 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 	{
 	  /* Fetch the thread variable for the MiG reply port,
 	     and set it to MACH_PORT_NULL.  */
-	  mach_port_t *loc = interrupted_reply_port_location (&thread_state,
+	  mach_port_t *loc = interrupted_reply_port_location (ss->thread,
+							      &thread_state,
 							      1);
 	  if (loc)
 	    {
@@ -929,23 +1095,28 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
 	    }
 	}
 
+	struct sigaction *action = & _hurd_sigstate_actions (ss) [signo];
+
 	/* Backdoor extra argument to signal handler.  */
 	scp->sc_error = detail->error;
 
 	/* Block requested signals while running the handler.  */
 	scp->sc_mask = ss->blocked;
-	__sigorset (&ss->blocked, &ss->blocked, &ss->actions[signo].sa_mask);
+	__sigorset (&ss->blocked, &ss->blocked, &action->sa_mask);
 
 	/* Also block SIGNO unless we're asked not to.  */
-	if (! (ss->actions[signo].sa_flags & (SA_RESETHAND | SA_NODEFER)))
+	if (! (action->sa_flags & (SA_RESETHAND | SA_NODEFER)))
 	  __sigaddset (&ss->blocked, signo);
 
 	/* Reset to SIG_DFL if requested.  SIGILL and SIGTRAP cannot
            be automatically reset when delivered; the system silently
            enforces this restriction.  */
-	if (ss->actions[signo].sa_flags & SA_RESETHAND
+	if (action->sa_flags & SA_RESETHAND
 	    && signo != SIGILL && signo != SIGTRAP)
-	  ss->actions[signo].sa_handler = SIG_DFL;
+	  action->sa_handler = SIG_DFL;
+
+	/* Any sigsuspend call must return after the handler does.  */
+	wake_sigsuspend (ss);
 
 	/* Start the thread running the handler (or possibly waiting for an
 	   RPC reply before running the handler).  */
@@ -960,95 +1131,134 @@ _hurd_internal_post_signal (struct hurd_sigstate *ss,
       }
     }
 
-  /* The signal has either been ignored or is now being handled.  We can
-     consider it delivered and reply to the killer.  */
-  reply ();
+  return ss;
+}
 
-  /* We get here unless the signal was fatal.  We still hold SS->lock.
-     Check for pending signals, and loop to post them.  */
-  {
-    /* Return nonzero if SS has any signals pending we should worry about.
-       We don't worry about any pending signals if we are stopped, nor if
-       SS is in a critical section.  We are guaranteed to get a sig_post
-       message before any of them become deliverable: either the SIGCONT
-       signal, or a sig_post with SIGNO==0 as an explicit poll when the
-       thread finishes its critical section.  */
-    inline int signals_pending (void)
+/* Return the set of pending signals in SS which should be delivered. */
+static sigset_t
+pending_signals (struct hurd_sigstate *ss)
+{
+  /* We don't worry about any pending signals if we are stopped, nor if
+     SS is in a critical section.  We are guaranteed to get a sig_post
+     message before any of them become deliverable: either the SIGCONT
+     signal, or a sig_post with SIGNO==0 as an explicit poll when the
+     thread finishes its critical section.  */
+  if (_hurd_stopped || __spin_lock_locked (&ss->critical_section_lock))
+    return 0;
+
+  return _hurd_sigstate_pending (ss) & ~ss->blocked;
+}
+
+/* Post the specified pending signals in SS and return 1.  If one of
+   them is traced, abort immediately and return 0.  SS must be locked on
+   entry and will be unlocked in all cases.  */
+static int
+post_pending (struct hurd_sigstate *ss, sigset_t pending, void (*reply) (void))
+{
+  int signo;
+  struct hurd_signal_detail detail;
+
+  /* Make sure SS corresponds to an actual thread, since we assume it won't
+     change in post_signal. */
+  assert (ss->thread != MACH_PORT_NULL);
+
+  for (signo = 1; signo < NSIG; ++signo)
+    if (__sigismember (&pending, signo))
       {
-	if (_hurd_stopped || __spin_lock_locked (&ss->critical_section_lock))
+	detail = sigstate_clear_pending (ss, signo);
+	_hurd_sigstate_unlock (ss);
+
+	/* Will reacquire the lock, except if the signal is traced.  */
+	if (! post_signal (ss, signo, &detail, 0, reply))
 	  return 0;
-	return pending = ss->pending & ~ss->blocked;
       }
 
-  check_pending_signals:
-    untraced = 0;
+  /* No more signals pending; SS->lock is still locked.  */
+  _hurd_sigstate_unlock (ss);
 
-    if (signals_pending ())
-      {
-	for (signo = 1; signo < NSIG; ++signo)
-	  if (__sigismember (&pending, signo))
-	    {
-	    deliver_pending:
-	      __sigdelset (&ss->pending, signo);
-	      *detail = ss->pending_data[signo];
-	      __spin_unlock (&ss->lock);
-	      goto post_signal;
-	    }
-      }
+  return 1;
+}
 
-    /* No pending signals left undelivered for this thread.
-       If we were sent signal 0, we need to check for pending
-       signals for all threads.  */
-    if (signo == 0)
-      {
-	__spin_unlock (&ss->lock);
-	__mutex_lock (&_hurd_siglock);
-	for (ss = _hurd_sigstates; ss != NULL; ss = ss->next)
-	  {
-	    __spin_lock (&ss->lock);
-	    for (signo = 1; signo < NSIG; ++signo)
-	      if (__sigismember (&ss->pending, signo)
-		  && (!__sigismember (&ss->blocked, signo)
-		      /* We "deliver" immediately pending blocked signals whose
-			 action might be to ignore, so that if ignored they are
-			 dropped right away.  */
-		      || ss->actions[signo].sa_handler == SIG_IGN
-		      || ss->actions[signo].sa_handler == SIG_DFL))
-		{
-		  mutex_unlock (&_hurd_siglock);
-		  goto deliver_pending;
-		}
-	    __spin_unlock (&ss->lock);
-	  }
-	__mutex_unlock (&_hurd_siglock);
-      }
-    else
-      {
-	/* No more signals pending; SS->lock is still locked.
-	   Wake up any sigsuspend call that is blocking SS->thread.  */
-	if (ss->suspended != MACH_PORT_NULL)
-	  {
-	    /* There is a sigsuspend waiting.  Tell it to wake up.  */
-	    error_t err;
-	    mach_msg_header_t msg;
-	    msg.msgh_bits = MACH_MSGH_BITS (MACH_MSG_TYPE_MAKE_SEND, 0);
-	    msg.msgh_remote_port = ss->suspended;
-	    msg.msgh_local_port = MACH_PORT_NULL;
-	    /* These values do not matter.  */
-	    msg.msgh_id = 8675309; /* Jenny, Jenny.  */
-	    ss->suspended = MACH_PORT_NULL;
-	    err = __mach_msg (&msg, MACH_SEND_MSG, sizeof msg, 0,
-			      MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE,
-			      MACH_PORT_NULL);
-	    assert_perror (err);
-	  }
-	__spin_unlock (&ss->lock);
-      }
-  }
+/* Post all the pending signals of all threads and return 1.  If a traced
+   signal is encountered, abort immediately and return 0.  */
+static int
+post_all_pending_signals (void (*reply) (void))
+{
+  struct hurd_sigstate *ss;
+  sigset_t pending = 0;
 
-  /* All pending signals delivered to all threads.
-     Now we can send the reply message even for signal 0.  */
-  reply ();
+  for (;;)
+    {
+      __mutex_lock (&_hurd_siglock);
+      for (ss = _hurd_sigstates; ss != NULL; ss = ss->next)
+        {
+	  _hurd_sigstate_lock (ss);
+
+	  pending = pending_signals (ss);
+	  if (pending)
+	    /* post_pending() below will unlock SS. */
+	    break;
+
+	  _hurd_sigstate_unlock (ss);
+	}
+      __mutex_unlock (&_hurd_siglock);
+
+      if (! pending)
+	return 1;
+      if (! post_pending (ss, pending, reply))
+	return 0;
+    }
+}
+
+/* Deliver a signal.  SS is not locked.  */
+void
+_hurd_internal_post_signal (struct hurd_sigstate *ss,
+			    int signo, struct hurd_signal_detail *detail,
+			    mach_port_t reply_port,
+			    mach_msg_type_name_t reply_port_type,
+			    int untraced)
+{
+  /* Reply to this sig_post message.  */
+  __typeof (__msg_sig_post_reply) *reply_rpc
+    = (untraced ? __msg_sig_post_untraced_reply : __msg_sig_post_reply);
+  void reply (void)
+    {
+      error_t err;
+      if (reply_port == MACH_PORT_NULL)
+	return;
+      err = (*reply_rpc) (reply_port, reply_port_type, 0);
+      reply_port = MACH_PORT_NULL;
+      if (err != MACH_SEND_INVALID_DEST) /* Ignore dead reply port.  */
+	assert_perror (err);
+    }
+
+  ss = post_signal (ss, signo, detail, untraced, reply);
+  if (! ss)
+    return;
+
+  /* The signal was neither fatal nor traced.  We still hold SS->lock.  */
+  if (signo != 0 && ss->thread != MACH_PORT_NULL)
+    {
+      /* The signal has either been ignored or is now being handled.  We can
+	 consider it delivered and reply to the killer.  */
+      reply ();
+
+      /* Post any pending signals for this thread.  */
+      if (! post_pending (ss, pending_signals (ss), reply))
+	return;
+    }
+  else
+    {
+      /* If this was a process-wide signal or a poll request, we need
+	 to check for pending signals for all threads.  */
+      _hurd_sigstate_unlock (ss);
+      if (! post_all_pending_signals (reply))
+	return;
+
+      /* All pending signals delivered to all threads.
+	 Now we can send the reply message even for signal 0.  */
+      reply ();
+    }
 }
 
 /* Decide whether REFPORT enables the sender to send us a SIGNO signal.
@@ -1167,9 +1377,10 @@ _S_msg_sig_post (mach_port_t me,
   d.code = sigcode;
   d.exc = 0;
 
-  /* Post the signal to the designated signal-receiving thread.  This will
-     reply when the signal can be considered delivered.  */
-  _hurd_internal_post_signal (_hurd_thread_sigstate (_hurd_sigthread),
+  /* Post the signal to a global receiver thread (or mark it pending in
+     the global sigstate).  This will reply when the signal can be
+     considered delivered.  */
+  _hurd_internal_post_signal (_hurd_global_sigstate,
 			      signo, &d, reply_port, reply_port_type,
 			      0); /* Stop if traced.  */
 
@@ -1197,7 +1408,7 @@ _S_msg_sig_post_untraced (mach_port_t me,
 
   /* Post the signal to the designated signal-receiving thread.  This will
      reply when the signal can be considered delivered.  */
-  _hurd_internal_post_signal (_hurd_thread_sigstate (_hurd_sigthread),
+  _hurd_internal_post_signal (_hurd_global_sigstate,
 			      signo, &d, reply_port, reply_port_type,
 			      1); /* Untraced flag. */
 
@@ -1208,8 +1419,8 @@ extern void __mig_init (void *);
 
 #include <mach/task_special_ports.h>
 
-/* Initialize the message port and _hurd_sigthread and start the signal
-   thread.  */
+/* Initialize the message port, _hurd_global_sigstate, and start the
+   signal thread.  */
 
 void
 _hurdsig_init (const int *intarray, size_t intarraysize)
@@ -1232,30 +1443,38 @@ _hurdsig_init (const int *intarray, size_t intarraysize)
 				  MACH_MSG_TYPE_MAKE_SEND);
   assert_perror (err);
 
+  /* Initialize the global signal state.  */
+  _hurd_global_sigstate = _hurd_thread_sigstate (MACH_PORT_NULL);
+
+  /* We block all signals, and let actual threads pull them from the
+     pending mask.  */
+  __sigfillset(& _hurd_global_sigstate->blocked);
+
   /* Initialize the main thread's signal state.  */
   ss = _hurd_self_sigstate ();
 
-  /* Copy inherited values from our parent (or pre-exec process state)
-     into the signal settings of the main thread.  */
+  /* Mark it as a process-wide signal receiver.  Threads in this set use
+     the common action vector in _hurd_global_sigstate.  */
+  _hurd_sigstate_set_global_rcv (ss);
+
+  /* Copy inherited signal settings from our parent (or pre-exec process
+     state) */
   if (intarraysize > INIT_SIGMASK)
     ss->blocked = intarray[INIT_SIGMASK];
   if (intarraysize > INIT_SIGPENDING)
-    ss->pending = intarray[INIT_SIGPENDING];
+    _hurd_global_sigstate->pending = intarray[INIT_SIGPENDING];
   if (intarraysize > INIT_SIGIGN && intarray[INIT_SIGIGN] != 0)
     {
       int signo;
       for (signo = 1; signo < NSIG; ++signo)
 	if (intarray[INIT_SIGIGN] & __sigmask(signo))
-	  ss->actions[signo].sa_handler = SIG_IGN;
+	  _hurd_global_sigstate->actions[signo].sa_handler = SIG_IGN;
     }
-
-  /* Set the default thread to receive task-global signals
-     to this one, the main (first) user thread.  */
-  _hurd_sigthread = ss->thread;
 
   /* Start the signal thread listening on the message port.  */
 
-  if (__hurd_threadvar_stack_mask == 0)
+#pragma weak __cthread_fork
+  if (!__cthread_fork)
     {
       err = __thread_create (__mach_task_self (), &_hurd_msgport_thread);
       assert_perror (err);
@@ -1266,16 +1485,10 @@ _hurdsig_init (const int *intarray, size_t intarraysize)
 				 (vm_address_t *) &__hurd_sigthread_stack_base,
 				 &stacksize);
       assert_perror (err);
+      err = __mach_setup_tls (_hurd_msgport_thread);
+      assert_perror (err);
 
       __hurd_sigthread_stack_end = __hurd_sigthread_stack_base + stacksize;
-      __hurd_sigthread_variables =
-	malloc (__hurd_threadvar_max * sizeof (unsigned long int));
-      if (__hurd_sigthread_variables == NULL)
-	__libc_fatal ("hurd: Can't allocate threadvars for signal thread\n");
-      memset (__hurd_sigthread_variables, 0,
-	      __hurd_threadvar_max * sizeof (unsigned long int));
-      __hurd_sigthread_variables[_HURD_THREADVAR_LOCALE]
-	= (unsigned long int) &_nl_global_locale;
 
       /* Reinitialize the MiG support routines so they will use a per-thread
 	 variable for the cached reply port.  */
@@ -1295,9 +1508,25 @@ _hurdsig_init (const int *intarray, size_t intarraysize)
          we'll let the signal thread's per-thread variables be found as for
          any normal cthread, and just leave the magic __hurd_sigthread_*
          values all zero so they'll be ignored.  */
-#pragma weak cthread_fork
-#pragma weak cthread_detach
-      cthread_detach (cthread_fork ((cthread_fn_t) &_hurd_msgport_receive, 0));
+#pragma weak __cthread_detach
+#pragma weak __pthread_getattr_np
+#pragma weak __pthread_attr_getstack
+      __cthread_t thread = __cthread_fork (
+			     (cthread_fn_t) &_hurd_msgport_receive, 0);
+      __cthread_detach (thread);
+
+      if (__pthread_getattr_np)
+	{
+	  /* Record signal thread stack layout for fork() */
+	  pthread_attr_t attr;
+	  void *addr;
+	  size_t size;
+
+	  __pthread_getattr_np ((pthread_t) thread, &attr);
+	  __pthread_attr_getstack (&attr, &addr, &size);
+	  __hurd_sigthread_stack_base = (uintptr_t) addr;
+	  __hurd_sigthread_stack_end = __hurd_sigthread_stack_base + size;
+	}
 
       /* XXX We need the thread port for the signal thread further on
          in this thread (see hurdfault.c:_hurdsigfault_init).
@@ -1341,23 +1570,23 @@ reauth_proc (mach_port_t new)
   ref = __mach_reply_port ();
   if (! HURD_PORT_USE (&_hurd_ports[INIT_PORT_PROC],
 		       __proc_reauthenticate (port, ref,
-					      MACH_MSG_TYPE_MAKE_SEND) ||
-		       __auth_user_authenticate (new, ref,
-						 MACH_MSG_TYPE_MAKE_SEND,
-						 &ignore))
+					      MACH_MSG_TYPE_MAKE_SEND)
+		       || __auth_user_authenticate (new, ref,
+						    MACH_MSG_TYPE_MAKE_SEND,
+						    &ignore))
       && ignore != MACH_PORT_NULL)
     __mach_port_deallocate (__mach_task_self (), ignore);
   __mach_port_destroy (__mach_task_self (), ref);
 
   /* Set the owner of the process here too. */
-  mutex_lock (&_hurd_id.lock);
+  __mutex_lock (&_hurd_id.lock);
   if (!_hurd_check_ids ())
     HURD_PORT_USE (&_hurd_ports[INIT_PORT_PROC],
 		   __proc_setowner (port,
 				    (_hurd_id.gen.nuids
 				     ? _hurd_id.gen.uids[0] : 0),
 				    !_hurd_id.gen.nuids));
-  mutex_unlock (&_hurd_id.lock);
+  __mutex_unlock (&_hurd_id.lock);
 
   (void) &reauth_proc;		/* Silence compiler warning.  */
 }

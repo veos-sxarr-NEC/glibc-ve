@@ -1,5 +1,5 @@
 /* Initialization code run first thing by the ELF startup code.  For i386/Hurd.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <ctype.h>
@@ -30,15 +30,12 @@
 
 #include <ldsodefs.h>
 #include <fpu_control.h>
+#include <libc-diag.h>
 
 extern void __mach_init (void);
 extern void __init_misc (int, char **, char **);
-#ifdef USE_NONOPTION_FLAGS
-extern void __getopt_clean_environment (char **);
-#endif
 extern void __libc_global_ctors (void);
 
-unsigned int __hurd_threadvar_max;
 unsigned long int __hurd_threadvar_stack_offset;
 unsigned long int __hurd_threadvar_stack_mask;
 
@@ -88,11 +85,6 @@ posixland_init (int argc, char **argv, char **envp)
 #endif
   __init_misc (argc, argv, envp);
 
-#ifdef USE_NONOPTION_FLAGS
-  /* This is a hack to make the special getopt in GNU libc working.  */
-  __getopt_clean_environment (envp);
-#endif
-
   /* Initialize ctype data.  */
   __ctype_init ();
 
@@ -113,36 +105,16 @@ init1 (int argc, char *arg0, ...)
     ++envp;
   d = (void *) ++envp;
 
-  /* If we are the bootstrap task started by the kernel,
-     then after the environment pointers there is no Hurd
-     data block; the argument strings start there.  */
+  /* Initialize libpthread if linked in.  */
+  if (__pthread_initialize_minimal != NULL)
+    __pthread_initialize_minimal ();
+
   if ((void *) d == argv[0])
-    {
-#ifndef SHARED
-      /* With a new enough linker (binutils-2.23 or better),
-         the magic __ehdr_start symbol will be available and
-         __libc_start_main will have done this that way already.  */
-      if (_dl_phdr == NULL)
-        {
-          /* We may need to see our own phdrs, e.g. for TLS setup.
-             Try the usual kludge to find the headers without help from
-             the exec server.  */
-          extern const void __executable_start;
-          const ElfW(Ehdr) *const ehdr = &__executable_start;
-          _dl_phdr = (const void *) ehdr + ehdr->e_phoff;
-          _dl_phnum = ehdr->e_phnum;
-          assert (ehdr->e_phentsize == sizeof (ElfW(Phdr)));
-        }
-#endif
-      return;
-    }
+    /* No Hurd data block to process.  */
+    return;
 
 #ifndef SHARED
   __libc_enable_secure = d->flags & EXEC_SECURE;
-
-  _dl_phdr = (ElfW(Phdr) *) d->phdr;
-  _dl_phnum = d->phdrsz / sizeof (ElfW(Phdr));
-  assert (d->phdrsz % sizeof (ElfW(Phdr)) == 0);
 #endif
 
   _hurd_init_dtable = d->dtable;
@@ -155,8 +127,8 @@ init1 (int argc, char *arg0, ...)
     char dummy;
     const vm_address_t newsp = (vm_address_t) &dummy;
 
-    if (d->stack_size != 0 && (newsp < d->stack_base ||
-			       newsp - d->stack_base > d->stack_size))
+    if (d->stack_size != 0 && (newsp < d->stack_base
+			       || newsp - d->stack_base > d->stack_size))
       /* The new stack pointer does not intersect with the
 	 stack the exec server set up for us, so free that stack.  */
       __vm_deallocate (__mach_task_self (), d->stack_base, d->stack_size);
@@ -173,19 +145,16 @@ init1 (int argc, char *arg0, ...)
 static inline void
 init (int *data)
 {
+  /* data is the address of the argc parameter to _dl_init_first or
+     doinit1 in _hurd_stack_setup, so the array subscripts are
+     undefined.  */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_NEEDS_COMMENT (10, "-Warray-bounds");
+
   int argc = *data;
   char **argv = (void *) (data + 1);
   char **envp = &argv[argc + 1];
   struct hurd_startup_data *d;
-  unsigned long int threadvars[_HURD_THREADVAR_MAX];
-
-  /* Provide temporary storage for thread-specific variables on the
-     startup stack so the cthreads initialization code can use them
-     for malloc et al, or so we can use malloc below for the real
-     threadvars array.  */
-  memset (threadvars, 0, sizeof threadvars);
-  threadvars[_HURD_THREADVAR_LOCALE] = (unsigned long int) &_nl_global_locale;
-  __hurd_threadvar_stack_offset = (unsigned long int) threadvars;
 
   /* Since the cthreads initialization code uses malloc, and the
      malloc initialization code needs to get at the environment, make
@@ -198,13 +167,37 @@ init (int *data)
     ++envp;
   d = (void *) ++envp;
 
-  /* The user might have defined a value for this, to get more variables.
-     Otherwise it will be zero on startup.  We must make sure it is set
-     properly before before cthreads initialization, so cthreads can know
-     how much space to leave for thread variables.  */
-  if (__hurd_threadvar_max < _HURD_THREADVAR_MAX)
-    __hurd_threadvar_max = _HURD_THREADVAR_MAX;
+#ifndef SHARED
+  /* If we are the bootstrap task started by the kernel,
+     then after the environment pointers there is no Hurd
+     data block; the argument strings start there.  */
+  if ((void *) d == argv[0] || d->phdr == 0)
+    {
+      /* With a new enough linker (binutils-2.23 or better),
+         the magic __ehdr_start symbol will be available and
+         __libc_start_main will have done this that way already.  */
+      if (_dl_phdr == NULL)
+        {
+          /* We may need to see our own phdrs, e.g. for TLS setup.
+             Try the usual kludge to find the headers without help from
+             the exec server.  */
+          extern const void __executable_start;
+          const ElfW(Ehdr) *const ehdr = &__executable_start;
+          _dl_phdr = (const void *) ehdr + ehdr->e_phoff;
+          _dl_phnum = ehdr->e_phnum;
+          assert (ehdr->e_phentsize == sizeof (ElfW(Phdr)));
+        }
+    }
+  else
+    {
+      _dl_phdr = (ElfW(Phdr) *) d->phdr;
+      _dl_phnum = d->phdrsz / sizeof (ElfW(Phdr));
+      assert (d->phdrsz % sizeof (ElfW(Phdr)) == 0);
+    }
 
+  /* We need to setup TLS before initializing libpthread.  */
+  __libc_setup_tls ();
+#endif
 
   /* After possibly switching stacks, call `init1' (above) with the user
      code as the return address, and the argument data immediately above
@@ -219,11 +212,6 @@ init (int *data)
       void switch_stacks (void);
 
       __libc_stack_end = newsp;
-
-      /* Copy per-thread variables from that temporary
-	 area onto the new cthread stack.  */
-      memcpy (__hurd_threadvar_location_from_sp (0, newsp),
-	      threadvars, sizeof threadvars);
 
       /* Copy the argdata from the old stack to the new one.  */
       newsp = memcpy (newsp - ((char *) &d[1] - (char *) data), data,
@@ -265,24 +253,9 @@ init (int *data)
     }
   else
     {
-      /* We are not using cthreads, so we will have just a single allocated
-	 area for the per-thread variables of the main user thread.  */
-      unsigned long int *array;
-      unsigned int i;
       int usercode;
 
       void call_init1 (void);
-
-      array = malloc (__hurd_threadvar_max * sizeof (unsigned long int));
-      if (array == NULL)
-	__libc_fatal ("Can't allocate single-threaded thread variables.");
-
-      /* Copy per-thread variables from the temporary array into the
-	 newly malloc'd space.  */
-      memcpy (array, threadvars, sizeof threadvars);
-      __hurd_threadvar_stack_offset = (unsigned long int) array;
-      for (i = _HURD_THREADVAR_MAX; i < __hurd_threadvar_max; ++i)
-	array[i] = 0;
 
       /* The argument data is just above the stack frame we will unwind by
 	 returning.  Mutate our own return address to run the code below.  */
@@ -299,6 +272,8 @@ init (int *data)
 	 restored by function return.  */
       asm volatile ("# a %0 c %1" : : "a" (usercode), "c" (&init1));
     }
+
+  DIAG_POP_NEEDS_COMMENT;	/* -Warray-bounds.  */
 }
 
 /* These bits of inline assembler used to be located inside `init'.
@@ -395,7 +370,7 @@ _hurd_stack_setup (void)
       *--data = caller;
       asm volatile ("movl %0, %%esp\n" /* Switch to new outermost stack.  */
 		    "movl $0, %%ebp\n" /* Clear outermost frame pointer.  */
-		    "jmp *%1" : : "r" (data), "r" (&doinit1) : "sp");
+		    "jmp *%1" : : "r" (data), "r" (&doinit1));
       /* NOTREACHED */
     }
 

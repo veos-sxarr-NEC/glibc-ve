@@ -1,5 +1,5 @@
 /* Optimized mempcpy implementation for POWER7.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    Contributed by Luis Machado <luisgpm@br.ibm.com>.
    This file is part of the GNU C Library.
 
@@ -15,16 +15,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
 
-/* __ptr_t [r3] __mempcpy (__ptr_t dst [r3], __ptr_t src [r4], size_t len [r5]);
+/* void * [r3] __mempcpy (void *dst [r3], void *src [r4], size_t len [r5]);
     Returns 'dst' + 'len'.  */
 
+#ifndef MEMPCPY
+# define MEMPCPY __mempcpy
+#endif
 	.machine  power7
-EALIGN (__mempcpy, 5, 0)
+ENTRY_TOCLESS (MEMPCPY, 5)
 	CALL_MCOUNT 3
 
 	cmpldi	cr1,5,31
@@ -463,7 +466,7 @@ L(end_unaligned_loop):
 	add	3,3,5
 	blr
 
-END_GEN_TB (__mempcpy,TB_TOCLESS)
+END_GEN_TB (MEMPCPY,TB_TOCLESS)
 libc_hidden_def (__mempcpy)
 weak_alias (__mempcpy, mempcpy)
 libc_hidden_builtin_def (mempcpy)

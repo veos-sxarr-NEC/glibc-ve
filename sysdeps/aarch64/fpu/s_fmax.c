@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,8 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#define FUNC fmax
-#define INSN "fmaxnm"
-#include <s_fmin.c>
+#include <math.h>
+#include <libm-alias-double.h>
+
+double
+__fmax (double x, double y)
+{
+  return __builtin_fmax (x, y);
+}
+
+libm_alias_double (__fmax, fmax)

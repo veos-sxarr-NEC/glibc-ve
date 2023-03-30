@@ -1,6 +1,6 @@
 /* Include file for internal GNU MP types and definitions.
 
-Copyright (C) 1991-2015 Free Software Foundation, Inc.
+Copyright (C) 1991-2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -16,7 +16,7 @@ License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, see
-<http://www.gnu.org/licenses/>.  */
+<https://www.gnu.org/licenses/>.  */
 
 /* When using gcc, make sure to use its builtin alloca.  */
 #if ! defined (alloca) && defined (__GNUC__)
@@ -47,7 +47,8 @@ along with the GNU MP Library; see the file COPYING.LIB.  If not, see
 #endif
 #endif
 
-#if ! defined (HAVE_ALLOCA) || defined (USE_STACK_ALLOC)
+#if (! defined (alloca) && ! defined (HAVE_ALLOCA)) \
+    || defined (USE_STACK_ALLOC)
 #include "stack-alloc.h"
 #else
 #define TMP_DECL(m)
@@ -64,17 +65,11 @@ along with the GNU MP Library; see the file COPYING.LIB.  If not, see
 #define inline			/* Empty */
 #endif
 
-#define ABS(x) (x >= 0 ? x : -x)
-#ifndef MIN
-#define MIN(l,o) ((l) < (o) ? (l) : (o))
-#endif
-#ifndef MAX
-#define MAX(h,i) ((h) > (i) ? (h) : (i))
-#endif
+/* Get MAX/MIN macros.  */
+#include <sys/param.h>
 
 /* Field access macros.  */
 #define SIZ(x) ((x)->_mp_size)
-#define ABSIZ(x) ABS (SIZ (x))
 #define PTR(x) ((x)->_mp_d)
 #define EXP(x) ((x)->_mp_exp)
 #define PREC(x) ((x)->_mp_prec)
@@ -313,13 +308,17 @@ typedef unsigned int UHWtype;
 
 /* Prototypes for internal mpn calls.  */
 extern void impn_mul_n_basecase _PROTO ((mp_ptr prodp, mp_srcptr up,
-					 mp_srcptr vp, mp_size_t size));
+					 mp_srcptr vp, mp_size_t size))
+     attribute_hidden;
 extern void impn_mul_n _PROTO ((mp_ptr prodp, mp_srcptr up, mp_srcptr vp,
-				mp_size_t size, mp_ptr tspace));
+				mp_size_t size, mp_ptr tspace))
+     attribute_hidden;
 extern void impn_sqr_n_basecase _PROTO ((mp_ptr prodp, mp_srcptr up,
-					 mp_size_t size));
+					 mp_size_t size))
+     attribute_hidden;
 extern void impn_sqr_n _PROTO ((mp_ptr prodp, mp_srcptr up, mp_size_t size,
-				mp_ptr tspace));
+				mp_ptr tspace))
+     attribute_hidden;
 
 
 

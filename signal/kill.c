@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
@@ -23,13 +23,12 @@
    send SIG to all processes in the current process's process group.
    If PID is < -1, send SIG to all processes in process group - PID.  */
 int
-__kill (pid, sig)
-     int pid;
-     int sig;
+__kill (int pid, int sig)
 {
   __set_errno (ENOSYS);
   return -1;
 }
 stub_warning (kill)
 
+libc_hidden_def (__kill)
 weak_alias (__kill, kill)

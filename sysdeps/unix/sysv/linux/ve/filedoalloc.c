@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -54,61 +54,34 @@
    SUCH DAMAGE.*/
 
 /* Modified for GNU iostream by Per Bothner 1991, 1992. */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
-#ifndef _POSIX_SOURCE
-# define _POSIX_SOURCE
-#endif
 #include "libioP.h"
-#include <sys/types.h>
+#include <device-nrs.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-#ifdef _LIBC
-# undef isatty
-# define isatty(Fd) __isatty (Fd)
-
-# include <device-nrs.h>
-#endif
-
-
+/* Return the result of isatty, without changing errno.  */
 static int
 local_isatty (int fd)
 {
   int save_errno = errno;
-  int res = isatty (fd);
+  int res = __isatty (fd);
   __set_errno (save_errno);
   return res;
 }
 
-
-/*
- * Allocate a file buffer, or switch to unbuffered I/O.
- * Per the ANSI C standard, ALL tty devices default to line buffered.
- *
- * As a side effect, we set __SOPT or __SNPT (en/dis-able fseek
- * optimisation) right after the _fstat() that finds the buffer size.
- */
-
+/* Allocate a file buffer, or switch to unbuffered I/O.  Streams for
+   TTY devices default to line buffered.  */
 int
-_IO_file_doallocate (fp)
-     _IO_FILE *fp;
+_IO_file_doallocate (FILE *fp)
 {
-  _IO_size_t size;
+  size_t size;
   char *p;
   struct stat64 st;
 
-#ifndef _LIBC
-  /* If _IO_cleanup_registration_needed is non-zero, we should call the
-     function it points to.  This is to make sure _IO_cleanup gets called
-     on exit.  We call it from _IO_file_doallocate, since that is likely
-     to get called by any program that does buffered I/O. */
-  if (__glibc_unlikely (_IO_cleanup_registration_needed != NULL))
-    (*_IO_cleanup_registration_needed) ();
-#endif
-
-  size = _IO_BUFSIZ;
+  size = BUFSIZ;
   if (fp->_fileno >= 0 && __builtin_expect (_IO_SYSSTAT (fp, &st), 0) >= 0)
     {
       if (S_ISCHR (st.st_mode))
@@ -121,15 +94,17 @@ _IO_file_doallocate (fp)
 	      local_isatty (fp->_fileno))
 	    fp->_flags |= _IO_LINE_BUF;
 	}
-#if _IO_HAVE_ST_BLKSIZE
-      if (st.st_blksize > 0) {
+#if defined _STATBUF_ST_BLKSIZE
+      if (st.st_blksize > 0 && st.st_blksize < BUFSIZ) {
 	size = st.st_blksize;
 	if (size > __getpagesize())
 		size = __getpagesize();
-	}
+      }
 #endif
     }
-  ALLOC_BUF (p, size, EOF);
+  p = malloc (size);
+  if (__glibc_unlikely (p == NULL))
+    return EOF;
   _IO_setb (fp, p, p + size, 1);
   return 1;
 }

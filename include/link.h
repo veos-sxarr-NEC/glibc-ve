@@ -1,6 +1,6 @@
 /* Data structure for communication from the run-time dynamic linker for
    loaded ELF shared objects.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_PRIVATE_LINK_H
 #define	_PRIVATE_LINK_H	1
@@ -24,12 +24,18 @@
 # error this should be impossible
 #endif
 
+# ifndef _ISOMAC
 /* Get most of the contents from the public header, but we define a
    different `struct link_map' type for private use.  The la_objopen
    prototype uses the type, so we have to declare it separately.  */
-#define link_map	link_map_public
-#define la_objopen	la_objopen_wrongproto
+#  define link_map	link_map_public
+#  define la_objopen	la_objopen_wrongproto
+# endif
+
 #include <elf/link.h>
+
+# ifndef _ISOMAC
+
 #undef	link_map
 #undef	la_objopen
 
@@ -39,10 +45,11 @@ extern unsigned int la_objopen (struct link_map *__map, Lmid_t __lmid,
 
 #include <stdint.h>
 #include <stddef.h>
-#include <bits/linkmap.h>
+#include <linkmap.h>
+#include <dl-fileid.h>
 #include <dl-lookupcfg.h>
 #include <tls.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 
 
 /* Some internal data structures of the dynamic linker used in the
@@ -71,7 +78,6 @@ struct r_search_path_struct
     struct r_search_path_elem **dirs;
     int malloced;
   };
-
 
 /* Structure describing a loaded shared object.  The `l_next' and `l_prev'
    members form a chain of all the shared objects loaded at startup.
@@ -196,6 +202,20 @@ struct link_map
 				       freed, ie. not allocated with
 				       the dummy malloc in ld.so.  */
 
+    /* NODELETE status of the map.  Only valid for maps of type
+       lt_loaded.  Lazy binding sets l_nodelete_active directly,
+       potentially from signal handlers.  Initial loading of an
+       DF_1_NODELETE object set l_nodelete_pending.  Relocation may
+       set l_nodelete_pending as well.  l_nodelete_pending maps are
+       promoted to l_nodelete_active status in the final stages of
+       dlopen, prior to calling ELF constructors.  dlclose only
+       refuses to unload l_nodelete_active maps, the pending status is
+       ignored.  */
+    bool l_nodelete_active;
+    bool l_nodelete_pending;
+
+#include <link_map.h>
+
     /* Collected information about own RPATH directories.  */
     struct r_search_path_struct l_rpath_dirs;
 
@@ -207,6 +227,10 @@ struct link_map
       unsigned int boundndx;
       uint32_t enterexit;
       unsigned int flags;
+      /* CONCURRENCY NOTE: This is used to guard the concurrent initialization
+	 of the relocation result across multiple threads.  See the more
+	 detailed notes in elf/dl-runtime.c.  */
+      unsigned int init;
     } *l_reloc_result;
 
     /* Pointer to the version information if available.  */
@@ -235,8 +259,7 @@ struct link_map
 
     /* This information is kept to check for sure whether a shared
        object is the same as one already loaded.  */
-    dev_t l_dev;
-    ino64_t l_ino;
+    struct r_file_id l_file_id;
 
     /* Collected information about own RUNPATH directories.  */
     struct r_search_path_struct l_runpath_dirs;
@@ -302,7 +325,9 @@ struct link_map
     /* Index of the module in the dtv array.  */
     size_t l_tls_modid;
 
-    /* Number of thread_local objects constructed by this DSO.  */
+    /* Number of thread_local objects constructed by this DSO.  This is
+       atomically accessed and modified and is not always protected by the load
+       lock.  See also: CONCURRENCY NOTES in cxa_thread_atexit_impl.c.  */
     size_t l_tls_dtor_count;
 
     /* Information used to change permission after the relocations are
@@ -311,15 +336,17 @@ struct link_map
     size_t l_relro_size;
 
     unsigned long long int l_serial;
-
-    /* Audit information.  This array apparent must be the last in the
-       structure.  Never add something after it.  */
-    struct auditstate
-    {
-      uintptr_t cookie;
-      unsigned int bindflags;
-    } l_audit[0];
   };
+
+/* Information used by audit modules.  For most link maps, this data
+   immediate follows the link map in memory.  For the dynamic linker,
+   it is allocated separately.  See link_map_audit_state in
+   <ldsodefs.h>.  */
+struct auditstate
+{
+  uintptr_t cookie;
+  unsigned int bindflags;
+};
 
 
 #if __ELF_NATIVE_CLASS == 32
@@ -333,10 +360,12 @@ struct link_map
 extern int __dl_iterate_phdr (int (*callback) (struct dl_phdr_info *info,
 					       size_t size, void *data),
 			      void *data);
+hidden_proto (__dl_iterate_phdr)
 
 /* We use this macro to refer to ELF macros independent of the native
    wordsize.  `ELFW(R_TYPE)' is used in place of `ELF32_R_TYPE' or
    `ELF64_R_TYPE'.  */
 #define ELFW(type)	_ElfW (ELF, __ELF_NATIVE_CLASS, type)
 
+# endif /* !_ISOMAC */
 #endif /* include/link.h */

@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    Contributed by Martin Schwidefsky (schwidefsky@de.ibm.com).
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -34,12 +34,12 @@ __brk (void *addr)
   void *newbrk;
 
   {
-    register void *__addr asm("2") = addr;
+    register void *__addr __asm__("2") = addr;
 
-    asm ("svc  %b1\n\t"		/* call sys_brk */
-	 : "=d" (__addr)
-	 : "I" (SYS_ify(brk)), "r" (__addr)
-	 : "cc", "memory" );
+    __asm__ ("svc  %b1\n\t"		/* call sys_brk */
+	     : "=d" (__addr)
+	     : "I" (SYS_ify(brk)), "r" (__addr)
+	     : "cc", "memory" );
     newbrk = __addr;
   }
   __curbrk = newbrk;

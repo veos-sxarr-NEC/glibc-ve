@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,16 +13,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
+#include <internal-signals.h>
 
 /* Set all signals in SET.  */
 int
-sigfillset (set)
-     sigset_t *set;
+sigfillset (sigset_t *set)
 {
   if (set == NULL)
     {
@@ -32,14 +32,7 @@ sigfillset (set)
 
   memset (set, 0xff, sizeof (sigset_t));
 
-  /* If the implementation uses a cancellation signal don't set the bit.  */
-#ifdef SIGCANCEL
-  __sigdelset (set, SIGCANCEL);
-#endif
-  /* Likewise for the signal to implement setxid.  */
-#ifdef SIGSETXID
-  __sigdelset (set, SIGSETXID);
-#endif
+  __clear_internal_signals (set);
 
   return 0;
 }

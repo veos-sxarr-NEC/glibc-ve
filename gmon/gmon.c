@@ -26,8 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
-
+/* Changes by NEC Corporation for the VE port, 2020 */
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/gmon.h>
@@ -48,6 +47,26 @@
 #include <libc-internal.h>
 #include <not-cancel.h>
 
+#ifdef PIC
+# include <link.h>
+
+static int
+callback (struct dl_phdr_info *info, size_t size, void *data)
+{
+  if (info->dlpi_name[0] == '\0')
+    {
+      /* The link map for the executable is created by calling
+	 _dl_new_object with "" as filename.  dl_iterate_phdr
+	 calls the callback function with filename from the
+	 link map as dlpi_name.  */
+      u_long *load_address = data;
+      *load_address = (u_long) info->dlpi_addr;
+      return 1;
+    }
+
+  return 0;
+}
+#endif
 
 /*  Head of basic-block list or NULL. */
 struct __bb *__bb_head attribute_hidden;
@@ -60,13 +79,14 @@ struct gmonparam _gmonparam attribute_hidden = { GMON_PROF_OFF };
 static int	s_scale;
 #define		SCALE_1_TO_1	0x10000L
 
-#define ERR(s) write_not_cancel (STDERR_FILENO, s, sizeof (s) - 1)
+#define ERR(s) __write_nocancel (STDERR_FILENO, s, sizeof (s) - 1)
 
 void moncontrol (int mode);
 void __moncontrol (int mode);
-static void write_hist (int fd) internal_function;
-static void write_call_graph (int fd) internal_function;
-static void write_bb_counts (int fd) internal_function;
+libc_hidden_proto (__moncontrol)
+static void write_hist (int fd, u_long load_address);
+static void write_call_graph (int fd, u_long load_address);
+static void write_bb_counts (int fd);
 
 /*
  * Control profiling
@@ -74,8 +94,7 @@ static void write_bb_counts (int fd) internal_function;
  *	all the data structures are ready.
  */
 void
-__moncontrol (mode)
-     int mode;
+__moncontrol (int mode)
 {
   struct gmonparam *p = &_gmonparam;
 
@@ -96,13 +115,12 @@ __moncontrol (mode)
       p->state = GMON_PROF_OFF;
     }
 }
+libc_hidden_def (__moncontrol)
 weak_alias (__moncontrol, moncontrol)
 
 
 void
-__monstartup (lowpc, highpc)
-     u_long lowpc;
-     u_long highpc;
+__monstartup (u_long lowpc, u_long highpc)
 {
   int o;
   char *cp;
@@ -176,9 +194,7 @@ weak_alias (__monstartup, monstartup)
 
 
 static void
-internal_function
-write_hist (fd)
-     int fd;
+write_hist (int fd, u_long load_address)
 {
   u_char tag = GMON_TAG_TIME_HIST;
 
@@ -215,22 +231,20 @@ write_hist (fd)
 	      != offsetof (struct gmon_hist_hdr, dimen_abbrev)))
 	abort ();
 
-      thdr.low_pc = (char *) _gmonparam.lowpc;
-      thdr.high_pc = (char *) _gmonparam.highpc;
+      thdr.low_pc = (char *) _gmonparam.lowpc - load_address;
+      thdr.high_pc = (char *) _gmonparam.highpc - load_address;
       thdr.hist_size = _gmonparam.kcountsize / sizeof (HISTCOUNTER);
       thdr.prof_rate = __profile_frequency ();
       strncpy (thdr.dimen, "seconds", sizeof (thdr.dimen));
       thdr.dimen_abbrev = 's';
 
-      writev_not_cancel_no_status (fd, iov, 3);
+      __writev_nocancel_nostatus (fd, iov, 3);
     }
 }
 
 
 static void
-internal_function
-write_call_graph (fd)
-     int fd;
+write_call_graph (int fd, u_long load_address)
 {
 #define NARCS_PER_WRITEV	32
   u_char tag = GMON_TAG_CG_ARC;
@@ -273,27 +287,26 @@ write_call_graph (fd)
 	    }
 	  arc;
 
-	  arc.frompc = (char *) frompc;
-	  arc.selfpc = (char *) _gmonparam.tos[to_index].selfpc;
+	  arc.frompc = (char *) frompc - load_address;
+	  arc.selfpc = ((char *) _gmonparam.tos[to_index].selfpc
+			- load_address);
 	  arc.count  = _gmonparam.tos[to_index].count;
 	  memcpy (raw_arc + nfilled, &arc, sizeof (raw_arc [0]));
 
 	  if (++nfilled == NARCS_PER_WRITEV)
 	    {
-	      writev_not_cancel_no_status (fd, iov, 2 * nfilled);
+	      __writev_nocancel_nostatus (fd, iov, 2 * nfilled);
 	      nfilled = 0;
 	    }
 	}
     }
   if (nfilled > 0)
-    writev_not_cancel_no_status (fd, iov, 2 * nfilled);
+    __writev_nocancel_nostatus (fd, iov, 2 * nfilled);
 }
 
 
 static void
-internal_function
-write_bb_counts (fd)
-     int fd;
+write_bb_counts (int fd)
 {
   struct __bb *grp;
   u_char tag = GMON_TAG_BB_COUNT;
@@ -320,12 +333,12 @@ write_bb_counts (fd)
   for (grp = __bb_head; grp; grp = grp->next)
     {
       ncounts = grp->ncounts;
-      writev_not_cancel_no_status (fd, bbhead, 2);
+      __writev_nocancel_nostatus (fd, bbhead, 2);
       for (nfilled = i = 0; i < ncounts; ++i)
 	{
 	  if (nfilled > (sizeof (bbbody) / sizeof (bbbody[0])) - 2)
 	    {
-	      writev_not_cancel_no_status (fd, bbbody, nfilled);
+	      __writev_nocancel_nostatus (fd, bbbody, nfilled);
 	      nfilled = 0;
 	    }
 
@@ -333,7 +346,7 @@ write_bb_counts (fd)
 	  bbbody[nfilled++].iov_base = &grp->counts[i];
 	}
       if (nfilled > 0)
-	writev_not_cancel_no_status (fd, bbbody, nfilled);
+	__writev_nocancel_nostatus (fd, bbbody, nfilled);
     }
 }
 
@@ -343,10 +356,6 @@ write_gmon (void)
 {
     int fd = -1;
     char *env;
-
-#ifndef O_NOFOLLOW
-# define O_NOFOLLOW	0
-#endif
 
 #ifdef __ve__
     env = getenv ("VE_GMON_OUT_PREFIX");
@@ -358,12 +367,12 @@ write_gmon (void)
 	size_t len = strlen (env);
 	char buf[len + 20];
 	__snprintf (buf, sizeof (buf), "%s.%u", env, __getpid ());
-	fd = open_not_cancel (buf, O_CREAT|O_TRUNC|O_WRONLY|O_NOFOLLOW, 0666);
+	fd = __open_nocancel (buf, O_CREAT|O_TRUNC|O_WRONLY|O_NOFOLLOW, 0666);
       }
 
     if (fd == -1)
       {
-	fd = open_not_cancel ("gmon.out", O_CREAT|O_TRUNC|O_WRONLY|O_NOFOLLOW,
+	fd = __open_nocancel ("gmon.out", O_CREAT|O_TRUNC|O_WRONLY|O_NOFOLLOW,
 			      0666);
 	if (fd < 0)
 	  {
@@ -391,18 +400,24 @@ write_gmon (void)
     memcpy (&ghdr.cookie[0], GMON_MAGIC, sizeof (ghdr.cookie));
     ghdr.version = GMON_VERSION;
     memset (ghdr.spare, '\0', sizeof (ghdr.spare));
-    write_not_cancel (fd, &ghdr, sizeof (struct gmon_hdr));
+    __write_nocancel (fd, &ghdr, sizeof (struct gmon_hdr));
+
+    /* Get load_address to profile PIE.  */
+    u_long load_address = 0;
+#ifdef PIC
+    __dl_iterate_phdr (callback, &load_address);
+#endif
 
     /* write PC histogram: */
-    write_hist (fd);
+    write_hist (fd, load_address);
 
     /* write call-graph: */
-    write_call_graph (fd);
+    write_call_graph (fd, load_address);
 
     /* write basic-block execution counts: */
     write_bb_counts (fd);
 
-    close_not_cancel_no_status (fd);
+    __close_nocancel_nostatus (fd);
 }
 
 

@@ -27,10 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)rexec.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -49,12 +45,8 @@ int	rexecoptions;
 libc_freeres_ptr (static char *ahostbuf);
 
 int
-rexec_af(ahost, rport, name, pass, cmd, fd2p, af)
-	char **ahost;
-	int rport;
-	const char *name, *pass, *cmd;
-	int *fd2p;
-	sa_family_t af;
+rexec_af (char **ahost, int rport, const char *name, const char *pass,
+	  const char *cmd, int *fd2p, sa_family_t af)
 {
 	struct sockaddr_storage from;
 	struct addrinfo hints, *res0;
@@ -81,7 +73,7 @@ rexec_af(ahost, rport, name, pass, cmd, fd2p, af)
 
 	if (res0->ai_canonname){
 		free (ahostbuf);
-		ahostbuf = strdup (res0->ai_canonname);
+		ahostbuf = __strdup (res0->ai_canonname);
 		if (ahostbuf == NULL) {
 			perror ("rexec: strdup");
 			return (-1);
@@ -94,6 +86,7 @@ rexec_af(ahost, rport, name, pass, cmd, fd2p, af)
 	}
 	ruserpass(res0->ai_canonname, &name, &pass);
 retry:
+	/* NB: No SOCK_CLOEXEC for backwards compatibility.  */
 	s = __socket(res0->ai_family, res0->ai_socktype, 0);
 	if (s < 0) {
 		perror("rexec: socket");
@@ -198,11 +191,8 @@ bad:
 libc_hidden_def (rexec_af)
 
 int
-rexec(ahost, rport, name, pass, cmd, fd2p)
-	char **ahost;
-	int rport;
-	const char *name, *pass, *cmd;
-	int *fd2p;
+rexec (char **ahost, int rport, const char *name, const char *pass,
+       const char *cmd, int *fd2p)
 {
 	return rexec_af(ahost, rport, name, pass, cmd, fd2p, AF_INET);
 }

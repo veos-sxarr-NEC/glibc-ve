@@ -7,6 +7,7 @@
  */
 
 #include <machine/asm.h>
+#include <libm-alias-finite.h>
 
 	.section .rodata.cst8,"aM",@progbits,8
 
@@ -64,6 +65,7 @@ ENTRY(__ieee754_log2l)
 3:	jp	4b		// in case x is ±Inf
 	fstp	%st(1)
 	fstp	%st(1)
+	fadd	%st(0)
 	ret
 END (__ieee754_log2l)
-strong_alias (__ieee754_log2l, __log2l_finite)
+libm_alias_finite (__ieee754_log2l, __log2l)

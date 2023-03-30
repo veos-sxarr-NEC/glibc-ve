@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,13 +13,28 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #define _ERRNO_H	1
 #include <bits/errno.h>
 #include <tcb-offsets.h>
 
+#if SHSTK_ENABLED
+/* The shadow stack prevents us from pushing the saved return PC onto
+   the stack and returning normally.  Instead we pop the shadow stack
+   and return directly.  This is the safest way to return and ensures
+   any stack manipulations done by the vfork'd child doesn't cause the
+   parent to terminate when CET is enabled.  */
+# undef SYSCALL_ERROR_HANDLER
+# define SYSCALL_ERROR_HANDLER			\
+0:						\
+  SYSCALL_SET_ERRNO;				\
+  or $-1, %RAX_LP;				\
+  jmp 1b;
+# undef SYSCALL_ERROR_LABEL
+# define SYSCALL_ERROR_LABEL 0f
+#endif
 
 /* Clone the calling process, but without copying the whole address space.
    The calling process is suspended until the new process exits or is
@@ -34,34 +49,39 @@ ENTRY (__vfork)
 	cfi_adjust_cfa_offset(-8)
 	cfi_register(%rip, %rdi)
 
-	/* Save the TCB-cached PID away in %esi, and then negate the TCB
-           field.  But if it's zero, set it to 0x80000000 instead.  See
-           raise.c for the logic that relies on this value.  */
-	movl	%fs:PID, %esi
-	movl	$0x80000000, %ecx
-	movl	%esi, %edx
-	negl	%edx
-	cmove	%ecx, %edx
-	movl	%edx, %fs:PID
-
 	/* Stuff the syscall number in RAX and enter into the kernel.  */
 	movl	$SYS_ify (vfork), %eax
 	syscall
 
+#if !SHSTK_ENABLED
 	/* Push back the return PC.  */
 	pushq	%rdi
 	cfi_adjust_cfa_offset(8)
-
-	/* Restore the original value of the TCB cache of the PID, if we're
-	   the parent.  But in the child (syscall return value equals zero),
-	   leave things as they are.  */
-	testq	%rax, %rax
-	je	1f
-	movl	%esi, %fs:PID
-1:
+#endif
 
 	cmpl	$-4095, %eax
 	jae SYSCALL_ERROR_LABEL		/* Branch forward if it failed.  */
+
+#if SHSTK_ENABLED
+1:
+	/* Check if shadow stack is in use.  */
+	xorl	%esi, %esi
+	rdsspq	%rsi
+	testq	%rsi, %rsi
+	/* Normal return if shadow stack isn't in use.  */
+	je	L(no_shstk)
+
+	/* Pop return address from shadow stack and jump back to caller
+	   directly.  */
+	movl	$1, %esi
+	incsspq	%rsi
+	jmp	*%rdi
+
+L(no_shstk):
+	/* Push back the return PC.  */
+	pushq	%rdi
+	cfi_adjust_cfa_offset(8)
+#endif
 
 	/* Normal return.  */
 	ret

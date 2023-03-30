@@ -1,4 +1,4 @@
-/* Copyright (C) 1994-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <string.h>
@@ -27,13 +27,8 @@
    the sender, and store the actual size of the address in *ADDR_LEN.
    Returns the number of bytes read or -1 for errors.  */
 ssize_t
-__recvfrom (fd, buf, n, flags, addrarg, addr_len)
-     int fd;
-     void *buf;
-     size_t n;
-     int flags;
-     __SOCKADDR_ARG addrarg;
-     socklen_t *addr_len;
+__recvfrom (int fd, void *buf, size_t n, int flags, __SOCKADDR_ARG addrarg,
+	    socklen_t *addr_len)
 {
   error_t err;
   mach_port_t addrport;

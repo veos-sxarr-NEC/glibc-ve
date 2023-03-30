@@ -8,6 +8,7 @@
  */
 
 #include <machine/asm.h>
+#include <libm-alias-finite.h>
 
 	.section .rodata.cst8,"aM",@progbits,8
 
@@ -64,6 +65,7 @@ ENTRY(__ieee754_logl)
 	ret
 
 3:	fstp	%st(1)
+	fadd	%st(0)
 	ret
 END (__ieee754_logl)
 
@@ -81,7 +83,14 @@ ENTRY(__logl_finite)
 	fcomip	%st(1)		// |x-1| : x-1 : x : log(2)
 	fstp	%st(0)		// x-1 : x : log(2)
 	jc	2b
-	fstp	%st(1)		// x-1 : log(2)
+	fxam
+	fnstsw
+	andb	$0x45, %ah
+	cmpb	$0x40, %ah
+	jne	6f
+	fabs			// log(1) is +0 in all rounding modes.
+6:	fstp	%st(1)		// x-1 : log(2)
 	fyl2xp1			// log(x)
 	ret
 END(__logl_finite)
+libm_alias_finite (__logl_finite, __logl)

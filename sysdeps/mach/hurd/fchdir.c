@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -24,8 +24,7 @@
 /* Change the current directory to FD.  */
 
 int
-__fchdir (fd)
-     int fd;
+__fchdir (int fd)
 {
   return _hurd_change_directory_port_from_fd (&_hurd_ports[INIT_PORT_CWDIR],
 					      fd);

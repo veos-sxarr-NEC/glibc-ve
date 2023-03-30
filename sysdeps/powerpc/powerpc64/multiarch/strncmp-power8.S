@@ -1,4 +1,4 @@
-/* Copyright (C) 2015 Free Software Foundation, Inc.
+/* Copyright (C) 2015-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,28 +13,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sysdep.h>
-
-#undef EALIGN
-#define EALIGN(name,alignt,words)				\
-  .section ".text";						\
-  ENTRY_2(__strncmp_power8)					\
-  .align ALIGNARG(alignt);					\
-  EALIGN_W_##words;						\
-  BODY_LABEL(__strncmp_power8):					\
-  cfi_startproc;						\
-  LOCALENTRY(__strncmp_power8)
-
-#undef END
-#define END(name)						\
-  cfi_endproc;							\
-  TRACEBACK(__strncmp_power8)					\
-  END_2(__strncmp_power8)
-
+#if IS_IN (libc)
+#define STRNCMP __strncmp_power8
 
 #undef libc_hidden_builtin_def
 #define libc_hidden_builtin_def(name)
 
 #include <sysdeps/powerpc/powerpc64/power8/strncmp.S>
+#endif

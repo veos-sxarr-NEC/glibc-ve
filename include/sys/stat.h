@@ -7,12 +7,14 @@ extern int __stat (const char *__file, struct stat *__buf);
 extern int __fstat (int __fd, struct stat *__buf);
 extern int __lstat (const char *__file, struct stat *__buf);
 extern int __chmod (const char *__file, __mode_t __mode);
+libc_hidden_proto (__chmod)
 extern int __fchmod (int __fd, __mode_t __mode);
 extern __mode_t __umask (__mode_t __mask);
 extern int __mkdir (const char *__path, __mode_t __mode);
+libc_hidden_proto (__mkdir)
 extern int __mknod (const char *__path,
 		    __mode_t __mode, __dev_t __dev);
-#if IS_IN (libc) || IS_IN (rtld)
+#if IS_IN (libc) || (IS_IN (rtld) && !defined NO_RTLD_HIDDEN)
 hidden_proto (__fxstat)
 hidden_proto (__fxstat64)
 hidden_proto (__lxstat)
@@ -35,6 +37,9 @@ libc_hidden_proto (__xmknodat)
 libc_hidden_proto (__fxstatat)
 libc_hidden_proto (__fxstatat64)
 
+# if IS_IN (rtld) && !defined NO_RTLD_HIDDEN
+extern __typeof (__fxstatat64) __fxstatat64 attribute_hidden;
+# endif
 
 /* The `stat', `fstat', `lstat' functions have to be handled special since
    even while not compiling the library with optimization calls to these

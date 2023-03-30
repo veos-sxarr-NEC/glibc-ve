@@ -1,5 +1,5 @@
 /* Round float to integer away from zero.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,19 +15,23 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 
 #include <math_private.h>
-
-
-static const float huge = 1.0e30;
+#include <libm-alias-float.h>
+#include <math-use-builtins.h>
 
 
 float
 __roundf (float x)
 {
+#if USE_ROUNDF_BUILTIN
+  return __builtin_roundf (x);
+#else
+  /* Use generic implementation.  */
   int32_t i0, j0;
 
   GET_FLOAT_WORD (i0, x);
@@ -36,21 +40,17 @@ __roundf (float x)
     {
       if (j0 < 0)
 	{
-	  math_force_eval (huge + x);
-
 	  i0 &= 0x80000000;
 	  if (j0 == -1)
 	    i0 |= 0x3f800000;
 	}
       else
 	{
-	  u_int32_t i = 0x007fffff >> j0;
+	  uint32_t i = 0x007fffff >> j0;
 	  if ((i0 & i) == 0)
 	    /* X is integral.  */
 	    return x;
-	  math_force_eval (huge + x);
 
-	  /* Raise inexact if x != 0.  */
 	  i0 += 0x00400000 >> j0;
 	  i0 &= ~i;
 	}
@@ -66,5 +66,6 @@ __roundf (float x)
 
   SET_FLOAT_WORD (x, i0);
   return x;
+#endif /* ! USE_ROUNDF_BUILTIN  */
 }
-weak_alias (__roundf, roundf)
+libm_alias_float (__round, round)

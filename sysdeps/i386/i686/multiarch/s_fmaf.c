@@ -1,5 +1,5 @@
 /* Multiple versions of fmaf.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,21 +15,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#ifdef HAVE_AVX_SUPPORT
 #include <math.h>
 #include <init-arch.h>
+#include <libm-alias-float.h>
 
 extern float __fmaf_ia32 (float x, float y, float z) attribute_hidden;
 extern float __fmaf_fma (float x, float y, float z) attribute_hidden;
 
-libm_ifunc (__fmaf, HAS_FMA ? __fmaf_fma : __fmaf_ia32);
-weak_alias (__fmaf, fmaf)
+libm_ifunc (__fmaf,
+	    HAS_ARCH_FEATURE (FMA_Usable) ? __fmaf_fma : __fmaf_ia32);
+libm_alias_float (__fma, fma)
 
-# define __fmaf __fmaf_ia32
-#endif
+#define __fmaf __fmaf_ia32
 
 #include <sysdeps/ieee754/dbl-64/s_fmaf.c>

@@ -1,5 +1,5 @@
 /* Assembler macros for s390.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    Contributed by Martin Schwidefsky (schwidefsky@de.ibm.com).
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdeps/generic/sysdep.h>
 
@@ -32,7 +32,7 @@
 #define	ENTRY(name)							      \
   .globl C_SYMBOL_NAME(name);						      \
   .type C_SYMBOL_NAME(name),@function;					      \
-  .align ALIGNARG(2);							      \
+  .align ALIGNARG(4);							      \
   C_LABEL(name)								      \
   cfi_startproc;							      \
   CALL_MCOUNT
@@ -82,14 +82,14 @@ lose: SYSCALL_PIC_SETUP				\
   END (name)
 
 #undef JUMPTARGET
-#ifdef PIC
+#ifdef SHARED
 #define JUMPTARGET(name)	name##@PLT
 #define SYSCALL_PIC_SETUP             \
-    bras  %r12,1f                     \
-0:  .long _GLOBAL_OFFSET_TABLE_-0b    \
+    bras  %r12,1f;		      \
+0:  .long _GLOBAL_OFFSET_TABLE_-0b;   \
 1:  al    %r12,0(%r12)
 #else
-#define JUMPTARGET(name)   	name
+#define JUMPTARGET(name)	name
 #define SYSCALL_PIC_SETUP	/* Nothing.  */
 #endif
 

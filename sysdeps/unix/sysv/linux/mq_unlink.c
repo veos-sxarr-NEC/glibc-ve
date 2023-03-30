@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <mqueue.h>
@@ -26,10 +26,7 @@ int
 mq_unlink (const char *name)
 {
   if (name[0] != '/')
-    {
-      __set_errno (EINVAL);
-      return -1;
-    }
+    return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
 
   INTERNAL_SYSCALL_DECL (err);
   int ret = INTERNAL_SYSCALL (mq_unlink, err, 1, name + 1);
@@ -41,8 +38,7 @@ mq_unlink (const char *name)
       ret = INTERNAL_SYSCALL_ERRNO (ret, err);
       if (ret == EPERM)
 	ret = EACCES;
-      __set_errno (ret);
-      ret = -1;
+      return INLINE_SYSCALL_ERROR_RETURN_VALUE (ret);
     }
 
   return ret;

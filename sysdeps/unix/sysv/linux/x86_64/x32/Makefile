@@ -5,6 +5,7 @@ ifeq ($(subdir),misc)
 sysdep_routines += arch_prctl
 endif
 
-ifeq ($(subdir),posix)
-sysdep_routines += getcpu sched_getcpu-static
+ifeq ($(subdir),conform)
+# For bugs 16437 and 21279.
+conformtest-xfail-conds += x86_64-x32-linux
 endif

@@ -1,5 +1,5 @@
 /* Return arc cosine of complex float value.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define __cacosf __cacosf_not_defined
 #define cacosf cacosf_not_defined
@@ -24,11 +24,18 @@
 
 #undef __cacosf
 #undef cacosf
-#define __cacosf internal_cacosf
 
 static _Complex float internal_cacosf (_Complex float x);
 
-#include <math/s_cacosf.c>
+#define M_DECL_FUNC(f) internal_cacosf
+#include <math-type-macros-float.h>
+
+/* Disable any aliasing from base template.  */
+#undef declare_mgen_alias
+#define declare_mgen_alias(__to, __from)
+
+#include <math/s_cacos_template.c>
+
 #include "cfloat-compat.h"
 
 #undef __cacosf
@@ -47,4 +54,4 @@ __c2_cacosf (c2_cfloat_decl (x))
   return c2_cfloat_return (r);
 }
 
-cfloat_versions (cacosf);
+cfloat_versions (cacos);

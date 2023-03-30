@@ -78,8 +78,12 @@
  *	 See HP-15C Advanced Functions Handbook, p.193.
  */
 
+#include <float.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libc-diag.h>
 
 static const double
   ln2_hi = 6.93147180369123816490e-01,  /* 3fe62e42 fee00000 */
@@ -118,7 +122,10 @@ __log1p (double x)
 	{
 	  math_force_eval (two54 + x);          /* raise inexact */
 	  if (ax < 0x3c900000)                  /* |x| < 2**-54 */
-	    return x;
+	    {
+	      math_check_force_underflow (x);
+	      return x;
+	    }
 	  else
 	    return x - x * x * 0.5;
 	}
@@ -187,10 +194,14 @@ __log1p (double x)
   if (k == 0)
     return f - (hfsq - s * (hfsq + R));
   else
-    return k * ln2_hi - ((hfsq - (s * (hfsq + R) + (k * ln2_lo + c))) - f);
+    {
+      /* With GCC 7 when compiling with -Os the compiler warns that c
+	 might be used uninitialized.  This can't be true because k
+	 must be 0 for c to be uninitialized and we handled that
+	 computation earlier without using c.  */
+      DIAG_PUSH_NEEDS_COMMENT;
+      DIAG_IGNORE_Os_NEEDS_COMMENT (7, "-Wmaybe-uninitialized");
+      return k * ln2_hi - ((hfsq - (s * (hfsq + R) + (k * ln2_lo + c))) - f);
+      DIAG_POP_NEEDS_COMMENT;
+    }
 }
-weak_alias (__log1p, log1p)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__log1p, __log1pl)
-weak_alias (__log1p, log1pl)
-#endif

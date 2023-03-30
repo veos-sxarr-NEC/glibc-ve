@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -31,14 +31,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "pthreadP.h"
 #include <fork.h>
-
-/* This is defined by newer gcc version unique for each module.  */
-extern void *__dso_handle __attribute__ ((__weak__,
-					  __visibility__ ("hidden")));
+#include <dso_handle.h>
 
 
 /* Hide the symbol so that no definition but the one locally in the
@@ -48,16 +45,13 @@ int
 /* Don't mark the compatibility function as hidden.  */
 attribute_hidden
 #endif
-__pthread_atfork (prepare, parent, child)
-     void (*prepare) (void);
-     void (*parent) (void);
-     void (*child) (void);
+__pthread_atfork (void (*prepare) (void), void (*parent) (void),
+		  void (*child) (void))
 {
-  return __register_atfork (prepare, parent, child,
-			    &__dso_handle == NULL ? NULL : __dso_handle);
+  return __register_atfork (prepare, parent, child, __dso_handle);
 }
 #ifndef __pthread_atfork
 extern int pthread_atfork (void (*prepare) (void), void (*parent) (void),
 			   void (*child) (void)) attribute_hidden;
-strong_alias (__pthread_atfork, pthread_atfork)
+weak_alias (__pthread_atfork, pthread_atfork)
 #endif

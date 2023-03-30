@@ -1,5 +1,5 @@
 /* Test pthread_setname_np and pthread_getname_np.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <kernel-features.h>
 
 /* New name of process.  */
 #define NEW_NAME "setname"
@@ -44,19 +43,13 @@
    terminator.  */
 #define TASK_COMM_LEN 16
 
-long
-gettid (void)
-{
-    return syscall(__NR_gettid);
-}
-
 /* On Linux we can read this task's name from /proc.  */
 int
 get_self_comm (long tid, char *buf, size_t len)
 {
   int res = 0;
 #define FMT "/proc/self/task/%lu/comm"
-  char fname[sizeof (FMT) + 8];
+  char fname[sizeof (FMT) + 32];
   sprintf (fname, FMT, (unsigned long) tid);
 
   int fd = open (fname, O_RDONLY);
@@ -100,18 +93,6 @@ do_test (int argc, char **argv)
   if (res == 0)
     {
       res = get_self_comm (gettid (), name_check, TASK_COMM_LEN);
-
-#ifndef __ASSUME_PROC_PID_TASK_COMM
-      /* On this first test we look for ENOENT to be returned from
-         get_self_comm to indicate that the kernel is older than
-         2.6.33 and doesn't contain comm within the proc structure.
-         In that case we skip the entire test.  */
-      if (res == ENOENT)
-	{
-	  printf ("SKIP: The kernel does not have /proc/self/task/%%lu/comm.\n");
-	  return 0;
-	}
-#endif
 
       if (res == 0)
        {

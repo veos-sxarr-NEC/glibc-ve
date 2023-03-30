@@ -1,5 +1,5 @@
 /* Internal header for netgroup related functions.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _NETGROUP_H
 #define _NETGROUP_H	1
@@ -70,16 +70,13 @@ struct __netgrent
 
 /* The internal netgroup handling functions might be called from outside.  */
 extern int __internal_setnetgrent (const char *group,
-				   struct __netgrent *datap)
-  internal_function;
+				   struct __netgrent *datap);
 libc_hidden_proto (__internal_setnetgrent)
-extern void __internal_endnetgrent (struct __netgrent *datap)
-  internal_function;
+extern void __internal_endnetgrent (struct __netgrent *datap);
 libc_hidden_proto (__internal_endnetgrent)
 extern int __internal_getnetgrent_r (char **hostp, char **userp,
 				     char **domainp, struct __netgrent *datap,
-				     char *buffer, size_t buflen, int *errnop)
-  internal_function;
+				     char *buffer, size_t buflen, int *errnop);
 libc_hidden_proto (__internal_getnetgrent_r)
 
 #endif /* netgroup.h */

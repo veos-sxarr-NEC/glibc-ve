@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -29,15 +29,11 @@
 
 #undef fwrite_unlocked
 
-_IO_size_t
-fwrite_unlocked (buf, size, count, fp)
-     const void *buf;
-     _IO_size_t size;
-     _IO_size_t count;
-     _IO_FILE *fp;
+size_t
+fwrite_unlocked (const void *buf, size_t size, size_t count, FILE *fp)
 {
-  _IO_size_t request = size * count;
-  _IO_size_t written = 0;
+  size_t request = size * count;
+  size_t written = 0;
   CHECK_FILE (fp, 0);
   if (request == 0)
     return 0;

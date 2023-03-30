@@ -1,5 +1,5 @@
 /* interp - add information about dynamic loader to shared library objects.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,9 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <elf/runtime-linker.h>
+#include <runtime-linker.h>
 
 const char __invoke_dynamic_linker__[] __attribute__ ((section (".interp")))
   = RUNTIME_LINKER;

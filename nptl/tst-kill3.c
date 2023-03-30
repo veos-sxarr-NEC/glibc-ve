@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -25,6 +25,11 @@
 #include <sys/time.h>
 
 
+static int do_test (void);
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
+
 static pthread_cond_t c = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 static pthread_barrier_t b;
@@ -33,7 +38,7 @@ static pthread_barrier_t b;
 static void
 handler (int sig)
 {
-  write (1, "handler called\n", 15);
+  write_message ("handler called\n");
   _exit (1);
 }
 
@@ -151,8 +156,3 @@ do_test (void)
 
   return 0;
 }
-
-
-#define TIMEOUT 5
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"

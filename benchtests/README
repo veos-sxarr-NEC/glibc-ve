@@ -27,12 +27,54 @@ BENCH_DURATION.
 
 The benchmark suite does function call measurements using architecture-specific
 high precision timing instructions whenever available.  When such support is
-not available, it uses clock_gettime (CLOCK_PROCESS_CPUTIME_ID).  One can force
-the benchmark to use clock_gettime by invoking make as follows:
+not available, it uses clock_gettime (CLOCK_MONOTONIC).
 
-  $ make USE_CLOCK_GETTIME=1 bench
+On x86 processors, RDTSCP instruction provides more precise timing data
+than RDTSC instruction.  All x86 processors since 2010 support RDTSCP
+instruction.  One can force the benchmark to use RDTSCP by invoking make
+as follows:
 
-Again, one must run `make bench-clean' before changing the measurement method.
+  $ make USE_RDTSCP=1 bench
+
+One must run `make bench-clean' before changing the measurement method.
+
+Running benchmarks on another target:
+====================================
+
+If the target where you want to run benchmarks is not capable of building the
+code or you're cross-building, you could build and execute the benchmark in
+separate steps.  On the build system run:
+
+  $ make bench-build
+
+and then copy the source and build directories to the target and run the
+benchmarks from the build directory as usual:
+
+  $ make bench
+
+make sure the copy preserves timestamps by using either rsync or scp -p
+otherwise the above command may try to build the benchmark again.  Benchmarks
+that require generated code to be executed during the build are skipped when
+cross-building.
+
+Running subsets of benchmarks:
+==============================
+
+To run only a subset of benchmarks, one may invoke make as follows
+
+  $ make bench BENCHSET="bench-pthread bench-math malloc-thread"
+
+where BENCHSET may be a space-separated list of the following values:
+
+    bench-math
+    bench-pthread
+    bench-string
+    string-benchset
+    wcsmbs-benchset
+    stdlib-benchset
+    stdio-common-benchset
+    math-benchset
+    malloc-thread
 
 Adding a function to benchtests:
 ===============================
@@ -83,6 +125,12 @@ the same file by using the `name' directive that looks something like this:
 See the pow-inputs file for an example of what such a partitioned input file
 would look like.
 
+It is also possible to measure throughput of a (partial) trace extracted from
+a real workload.  In this case the whole trace is iterated over multiple times
+rather than repeating every input multiple times.  This can be done via:
+
+  ##name: workload-<name>
+
 Benchmark Sets:
 ==============
 
@@ -97,3 +145,14 @@ To add a benchset for `foo':
 - Write your bench-foo.c that prints out the measurements to stdout.
 - On execution, a bench-foo.out is created in $(objpfx) with the contents of
   stdout.
+
+Reading String Benchmark Results:
+================================
+
+Some of the string benchmark results are now in JSON to make it easier to read
+in scripts.  Use the benchtests/compare_strings.py script to show the results
+in a tabular format, generate graphs and more. Run
+
+    benchtests/scripts/compare_strings.py -h
+
+for usage information.

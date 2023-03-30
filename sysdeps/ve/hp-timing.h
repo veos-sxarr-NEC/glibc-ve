@@ -1,5 +1,5 @@
 /* High precision, low overhead timing functions.  VE version.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef _HP_TIMING_H
 #define _HP_TIMING_H	1
@@ -30,9 +30,23 @@
 /* We use 64bit values for the times.  */
 typedef unsigned long long int hp_timing_t;
 
+#ifndef DELAY_FOR_VLFA_EXCEPTION
+#define DELAY_FOR_VLFA_EXCEPTION \
+"or %s34,14,(0)1\n\t" \
+"brgt.w  0,%s34,32\n\t" \
+"fencei\n\t" \
+"subs.w.sx  %s34,%s34,(63)0\n\t" \
+"br.l -24\n\t" \
+"nop\n\t"
+#endif
+
 /* The "=A" constraint used in 32-bit mode does not work in 64-bit mode.  */
 #define HP_TIMING_NOW(Var) \
-({ __asm__ __volatile__ ("smir %0, %%usrcc" : "=r" (Var)); })
+({ \
+    __asm__ __volatile__ ( \
+    DELAY_FOR_VLFA_EXCEPTION \
+    ); \
+ __asm__ __volatile__ ("smir %0, %%usrcc" : "=r" (Var)); })
 
 #include <hp-timing-common.h>
 

@@ -1,5 +1,5 @@
 /* Mips version of processor capability information handling macros.
-   Copyright (C) 2007-2015 Free Software Foundation, Inc.
+   Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Robert Millan <rmh@gnu.org>.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DL_PROCINFO_H
 #define _DL_PROCINFO_H	1
@@ -28,13 +28,6 @@
 
 #define _DL_PLATFORMS_COUNT   4
 
-static inline const char *
-__attribute__ ((unused))
-_dl_platform_string (int idx)
-{
-  return GLRO(dl_mips_platforms)[idx];
-};
-
 static inline int
 __attribute__ ((unused, always_inline))
 _dl_string_platform (const char *str)
@@ -44,7 +37,7 @@ _dl_string_platform (const char *str)
   if (str != NULL)
     for (i = 0; i < _DL_PLATFORMS_COUNT; ++i)
       {
-        if (strcmp (str, _dl_platform_string (i)) == 0)
+        if (strcmp (str, GLRO(dl_mips_platforms)[i]) == 0)
           return i;
       }
   return -1;

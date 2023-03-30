@@ -1,4 +1,5 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Linux open syscall implementation, LFS.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,16 +14,23 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include <stdio.h>
+
 #include <sysdep-cancel.h>
 
-/* Open FILE with access OFLAG.  If OFLAG includes O_CREAT,
+
+#ifdef __OFF_T_MATCHES_OFF64_T
+# define EXTRA_OPEN_FLAGS 0
+#else
+# define EXTRA_OPEN_FLAGS O_LARGEFILE
+#endif
+
+/* Open FILE with access OFLAG.  If O_CREAT or O_TMPFILE is in OFLAG,
    a third argument is the file protection.  */
 int
 __libc_open64 (const char *file, int oflag, ...)
@@ -37,17 +45,17 @@ __libc_open64 (const char *file, int oflag, ...)
       va_end (arg);
     }
 
-  if (SINGLE_THREAD_P)
-    return INLINE_SYSCALL (open, 3, file, oflag | O_LARGEFILE, mode);
-
-  int oldtype = LIBC_CANCEL_ASYNC ();
-
-  int result = INLINE_SYSCALL (open, 3, file, oflag | O_LARGEFILE, mode);
-
-  LIBC_CANCEL_RESET (oldtype);
-
-  return result;
+  return SYSCALL_CANCEL (openat, AT_FDCWD, file, oflag | EXTRA_OPEN_FLAGS,
+			 mode);
 }
-weak_alias (__libc_open64, __open64)
+
+strong_alias (__libc_open64, __open64)
 libc_hidden_weak (__open64)
 weak_alias (__libc_open64, open64)
+
+#ifdef __OFF_T_MATCHES_OFF64_T
+strong_alias (__libc_open64, __libc_open)
+strong_alias (__libc_open64, __open)
+libc_hidden_weak (__open)
+weak_alias (__libc_open64, open)
+#endif

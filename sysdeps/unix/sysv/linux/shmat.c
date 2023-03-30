@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
@@ -14,39 +14,33 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
-#include <sys/shm.h>
+#include <sys/msg.h>
 #include <ipc_priv.h>
-
 #include <sysdep.h>
-#include <unistd.h>
-#include <sys/syscall.h>
+#include <errno.h>
 
 /* Attach the shared memory segment associated with SHMID to the data
    segment of the calling process.  SHMADDR and SHMFLG determine how
    and where the segment is attached.  */
 
 void *
-shmat (shmid, shmaddr, shmflg)
-     int shmid;
-     const void *shmaddr;
-     int shmflg;
+shmat (int shmid, const void *shmaddr, int shmflg)
 {
+#ifdef __ASSUME_DIRECT_SYSVIPC_SYSCALLS
+  return (void*) INLINE_SYSCALL_CALL (shmat, shmid, shmaddr, shmflg);
+#else
   INTERNAL_SYSCALL_DECL(err);
   unsigned long resultvar;
   void *raddr;
 
-  resultvar = INTERNAL_SYSCALL (ipc, err, 5, IPCOP_shmat,
-				shmid, shmflg,
-				(long int) &raddr,
-				(void *) shmaddr);
+  resultvar = INTERNAL_SYSCALL_CALL (ipc, err, IPCOP_shmat, shmid, shmflg,
+				     &raddr, shmaddr);
   if (INTERNAL_SYSCALL_ERROR_P (resultvar, err))
-    {
-      __set_errno (INTERNAL_SYSCALL_ERRNO (resultvar, err));
-      return (void *) -1l;
-    }
+    return (void *) INLINE_SYSCALL_ERROR_RETURN_VALUE (INTERNAL_SYSCALL_ERRNO (resultvar,
+									       err));
 
   return raddr;
+#endif
 }

@@ -1,5 +1,5 @@
 /* Definition of `struct stat' used in the kernel.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 struct kernel_stat
   {
@@ -46,3 +46,6 @@ struct kernel_stat
 #define _HAVE_STAT64___UNUSED5
 #define _HAVE_STAT64___PAD2
 #define _HAVE_STAT64_NSEC
+
+#define XSTAT_IS_XSTAT64 0
+#define STATFS_IS_STATFS64 0

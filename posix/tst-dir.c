@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2000.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <dirent.h>
 #include <errno.h>
@@ -26,7 +26,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
-
+#include <libc-diag.h>
 
 /* We expect four arguments:
    - source directory name
@@ -149,10 +149,8 @@ main (int argc, char *argv[])
 
   while ((d = readdir64 (dir1)) != NULL)
     {
-#ifdef _DIRENT_HAVE_D_TYPE
       if (d->d_type != DT_UNKNOWN && d->d_type != DT_REG)
 	continue;
-#endif
 
       if (d->d_ino == st2.st_ino)
 	{
@@ -234,10 +232,8 @@ main (int argc, char *argv[])
 
   while ((d = readdir64 (dir2)) != NULL)
     {
-#ifdef _DIRENT_HAVE_D_TYPE
       if (d->d_type != DT_UNKNOWN && d->d_type != DT_DIR)
 	continue;
-#endif
 
       if (d->d_ino == st2.st_ino)
 	{
@@ -319,14 +315,16 @@ main (int argc, char *argv[])
       exit (1);
     }
 
+  /* The test below covers the deprecated readdir64_r function.  */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_NEEDS_COMMENT (4.9, "-Wdeprecated-declarations");
+
   /* Try to find the new directory.  */
   rewinddir (dir1);
   while (readdir64_r (dir1, &direntbuf.d, &d) == 0 && d != NULL)
     {
-#ifdef _DIRENT_HAVE_D_TYPE
       if (d->d_type != DT_UNKNOWN && d->d_type != DT_DIR)
 	continue;
-#endif
 
       if (d->d_ino == st1.st_ino)
 	{
@@ -350,6 +348,8 @@ main (int argc, char *argv[])
 	    break;
 	}
     }
+
+  DIAG_POP_NEEDS_COMMENT;
 
   if (d == NULL)
     {
@@ -439,6 +439,10 @@ main (int argc, char *argv[])
       result = 1;
     }
 
+  /* The test below covers the deprecated readdir64_r function.  */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_NEEDS_COMMENT (4.9, "-Wdeprecated-declarations");
+
   /* We now should have a directory and a file in the new directory.  */
   rewinddir (dir2);
   while (readdir64_r (dir2, &direntbuf.d, &d) == 0 && d != NULL)
@@ -447,13 +451,11 @@ main (int argc, char *argv[])
 	  || strcmp (d->d_name, "..") == 0
 	  || strcmp (d->d_name, "another-dir") == 0)
 	{
-#ifdef _DIRENT_HAVE_D_TYPE
 	  if (d->d_type != DT_UNKNOWN && d->d_type != DT_DIR)
 	    {
 	      printf ("d_type for \"%s\" is wrong\n", d->d_name);
 	      result = 1;
 	    }
-#endif
 	  if (stat64 (d->d_name, &st3) < 0)
 	    {
 	      printf ("cannot stat \"%s\" is wrong\n", d->d_name);
@@ -467,13 +469,11 @@ main (int argc, char *argv[])
 	}
       else if (strcmp (d->d_name, "and-a-file") == 0)
 	{
-#ifdef _DIRENT_HAVE_D_TYPE
 	  if (d->d_type != DT_UNKNOWN && d->d_type != DT_REG)
 	    {
 	      printf ("d_type for \"%s\" is wrong\n", d->d_name);
 	      result = 1;
 	    }
-#endif
 	  if (stat64 (d->d_name, &st3) < 0)
 	    {
 	      printf ("cannot stat \"%s\" is wrong\n", d->d_name);
@@ -491,6 +491,8 @@ main (int argc, char *argv[])
 	  result = 1;
 	}
     }
+
+  DIAG_POP_NEEDS_COMMENT;
 
   if (stat64 ("does-not-exist", &st1) >= 0)
     {

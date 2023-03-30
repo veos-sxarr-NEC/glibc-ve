@@ -1,5 +1,5 @@
 /* Optimized memcpy implementation for PowerPC A2.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,25 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sysdep.h>
-
-#undef EALIGN
-#define EALIGN(name, alignt, words)				\
-  .section ".text";						\
-  ENTRY_2(__memcpy_a2)						\
-  .align ALIGNARG(alignt);					\
-  EALIGN_W_##words;						\
-  BODY_LABEL(__memcpy_a2):					\
-  cfi_startproc;						\
-  LOCALENTRY(__memcpy_a2)
-
-#undef END_GEN_TB
-#define END_GEN_TB(name, mask)					\
-  cfi_endproc;							\
-  TRACEBACK_MASK(__memcpy_a2,mask)				\
-  END_2(__memcpy_a2)
+#define MEMCPY __memcpy_a2
 
 #undef libc_hidden_builtin_def
 #define libc_hidden_builtin_def(name)

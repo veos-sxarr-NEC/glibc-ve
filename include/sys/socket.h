@@ -8,7 +8,8 @@
    protocol PROTOCOL.  If PROTOCOL is zero, one is chosen automatically.
    Returns a file descriptor for the new socket, or -1 for errors.  */
 extern int __socket (int __domain, int __type,
-		     int __protocol) attribute_hidden;
+		     int __protocol);
+libc_hidden_proto (__socket)
 
 /* Create two new sockets, of type TYPE in domain DOMAIN and using
    protocol PROTOCOL, which are connected to each other, and put file
@@ -19,7 +20,7 @@ extern int __socketpair (int __domain, int __type, int __protocol,
 
 /* Return a socket of any type.  The socket can be used in subsequent
    ioctl calls to talk to the kernel.  */
-extern int __opensock (void) internal_function attribute_hidden;
+extern int __opensock (void) attribute_hidden;
 
 /* Put the address of the peer connected to socket FD into *ADDR
    (which is *LEN bytes long), and its actual length into *LEN.  */
@@ -64,8 +65,8 @@ libc_hidden_proto (__connect)
 
    This function is a cancellation point and therefore not marked with
    __THROW.  */
-extern ssize_t __recv (int __fd, void *__buf, size_t __n, int __flags)
-     attribute_hidden;
+extern ssize_t __recv (int __fd, void *__buf, size_t __n, int __flags);
+libc_hidden_proto (__recv)
 
 /* Send N bytes of BUF on socket FD to peer at address ADDR (which is
    ADDR_LEN bytes long).  Returns the number sent, or -1 for errors.  */
@@ -153,13 +154,7 @@ libc_hidden_proto (__libc_sa_len)
 # define SA_LEN(_x)      __libc_sa_len((_x)->sa_family)
 #endif
 
-#ifdef SOCK_CLOEXEC
-extern int __have_sock_cloexec attribute_hidden;
-/* At lot of other functionality became available at the same time as
-   SOCK_CLOEXEC.  Avoid defining separate variables for all of them
-   unless it is really necessary.  */
-# define __have_paccept __have_sock_cloexec
-#endif
+libc_hidden_proto (__cmsg_nxthdr)
 
 #endif
 #endif

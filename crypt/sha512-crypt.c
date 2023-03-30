@@ -1,5 +1,5 @@
 /* One way encryption based on SHA512 sum.
-   Copyright (C) 2007-2015 Free Software Foundation, Inc.
+   Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2007.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -99,11 +99,7 @@ extern char *__sha512_crypt (const char *key, const char *salt);
 
 
 char *
-__sha512_crypt_r (key, salt, buffer, buflen)
-     const char *key;
-     const char *salt;
-     char *buffer;
-     int buflen;
+__sha512_crypt_r (const char *key, const char *salt, char *buffer, int buflen)
 {
   unsigned char alt_result[64]
     __attribute__ ((__aligned__ (__alignof__ (uint64_t))));
@@ -322,8 +318,8 @@ __sha512_crypt_r (key, salt, buffer, buflen)
 
   if (rounds_custom)
     {
-      int n = snprintf (cp, MAX (0, buflen), "%s%zu$",
-			sha512_rounds_prefix, rounds);
+      int n = __snprintf (cp, MAX (0, buflen), "%s%zu$",
+			  sha512_rounds_prefix, rounds);
       cp += n;
       buflen -= n;
     }
@@ -397,16 +393,16 @@ __sha512_crypt_r (key, salt, buffer, buflen)
 #ifndef USE_NSS
   __sha512_init_ctx (&ctx);
   __sha512_finish_ctx (&ctx, alt_result);
-  memset (&ctx, '\0', sizeof (ctx));
-  memset (&alt_ctx, '\0', sizeof (alt_ctx));
+  explicit_bzero (&ctx, sizeof (ctx));
+  explicit_bzero (&alt_ctx, sizeof (alt_ctx));
 #endif
-  memset (temp_result, '\0', sizeof (temp_result));
-  memset (p_bytes, '\0', key_len);
-  memset (s_bytes, '\0', salt_len);
+  explicit_bzero (temp_result, sizeof (temp_result));
+  explicit_bzero (p_bytes, key_len);
+  explicit_bzero (s_bytes, salt_len);
   if (copied_key != NULL)
-    memset (copied_key, '\0', key_len);
+    explicit_bzero (copied_key, key_len);
   if (copied_salt != NULL)
-    memset (copied_salt, '\0', salt_len);
+    explicit_bzero (copied_salt, salt_len);
 
   free (free_key);
   free (free_pbytes);

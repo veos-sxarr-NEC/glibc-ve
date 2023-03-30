@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,13 +13,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 
 #ifndef STRNCAT
 # undef strncat
 # define STRNCAT  strncat
+# define STRNCAT_PRIMARY
 #endif
 
 char *
@@ -37,3 +38,7 @@ STRNCAT (char *s1, const char *s2, size_t n)
 
   return s;
 }
+#ifdef STRNCAT_PRIMARY
+strong_alias (STRNCAT, __strncat)
+libc_hidden_def (__strncat)
+#endif

@@ -1,5 +1,5 @@
 /* Test program for bad DES salt detection in crypt.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <unistd.h>
@@ -61,6 +61,9 @@ do_test (void)
       tests[n - 1][1] = &page[pagesize - 1];
     }
 
+  /* Mark cd as initialized before first call to crypt_r.  */
+  cd.initialized = 0;
+
   for (size_t i = 0; i < n; i++)
     {
       if (crypt (tests[i][0], tests[i][1]))
@@ -81,6 +84,5 @@ do_test (void)
   return result;
 }
 
-#define TIMEOUT 5
 #define TEST_FUNCTION do_test ()
 #include "../test-skeleton.c"

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -40,8 +40,8 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 
-#include <libc-internal.h>
 #include <libc-mmap.h>
+#include <libc-pointer-arith.h>
 #include "../../crypt/md5.h"
 #include "../localeinfo.h"
 #include "../locarchive.h"
@@ -57,7 +57,7 @@
 
 extern const char *output_prefix;
 
-#define ARCHIVE_NAME LOCALEDIR "/locale-archive"
+#define ARCHIVE_NAME COMPLOCALEDIR "/locale-archive"
 
 static const char *locnames[] =
   {
@@ -320,8 +320,8 @@ compare_from_file (struct locarhandle *ah, void *p1, uint32_t offset2,
 {
   void *p2 = xmalloc (size);
   if (pread (ah->fd, p2, size, offset2) != size)
-    WITH_CUR_LOCALE (error (4, errno,
-			    _("cannot read data from locale archive")));
+    record_error (4, errno,
+		  _("cannot read data from locale archive"));
 
   int res = memcmp (p1, p2, size);
   free (p2);
@@ -1127,11 +1127,8 @@ add_locale (struct locarhandle *ah,
    of the files if necessary.  Add all the names, possibly overwriting
    old files.  */
 int
-add_locale_to_archive (ah, name, data, replace)
-     struct locarhandle *ah;
-     const char *name;
-     locale_data_t data;
-     bool replace;
+add_locale_to_archive (struct locarhandle *ah, const char *name,
+		       locale_data_t data, bool replace)
 {
   char *normalized_name = NULL;
   uint32_t locrec_offset;
@@ -1329,10 +1326,7 @@ add_locale_to_archive (ah, name, data, replace)
 
 
 int
-add_locales_to_archive (nlist, list, replace)
-     size_t nlist;
-     char *list[];
-     bool replace;
+add_locales_to_archive (size_t nlist, char *list[], bool replace)
 {
   struct locarhandle ah;
   int result = 0;
@@ -1391,17 +1385,13 @@ add_locales_to_archive (nlist, list, replace)
 		     a directory we have to look at a file with the
 		     prefix "SYS_".  Otherwise we have found what we
 		     are looking for.  */
-#ifdef _DIRENT_HAVE_D_TYPE
 		  d_type = d->d_type;
 
 		  if (d_type != DT_REG)
-#endif
 		    {
 		      char fullname[fnamelen + 2 * strlen (d->d_name) + 7];
 
-#ifdef _DIRENT_HAVE_D_TYPE
 		      if (d_type == DT_UNKNOWN)
-#endif
 			{
 			  strcpy (stpcpy (stpcpy (fullname, fname), "/"),
 				  d->d_name);
@@ -1529,9 +1519,7 @@ add_locales_to_archive (nlist, list, replace)
 
 
 int
-delete_locales_from_archive (nlist, list)
-     size_t nlist;
-     char *list[];
+delete_locales_from_archive (size_t nlist, char *list[])
 {
   struct locarhandle ah;
   struct locarhead *head;

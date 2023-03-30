@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  Stub version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define ELF_MACHINE_NAME "stub"
 
@@ -51,10 +51,11 @@ elf_machine_load_address (void)
 
 /* Fixup a PLT entry to bounce directly to the function at VALUE.  */
 
-static inline Elf32_Addr
+static inline ElfW(Addr)
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
-		       const Elf32_Rel *reloc,
-		       Elf32_Addr *reloc_addr, Elf32_Addr value)
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
+		       const ElfW(Rel) *reloc,
+		       ElfW(Addr) *reloc_addr, ElfW(Addr) value)
 {
   return *reloc_addr = value;
 }

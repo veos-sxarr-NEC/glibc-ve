@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Wants:
    AC_STDC_HEADERS
@@ -175,8 +175,8 @@ extern char *alloca ();
 # include <not-cancel.h>
 # include <kernel-features.h>
 #else
-# define openat64_not_cancel_3(dfd, name, mode) openat64 (dfd, name, mode)
-# define close_not_cancel_no_status(fd) close (fd)
+# define __openat64_nocancel(dfd, name, mode) openat64 (dfd, name, mode)
+# define __close_nocancel_nostatus(fd) close (fd)
 #endif
 
 #ifndef PATH_MAX
@@ -222,9 +222,7 @@ static int __rtld_have_atfcts;
    unless SIZE == 0, in which case it is as big as necessary.  */
 
 GETCWD_RETURN_TYPE
-__getcwd (buf, size)
-     char *buf;
-     size_t size;
+__getcwd (char *buf, size_t size)
 {
 #ifndef __ASSUME_ATFCTS
   static const char dots[]
@@ -283,13 +281,7 @@ __getcwd (buf, size)
   while (!(thisdev == rootdev && thisino == rootino))
     {
       if (__have_atfcts >= 0)
-	{
-	  int mode = O_RDONLY;
-#ifdef O_CLOEXEC
-	  mode |= O_CLOEXEC;
-#endif
-	  fd = openat64_not_cancel_3 (fd, "..", mode);
-	}
+	  fd = __openat64_nocancel (fd, "..", O_RDONLY | O_CLOEXEC);
       else
 	fd = -1;
       if (fd >= 0)
@@ -326,7 +318,7 @@ __getcwd (buf, size)
 		}
 	      else
 		{
-		  new = realloc ((__ptr_t) dotlist, dotsize * 2 + 1);
+		  new = realloc ((void *) dotlist, dotsize * 2 + 1);
 		  if (new == NULL)
 		    goto lose;
 		  dotp = &new[dotsize];
@@ -500,7 +492,7 @@ __getcwd (buf, size)
 
 #ifndef __ASSUME_ATFCTS
   if (dotlist != dots)
-    free ((__ptr_t) dotlist);
+    free ((void *) dotlist);
 #endif
 
   size_t used = path + allocated - pathp;
@@ -524,12 +516,12 @@ __getcwd (buf, size)
   int save_errno = errno;
 #ifndef __ASSUME_ATFCTS
   if (dotlist != dots)
-    free ((__ptr_t) dotlist);
+    free ((void *) dotlist);
 #endif
   if (dirstream != NULL)
     __closedir (dirstream);
   if (fd_needs_closing)
-    close_not_cancel_no_status (fd);
+    __close_nocancel_nostatus (fd);
 #ifndef NO_ALLOCATION
   if (buf == NULL)
     free (path);
@@ -539,5 +531,6 @@ __getcwd (buf, size)
 }
 
 #if defined _LIBC && !defined __getcwd
+libc_hidden_def (__getcwd)
 weak_alias (__getcwd, getcwd)
 #endif

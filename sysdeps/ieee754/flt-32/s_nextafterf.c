@@ -17,8 +17,11 @@
 static char rcsid[] = "$NetBSD: s_nextafterf.c,v 1.4 1995/05/10 20:48:01 jtc Exp $";
 #endif
 
+#include <errno.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <libm-alias-float.h>
 #include <float.h>
 
 float __nextafterf(float x, float y)
@@ -59,12 +62,14 @@ float __nextafterf(float x, float y)
 	if(hy>=0x7f800000) {
 	  float u = x+x;	/* overflow  */
 	  math_force_eval (u);
+	  __set_errno (ERANGE);
 	}
 	if(hy<0x00800000) {
 	    float u = x*x;			/* underflow */
 	    math_force_eval (u);		/* raise underflow flag */
+	    __set_errno (ERANGE);
 	}
 	SET_FLOAT_WORD(x,hx);
 	return x;
 }
-weak_alias (__nextafterf, nextafterf)
+libm_alias_float (__nextafter, nextafter)

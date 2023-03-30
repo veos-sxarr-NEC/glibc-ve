@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/time.h>
@@ -24,16 +24,18 @@
    of time adjustment remaining to be done from the last `__adjtime' call.
    This call is restricted to the super-user.  */
 int
-__adjtime (delta, olddelta)
-     const struct timeval *delta;
-     struct timeval *olddelta;
+__adjtime (const struct timeval *delta, struct timeval *olddelta)
 {
   error_t err;
   mach_port_t hostpriv;
+  struct timeval dummy;
 
   err = __get_privileged_ports (&hostpriv, NULL);
   if (err)
     return __hurd_fail (EPERM);
+
+  if (olddelta == NULL)
+    olddelta = &dummy;
 
   err = __host_adjust_time (hostpriv,
 			    /* `time_value_t' and `struct timeval' are in

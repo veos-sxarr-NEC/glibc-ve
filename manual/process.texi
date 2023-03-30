@@ -51,9 +51,8 @@ function.  This function does all the work of running a subprogram, but
 it doesn't give you much control over the details: you have to wait
 until the subprogram terminates before you can do anything else.
 
-@comment stdlib.h
-@comment ISO
 @deftypefun int system (const char *@var{command})
+@standards{ISO, stdlib.h}
 @pindex sh
 @safety{@prelim{}@mtsafe{}@asunsafe{@ascuplugin{} @ascuheap{} @asulock{}}@acunsafe{@aculock{} @acsmem{}}}
 @c system @ascuplugin @ascuheap @asulock @aculock @acsmem
@@ -133,22 +132,19 @@ output channels of the command being executed.
 This section gives an overview of processes and of the steps involved in
 creating a process and making it run another program.
 
-@cindex process ID
-@cindex process lifetime
-Each process is named by a @dfn{process ID} number.  A unique process ID
-is allocated to each process when it is created.  The @dfn{lifetime} of
-a process ends when its termination is reported to its parent process;
-at that time, all of the process resources, including its process ID,
-are freed.
-
 @cindex creating a process
 @cindex forking a process
 @cindex child process
 @cindex parent process
-Processes are created with the @code{fork} system call (so the operation
-of creating a new process is sometimes called @dfn{forking} a process).
-The @dfn{child process} created by @code{fork} is a copy of the original
-@dfn{parent process}, except that it has its own process ID.
+@cindex subprocess
+A new processes is created when one of the functions
+@code{posix_spawn}, @code{fork}, or @code{vfork} is called.  (The
+@code{system} and @code{popen} also create new processes internally.)
+Due to the name of the @code{fork} function, the act of creating a new
+process is sometimes called @dfn{forking} a process.  Each new process
+(the @dfn{child process} or @dfn{subprocess}) is allocated a process
+ID, distinct from the process ID of the parent process.  @xref{Process
+Identification}.
 
 After forking a child process, both the parent and child processes
 continue to execute normally.  If you want your program to wait for a
@@ -175,35 +171,72 @@ too, instead of returning to the previous process image.
 @node Process Identification
 @section Process Identification
 
-The @code{pid_t} data type represents process IDs.  You can get the
-process ID of a process by calling @code{getpid}.  The function
-@code{getppid} returns the process ID of the parent of the current
-process (this is also known as the @dfn{parent process ID}).  Your
-program should include the header files @file{unistd.h} and
+@cindex process ID
+Each process is named by a @dfn{process ID} number, a value of type
+@code{pid_t}.  A process ID is allocated to each process when it is
+created.  Process IDs are reused over time.  The lifetime of a process
+ends when the parent process of the corresponding process waits on the
+process ID after the process has terminated.  @xref{Process
+Completion}.  (The parent process can arrange for such waiting to
+happen implicitly.)  A process ID uniquely identifies a process only
+during the lifetime of the process.  As a rule of thumb, this means
+that the process must still be running.
+
+Process IDs can also denote process groups and sessions.
+@xref{Job Control}.
+
+@cindex thread ID
+@cindex task ID
+@cindex thread group
+On Linux, threads created by @code{pthread_create} also receive a
+@dfn{thread ID}.  The thread ID of the initial (main) thread is the
+same as the process ID of the entire process.  Thread IDs for
+subsequently created threads are distinct.  They are allocated from
+the same numbering space as process IDs.  Process IDs and thread IDs
+are sometimes also referred to collectively as @dfn{task IDs}.  In
+contrast to processes, threads are never waited for explicitly, so a
+thread ID becomes eligible for reuse as soon as a thread exits or is
+canceled.  This is true even for joinable threads, not just detached
+threads.  Threads are assigned to a @dfn{thread group}.  In
+@theglibc{} implementation running on Linux, the process ID is the
+thread group ID of all threads in the process.
+
+You can get the process ID of a process by calling @code{getpid}.  The
+function @code{getppid} returns the process ID of the parent of the
+current process (this is also known as the @dfn{parent process ID}).
+Your program should include the header files @file{unistd.h} and
 @file{sys/types.h} to use these functions.
 @pindex sys/types.h
 @pindex unistd.h
 
-@comment sys/types.h
-@comment POSIX.1
 @deftp {Data Type} pid_t
+@standards{POSIX.1, sys/types.h}
 The @code{pid_t} data type is a signed integer type which is capable
 of representing a process ID.  In @theglibc{}, this is an @code{int}.
 @end deftp
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun pid_t getpid (void)
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 The @code{getpid} function returns the process ID of the current process.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun pid_t getppid (void)
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 The @code{getppid} function returns the process ID of the parent of the
 current process.
+@end deftypefun
+
+@deftypefun pid_t gettid (void)
+@standards{Linux, unistd.h}
+@safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
+The @code{gettid} function returns the thread ID of the current
+thread.  The returned value is obtained from the Linux kernel and is
+not subject to caching.  See the discussion of thread IDs above,
+especially regarding reuse of the IDs of threads which have exited.
+
+This function is specific to Linux.
 @end deftypefun
 
 @node Creating a Process
@@ -213,9 +246,8 @@ The @code{fork} function is the primitive for creating a process.
 It is declared in the header file @file{unistd.h}.
 @pindex unistd.h
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun pid_t fork (void)
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@asunsafe{@ascuplugin{}}@acunsafe{@aculock{}}}
 @c The nptl/.../linux implementation safely collects fork_handlers into
 @c an alloca()ed linked list and increments ref counters; it uses atomic
@@ -291,9 +323,8 @@ signals and signal actions from the parent process.)
 @end itemize
 
 
-@comment unistd.h
-@comment BSD
 @deftypefun pid_t vfork (void)
+@standards{BSD, unistd.h}
 @safety{@prelim{}@mtsafe{}@asunsafe{@ascuplugin{}}@acunsafe{@aculock{}}}
 @c The vfork implementation proper is a safe syscall, but it may fall
 @c back to fork if the vfork syscall is not available.
@@ -339,9 +370,8 @@ The functions in this family differ in how you specify the arguments,
 but otherwise they all do the same thing.  They are declared in the
 header file @file{unistd.h}.
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int execv (const char *@var{filename}, char *const @var{argv}@t{[]})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 The @code{execv} function executes the file named by @var{filename} as a
 new process image.
@@ -358,18 +388,16 @@ The environment for the new process image is taken from the
 @ref{Environment Variables}, for information about environments.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int execl (const char *@var{filename}, const char *@var{arg0}, @dots{})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@asunsafe{@ascuheap{}}@acunsafe{@acsmem{}}}
 This is similar to @code{execv}, but the @var{argv} strings are
 specified individually instead of as an array.  A null pointer must be
 passed as the last such argument.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int execve (const char *@var{filename}, char *const @var{argv}@t{[]}, char *const @var{env}@t{[]})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 This is similar to @code{execv}, but permits you to specify the environment
 for the new program explicitly as the @var{env} argument.  This should
@@ -377,9 +405,8 @@ be an array of strings in the same format as for the @code{environ}
 variable; see @ref{Environment Access}.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int execle (const char *@var{filename}, const char *@var{arg0}, @dots{}, char *const @var{env}@t{[]})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@asunsafe{@ascuheap{}}@acunsafe{@acsmem{}}}
 This is similar to @code{execl}, but permits you to specify the
 environment for the new program explicitly.  The environment argument is
@@ -388,9 +415,8 @@ argument, and should be an array of strings in the same format as for
 the @code{environ} variable.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int execvp (const char *@var{filename}, char *const @var{argv}@t{[]})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{@mtsenv{}}@asunsafe{@ascuheap{}}@acunsafe{@acsmem{}}}
 The @code{execvp} function is similar to @code{execv}, except that it
 searches the directories listed in the @code{PATH} environment variable
@@ -402,9 +428,8 @@ it looks for them in the places that the user has chosen.  Shells use it
 to run the commands that users type.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int execlp (const char *@var{filename}, const char *@var{arg0}, @dots{})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{@mtsenv{}}@asunsafe{@ascuheap{}}@acunsafe{@acsmem{}}}
 This function is like @code{execl}, except that it performs the same
 file name searching as the @code{execvp} function.
@@ -497,7 +522,7 @@ information about signals, see @ref{Signal Handling}.
 File descriptors open in the existing process image remain open in the
 new process image, unless they have the @code{FD_CLOEXEC}
 (close-on-exec) flag set.  The files that remain open inherit all
-attributes of the open file description from the existing process image,
+attributes of the open file descriptors from the existing process image,
 including file locks.  File descriptors are discussed in @ref{Low-Level I/O}.
 
 Streams, by contrast, cannot survive through @code{exec} functions,
@@ -520,9 +545,8 @@ process to terminate or stop, and determine its status.  These functions
 are declared in the header file @file{sys/wait.h}.
 @pindex sys/wait.h
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefun pid_t waitpid (pid_t @var{pid}, int *@var{status-ptr}, int @var{options})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 The @code{waitpid} function is used to request status information from a
 child process whose process ID is @var{pid}.  Normally, the calling
@@ -594,7 +618,7 @@ These symbolic constants are defined as values for the @var{pid} argument
 to the @code{waitpid} function.
 
 @comment Extra blank lines make it look better.
-@table @code
+@vtable @code
 @item WAIT_ANY
 
 This constant macro (whose value is @code{-1}) specifies that
@@ -605,13 +629,13 @@ This constant macro (whose value is @code{-1}) specifies that
 This constant (with value @code{0}) specifies that @code{waitpid} should
 return status information about any child process in the same process
 group as the calling process.
-@end table
+@end vtable
 
 These symbolic constants are defined as flags for the @var{options}
 argument to the @code{waitpid} function.  You can bitwise-OR the flags
 together to obtain a value to use as the argument.
 
-@table @code
+@vtable @code
 @item WNOHANG
 
 This flag specifies that @code{waitpid} should return immediately
@@ -622,11 +646,10 @@ instead of waiting, if there is no child process ready to be noticed.
 This flag specifies that @code{waitpid} should report the status of any
 child processes that have been stopped as well as those that have
 terminated.
-@end table
+@end vtable
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefun pid_t wait (int *@var{status-ptr})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 This is a simplified version of @code{waitpid}, and is used to wait
 until any one child process terminates.  The call:
@@ -651,9 +674,8 @@ protected using cancellation handlers.
 @c ref pthread_cleanup_push / pthread_cleanup_pop
 @end deftypefun
 
-@comment sys/wait.h
-@comment BSD
 @deftypefun pid_t wait4 (pid_t @var{pid}, int *@var{status-ptr}, int @var{options}, struct rusage *@var{usage})
+@standards{BSD, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 If @var{usage} is a null pointer, @code{wait4} is equivalent to
 @code{waitpid (@var{pid}, @var{status-ptr}, @var{options})}.
@@ -704,58 +726,51 @@ encoded in the returned status value using the following macros.
 These macros are defined in the header file @file{sys/wait.h}.
 @pindex sys/wait.h
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefn Macro int WIFEXITED (int @var{status})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 This macro returns a nonzero value if the child process terminated
 normally with @code{exit} or @code{_exit}.
 @end deftypefn
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefn Macro int WEXITSTATUS (int @var{status})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 If @code{WIFEXITED} is true of @var{status}, this macro returns the
 low-order 8 bits of the exit status value from the child process.
 @xref{Exit Status}.
 @end deftypefn
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefn Macro int WIFSIGNALED (int @var{status})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 This macro returns a nonzero value if the child process terminated
 because it received a signal that was not handled.
 @xref{Signal Handling}.
 @end deftypefn
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefn Macro int WTERMSIG (int @var{status})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 If @code{WIFSIGNALED} is true of @var{status}, this macro returns the
 signal number of the signal that terminated the child process.
 @end deftypefn
 
-@comment sys/wait.h
-@comment BSD
 @deftypefn Macro int WCOREDUMP (int @var{status})
+@standards{BSD, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 This macro returns a nonzero value if the child process terminated
 and produced a core dump.
 @end deftypefn
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefn Macro int WIFSTOPPED (int @var{status})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 This macro returns a nonzero value if the child process is stopped.
 @end deftypefn
 
-@comment sys/wait.h
-@comment POSIX.1
 @deftypefn Macro int WSTOPSIG (int @var{status})
+@standards{POSIX.1, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 If @code{WIFSTOPPED} is true of @var{status}, this macro returns the
 signal number of the signal that caused the child process to stop.
@@ -763,53 +778,16 @@ signal number of the signal that caused the child process to stop.
 
 
 @node BSD Wait Functions
-@section BSD Process Wait Functions
+@section BSD Process Wait Function
 
-@Theglibc{} also provides these related facilities for compatibility
-with BSD Unix.  BSD uses the @code{union wait} data type to represent
-status values rather than an @code{int}.  The two representations are
-actually interchangeable; they describe the same bit patterns.  @Theglibc{}
-defines macros such as @code{WEXITSTATUS} so that they will
-work on either kind of object, and the @code{wait} function is defined
-to accept either type of pointer as its @var{status-ptr} argument.
-
-These functions are declared in @file{sys/wait.h}.
+@Theglibc{} also provides the @code{wait3} function for compatibility
+with BSD.  This function is declared in @file{sys/wait.h}.  It is the
+predecessor to @code{wait4}, which is more flexible.  @code{wait3} is
+now obsolete.
 @pindex sys/wait.h
 
-@comment sys/wait.h
-@comment BSD
-@deftp {Data Type} {union wait}
-This data type represents program termination status values.  It has
-the following members:
-
-@table @code
-@item int w_termsig
-The value of this member is the same as that of the
-@code{WTERMSIG} macro.
-
-@item int w_coredump
-The value of this member is the same as that of the
-@code{WCOREDUMP} macro.
-
-@item int w_retcode
-The value of this member is the same as that of the
-@code{WEXITSTATUS} macro.
-
-@item int w_stopsig
-The value of this member is the same as that of the
-@code{WSTOPSIG} macro.
-@end table
-
-Instead of accessing these members directly, you should use the
-equivalent macros.
-@end deftp
-
-The @code{wait3} function is the predecessor to @code{wait4}, which is
-more flexible.  @code{wait3} is now obsolete.
-
-@comment sys/wait.h
-@comment BSD
-@deftypefun pid_t wait3 (union wait *@var{status-ptr}, int @var{options}, struct rusage *@var{usage})
+@deftypefun pid_t wait3 (int *@var{status-ptr}, int @var{options}, struct rusage *@var{usage})
+@standards{BSD, sys/wait.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 If @var{usage} is a null pointer, @code{wait3} is equivalent to
 @code{waitpid (-1, @var{status-ptr}, @var{options})}.

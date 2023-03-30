@@ -256,4 +256,30 @@ cwd\comments\
 !posix\comments\
 @end macro
 
+@iftex
+@macro twoexp{exp}
+@math{2^{{\exp\}}}
+@end macro
+@end iftex
+@ifnottex
+@macro twoexp{exp}
+2^\exp\
+@end macro
+@end ifnottex
+
+@c Used by errlist.awk and errnos.awk to generate other files.
+@c Note that error values have ABI implications for the Hurd.
+@macro errno {err, val, str}
+@cindex \str\
+``\str\.''
+@end macro
+
+@c Dummy placeholder while converting annotations.
+@c For details on expected use, see `summary.pl --help'.
+@macro standards {standard, header}
+@end macro
+@c To be used for @*x lists of elements.
+@macro standardsx {element, standard, header}
+@end macro
+
 @end ifclear

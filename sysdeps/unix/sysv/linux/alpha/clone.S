@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Richard Henderson <rth@tamu.edu>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -22,9 +22,6 @@
 #include <sysdep.h>
 #define _ERRNO_H	1
 #include <bits/errno.h>
-
-#define CLONE_VM	0x00000100
-#define CLONE_THREAD	0x00010000
 
 /* int clone(int (*fn)(void *arg), void *child_stack, int flags,
 	     void *arg, pid_t *ptid, void *tls, pid_t *ctid);
@@ -43,9 +40,11 @@
 	cfi_startproc
 __clone:
 #ifdef PROF
+	.set noat
 	ldgp	gp,0(pv)
 	lda	AT, _mcount
 	jsr	AT, (AT), _mcount
+	.set at
 #endif
 
 	/* Sanity check arguments.  */
@@ -92,13 +91,6 @@ thread_start:
 	cfi_def_cfa_register(fp)
 	cfi_undefined(ra)
 
-	/* Check and see if we need to reset the PID.  */
-	ldq	t0, 16(sp)
-	lda	t1, CLONE_THREAD
-	and	t0, t1, t2
-	beq	t2, 2f
-1:
-
 	/* Load up the arguments.  */
 	ldq	pv, 0(sp)
 	ldq	a0, 8(sp)
@@ -108,33 +100,17 @@ thread_start:
 	jsr	ra, (pv)
 	ldgp	gp, 0(ra)
 
-	/* Call _exit rather than doing it inline for breakpoint purposes.  */
-	mov	v0, a0
-#ifdef PIC
-	bsr	ra, HIDDEN_JUMPTARGET(_exit)	!samegp
-#else
-	jsr	ra, HIDDEN_JUMPTARGET(_exit)
-#endif
+	mov     v0, a0
+	ldiq	v0, __NR_exit
+	call_pal PAL_callsys
 
 	/* Die horribly.  */
 	.align	4
 	halt
 
 	.align	4
-2:
-	rduniq
-	lda	t1, CLONE_VM
-	mov	v0, s0
-	lda	v0, -1
-	and	t0, t1, t2
-	bne	t2, 3f
-	lda	v0, __NR_getxpid
-	callsys
-3:
-	stl	v0, PID_OFFSET(s0)
-	stl	v0, TID_OFFSET(s0)
-	br	1b
 	cfi_endproc
 	.end thread_start
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

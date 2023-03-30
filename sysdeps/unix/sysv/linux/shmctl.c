@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
@@ -14,20 +14,84 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
 #include <sys/shm.h>
+#include <stdarg.h>
 #include <ipc_priv.h>
-
 #include <sysdep.h>
-#include <string.h>
-#include <sys/syscall.h>
-#include <bits/wordsize.h>
 #include <shlib-compat.h>
+#include <errno.h>
 
-#include <kernel-features.h>
+#ifndef DEFAULT_VERSION
+# ifndef __ASSUME_SYSVIPC_BROKEN_MODE_T
+#  define DEFAULT_VERSION GLIBC_2_2
+# else
+#  define DEFAULT_VERSION GLIBC_2_31
+# endif
+#endif
 
+static int
+shmctl_syscall (int shmid, int cmd, struct shmid_ds *buf)
+{
+#ifdef __ASSUME_DIRECT_SYSVIPC_SYSCALLS
+  return INLINE_SYSCALL_CALL (shmctl, shmid, cmd | __IPC_64, buf);
+#else
+  return INLINE_SYSCALL_CALL (ipc, IPCOP_shmctl, shmid, cmd | __IPC_64, 0,
+			      buf);
+#endif
+}
+
+/* Provide operations to control over shared memory segments.  */
+int
+__new_shmctl (int shmid, int cmd, struct shmid_ds *buf)
+{
+  /* POSIX states ipc_perm mode should have type of mode_t.  */
+  _Static_assert (sizeof ((struct shmid_ds){0}.shm_perm.mode)
+		  == sizeof (mode_t),
+		  "sizeof (msqid_ds.msg_perm.mode) != sizeof (mode_t)");
+
+#ifdef __ASSUME_SYSVIPC_BROKEN_MODE_T
+  struct shmid_ds tmpds;
+  if (cmd == IPC_SET)
+    {
+      tmpds = *buf;
+      tmpds.shm_perm.mode *= 0x10000U;
+      buf = &tmpds;
+    }
+#endif
+
+  int ret = shmctl_syscall (shmid, cmd, buf);
+
+#ifdef __ASSUME_SYSVIPC_BROKEN_MODE_T
+  if (ret >= 0)
+    {
+      switch (cmd)
+	{
+        case IPC_STAT:
+        case SHM_STAT:
+        case SHM_STAT_ANY:
+          buf->shm_perm.mode >>= 16;
+	}
+    }
+#endif
+
+  return ret;
+}
+versioned_symbol (libc, __new_shmctl, shmctl, DEFAULT_VERSION);
+
+#if defined __ASSUME_SYSVIPC_BROKEN_MODE_T \
+    && SHLIB_COMPAT (libc, GLIBC_2_2, GLIBC_2_31)
+int
+attribute_compat_text_section
+__shmctl_mode16 (int shmid, int cmd, struct shmid_ds *buf)
+{
+  return shmctl_syscall (shmid, cmd, buf);
+}
+compat_symbol (libc, __shmctl_mode16, shmctl, GLIBC_2_2);
+#endif
+
+#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_2)
 struct __old_shmid_ds
 {
   struct __old_ipc_perm shm_perm;	/* operation permission struct */
@@ -43,113 +107,19 @@ struct __old_shmid_ds
   struct vm_area_struct *__attaches;	/* descriptors for attaches */
 };
 
-struct __old_shminfo
-{
-  int shmmax;
-  int shmmin;
-  int shmmni;
-  int shmseg;
-  int shmall;
-};
-
-/* Provide operations to control over shared memory segments.  */
-#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_2)
-int __old_shmctl (int, int, struct __old_shmid_ds *);
-#endif
-int __new_shmctl (int, int, struct shmid_ds *);
-
-#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_2)
 int
 attribute_compat_text_section
 __old_shmctl (int shmid, int cmd, struct __old_shmid_ds *buf)
 {
-  return INLINE_SYSCALL (ipc, 5, IPCOP_shmctl, shmid, cmd, 0, buf);
+#if defined __ASSUME_DIRECT_SYSVIPC_SYSCALLS \
+    && !defined __ASSUME_SYSVIPC_DEFAULT_IPC_64
+  /* For architecture that have wire-up shmctl but also have __IPC_64 to a
+     value different than default (0x0), it means the compat symbol used the
+     __NR_ipc syscall.  */
+  return INLINE_SYSCALL_CALL (shmctl, shmid, cmd, buf);
+#else
+  return INLINE_SYSCALL_CALL (ipc, IPCOP_shmctl, shmid, cmd, 0, buf);
+#endif
 }
 compat_symbol (libc, __old_shmctl, shmctl, GLIBC_2_0);
 #endif
-
-int
-__new_shmctl (int shmid, int cmd, struct shmid_ds *buf)
-{
-#if __ASSUME_IPC64 > 0
-  return INLINE_SYSCALL (ipc, 5, IPCOP_shmctl, shmid, cmd | __IPC_64, 0,
-			 buf);
-#else
-  switch (cmd) {
-    case SHM_STAT:
-    case IPC_STAT:
-    case IPC_SET:
-#if __WORDSIZE != 32
-    case IPC_INFO:
-#endif
-      break;
-    default:
-      return INLINE_SYSCALL (ipc, 5, IPCOP_shmctl, shmid, cmd, 0, buf);
-  }
-
-  {
-    int save_errno = errno, result;
-    union
-      {
-	struct __old_shmid_ds ds;
-	struct __old_shminfo info;
-      } old;
-
-    /* Unfortunately there is no way how to find out for sure whether
-       we should use old or new shmctl.  */
-    result = INLINE_SYSCALL (ipc, 5, IPCOP_shmctl, shmid, cmd | __IPC_64, 0,
-			     buf);
-    if (result != -1 || errno != EINVAL)
-      return result;
-
-    __set_errno(save_errno);
-    if (cmd == IPC_SET)
-      {
-	old.ds.shm_perm.uid = buf->shm_perm.uid;
-	old.ds.shm_perm.gid = buf->shm_perm.gid;
-	old.ds.shm_perm.mode = buf->shm_perm.mode;
-	if (old.ds.shm_perm.uid != buf->shm_perm.uid ||
-	    old.ds.shm_perm.gid != buf->shm_perm.gid)
-	  {
-	    __set_errno (EINVAL);
-	    return -1;
-	  }
-      }
-    result = INLINE_SYSCALL (ipc, 5, IPCOP_shmctl, shmid, cmd, 0, &old.ds);
-    if (result != -1 && (cmd == SHM_STAT || cmd == IPC_STAT))
-      {
-	memset(buf, 0, sizeof(*buf));
-	buf->shm_perm.__key = old.ds.shm_perm.__key;
-	buf->shm_perm.uid = old.ds.shm_perm.uid;
-	buf->shm_perm.gid = old.ds.shm_perm.gid;
-	buf->shm_perm.cuid = old.ds.shm_perm.cuid;
-	buf->shm_perm.cgid = old.ds.shm_perm.cgid;
-	buf->shm_perm.mode = old.ds.shm_perm.mode;
-	buf->shm_perm.__seq = old.ds.shm_perm.__seq;
-	buf->shm_atime = old.ds.shm_atime;
-	buf->shm_dtime = old.ds.shm_dtime;
-	buf->shm_ctime = old.ds.shm_ctime;
-	buf->shm_segsz = old.ds.shm_segsz;
-	buf->shm_nattch = old.ds.shm_nattch;
-	buf->shm_cpid = old.ds.shm_cpid;
-	buf->shm_lpid = old.ds.shm_lpid;
-      }
-#if __WORDSIZE != 32
-    else if (result != -1 && cmd == IPC_INFO)
-      {
-	struct shminfo *i = (struct shminfo *)buf;
-
-	memset(i, 0, sizeof(*i));
-	i->shmmax = old.info.shmmax;
-	i->shmmin = old.info.shmmin;
-	i->shmmni = old.info.shmmni;
-	i->shmseg = old.info.shmseg;
-	i->shmall = old.info.shmall;
-      }
-#endif
-    return result;
-  }
-#endif
-}
-
-versioned_symbol (libc, __new_shmctl, shmctl, GLIBC_2_2);

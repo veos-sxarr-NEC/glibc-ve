@@ -1,6 +1,6 @@
 /* mpn_cmp -- Compare two low-level natural-number integers.
 
-Copyright (C) 1991-2015 Free Software Foundation, Inc.
+Copyright (C) 1991-2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -16,7 +16,7 @@ License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, see
-<http://www.gnu.org/licenses/>.  */
+<https://www.gnu.org/licenses/>.  */
 
 #include <gmp.h>
 #include "gmp-impl.h"
@@ -27,14 +27,7 @@ along with the GNU MP Library; see the file COPYING.LIB.  If not, see
    Return 1 if OP1 > OP2, 0 if they are equal, and -1 if OP1 < OP2.  */
 
 int
-#if __STDC__
 mpn_cmp (mp_srcptr op1_ptr, mp_srcptr op2_ptr, mp_size_t size)
-#else
-mpn_cmp (op1_ptr, op2_ptr, size)
-     mp_srcptr op1_ptr;
-     mp_srcptr op2_ptr;
-     mp_size_t size;
-#endif
 {
   mp_size_t i;
   mp_limb_t op1_word, op2_word;

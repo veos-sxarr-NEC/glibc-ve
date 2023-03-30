@@ -33,14 +33,17 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 #if defined(LIBM_SCCS) && !defined(lint)
 static char rcsid[] = "$NetBSD: e_asinf.c,v 1.5 1995/05/12 04:57:25 jtc Exp $";
 #endif
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const float
 one =  1.0000000000e+00, /* 0x3F800000 */
@@ -72,6 +75,7 @@ float __ieee754_asinf(float x)
 	    return (x-x)/(x-x);		/* asin(|x|>1) is NaN */
 	} else if (ix<0x3f000000) {	/* |x|<0.5 */
 	    if(ix<0x32000000) {		/* if |x| < 2**-27 */
+		math_check_force_underflow (x);
 		if(huge+x>one) return x;/* return x with inexact if x!=0*/
 	    } else {
 		t = x*x;
@@ -83,7 +87,7 @@ float __ieee754_asinf(float x)
 	w = one-fabsf(x);
 	t = w*0.5f;
 	p = t * (p0 + t * (p1 + t * (p2 + t * (p3 + t * p4))));
-	s = __ieee754_sqrtf(t);
+	s = sqrtf(t);
 	if(ix>=0x3F79999A) {	/* if |x| > 0.975 */
 	    t = pio2_hi-(2.0f*(s+s*p)-pio2_lo);
 	} else {
@@ -99,4 +103,4 @@ float __ieee754_asinf(float x)
 	}
 	if(hx>0) return t; else return -t;
 }
-strong_alias (__ieee754_asinf, __asinf_finite)
+libm_alias_finite (__ieee754_asinf, __asinf)

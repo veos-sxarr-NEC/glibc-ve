@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,20 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
-#include <stdbool.h>
+#include <futex-internal.h>
 #include <time.h>
 #include <sysdep.h>
 #include "pthreadP.h"
 
 
 int
-pthread_condattr_setclock (attr, clock_id)
-     pthread_condattr_t *attr;
-     clockid_t clock_id;
+pthread_condattr_setclock (pthread_condattr_t *attr, clockid_t clock_id)
 {
   /* Only a few clocks are allowed.  */
   if (clock_id != CLOCK_MONOTONIC && clock_id != CLOCK_REALTIME)
@@ -36,11 +34,11 @@ pthread_condattr_setclock (attr, clock_id)
     return EINVAL;
 
   /* Make sure the value fits in the bits we reserved.  */
-  assert (clock_id < (1 << COND_NWAITERS_SHIFT));
+  assert (clock_id < (1 << COND_CLOCK_BITS));
 
   int *valuep = &((struct pthread_condattr *) attr)->value;
 
-  *valuep = ((*valuep & ~(((1 << COND_NWAITERS_SHIFT) - 1) << 1))
+  *valuep = ((*valuep & ~(((1 << COND_CLOCK_BITS) - 1) << 1))
 	     | (clock_id << 1));
 
   return 0;

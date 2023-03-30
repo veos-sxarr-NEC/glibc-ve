@@ -1,5 +1,5 @@
 /* Truncate float value.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,23 +15,24 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <machine/asm.h>
+#include <libm-alias-float.h>
 
 ENTRY(__truncf)
 	flds	4(%esp)
-	subl	$8, %esp
-	cfi_adjust_cfa_offset (8)
-	fstcw	4(%esp)
+	subl	$32, %esp
+	cfi_adjust_cfa_offset (32)
+	fnstenv	4(%esp)
 	movl	$0xc00, %edx
 	orl	4(%esp), %edx
 	movl	%edx, (%esp)
 	fldcw	(%esp)
 	frndint
-	fldcw	4(%esp)
-	addl	$8, %esp
-	cfi_adjust_cfa_offset (-8)
+	fldenv	4(%esp)
+	addl	$32, %esp
+	cfi_adjust_cfa_offset (-32)
 	ret
 END(__truncf)
-weak_alias (__truncf, truncf)
+libm_alias_float (__trunc, trunc)

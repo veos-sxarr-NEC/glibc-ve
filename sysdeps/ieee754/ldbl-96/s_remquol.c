@@ -1,5 +1,5 @@
 /* Compute remainder and a congruent to the quotient.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,11 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
 
 static const long double zero = 0.0;
@@ -29,7 +30,7 @@ long double
 __remquol (long double x, long double p, int *quo)
 {
   int32_t ex,ep,hx,hp;
-  u_int32_t sx,lx,lp;
+  uint32_t sx,lx,lp;
   int cquo,qs;
 
   GET_LDOUBLE_WORDS (ex, hx, lx, x);
@@ -44,7 +45,7 @@ __remquol (long double x, long double p, int *quo)
     return (x * p) / (x * p); 			/* p = 0 */
   if ((ex == 0x7fff)				/* x not finite */
       || ((ep == 0x7fff)			/* p is NaN */
-	  && ((hp | lp) != 0)))
+	  && (((hp & 0x7fffffff) | lp) != 0)))
     return (x * p) / (x * p);
 
   if (ep <= 0x7ffb)
@@ -60,12 +61,12 @@ __remquol (long double x, long double p, int *quo)
   p  = fabsl (p);
   cquo = 0;
 
-  if (x >= 4 * p)
+  if (ep <= 0x7ffc && x >= 4 * p)
     {
       x -= 4 * p;
       cquo += 4;
     }
-  if (x >= 2 * p)
+  if (ep <= 0x7ffd && x >= 2 * p)
     {
       x -= 2 * p;
       cquo += 2;
@@ -101,8 +102,11 @@ __remquol (long double x, long double p, int *quo)
 
   *quo = qs ? -cquo : cquo;
 
+  /* Ensure correct sign of zero result in round-downward mode.  */
+  if (x == 0.0L)
+    x = 0.0L;
   if (sx)
     x = -x;
   return x;
 }
-weak_alias (__remquol, remquol)
+libm_alias_ldouble (__remquo, remquo)

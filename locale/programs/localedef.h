@@ -1,5 +1,5 @@
 /* General definitions for localedef(1).
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -14,7 +14,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef _LOCALEDEF_H
 #define _LOCALEDEF_H	1
@@ -24,7 +24,11 @@
 #include <locale.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 
+#include "record-status.h"
 #include "repertoire.h"
 #include "../locarchive.h"
 
@@ -110,30 +114,15 @@ struct localedef_t
 
 
 /* Global variables of the localedef program.  */
-extern int verbose;
-extern int be_quiet;
-extern int oldstyle_tables;
 extern const char *repertoire_global;
 extern int max_locarchive_open_retry;
 extern bool no_archive;
 extern const char *alias_file;
+extern bool hard_links;
 
 
 /* Prototypes for a few program-wide used functions.  */
 #include <programs/xmalloc.h>
-
-
-/* Wrapper to switch LC_CTYPE back to the locale specified in the
-   environment for output.  */
-#define WITH_CUR_LOCALE(stmt)					\
-  do {								\
-      int saved_errno = errno;					\
-      const char *cur_locale_ = setlocale (LC_CTYPE, NULL);	\
-      setlocale (LC_CTYPE, "");					\
-      errno = saved_errno; 					\
-      stmt;							\
-      setlocale (LC_CTYPE, cur_locale_);			\
-  } while (0)
 
 
 /* Mark given locale as to be read.  */

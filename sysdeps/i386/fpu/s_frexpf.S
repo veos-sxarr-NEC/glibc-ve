@@ -1,5 +1,5 @@
 /* ix87 specific frexp implementation for float.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,9 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <machine/asm.h>
+#include <libm-alias-float.h>
 
 	.section .rodata
 
@@ -77,4 +78,4 @@ ENTRY (__frexpf)
 
 	ret
 END (__frexpf)
-weak_alias (__frexpf, frexpf)
+libm_alias_float (__frexp, frexp)

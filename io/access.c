@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,17 +13,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
 
+/* Test for access to FILE without setting errno.   */
+int
+__access_noerrno (const char *file, int type)
+{
+  return -1;
+}
+
 /* Test for access to FILE.  */
 int
-__access (file, type)
-     const char *file;
-     int type;
+__access (const char *file, int type)
 {
   if (file == NULL || (type & ~(R_OK|W_OK|X_OK|F_OK)) != 0)
     {
@@ -34,6 +39,7 @@ __access (file, type)
   __set_errno (ENOSYS);
   return -1;
 }
+libc_hidden_def (__access)
 stub_warning (access)
 
 weak_alias (__access, access)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <net/if.h>
 #include <errno.h>
@@ -58,14 +58,3 @@ __if_nameindex (void)
 weak_alias (__if_nameindex, if_nameindex)
 libc_hidden_weak (if_nameindex)
 stub_warning (if_nameindex)
-
-#if 0
-void
-internal_function
-__protocol_available (int *have_inet, int *have_inet6)
-{
-  /* By default we assume that IPv4 is available, IPv6 not.  */
-  *have_inet = 1;
-  *have_inet6 = 0;
-}
-#endif

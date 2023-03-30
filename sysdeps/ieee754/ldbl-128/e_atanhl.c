@@ -32,18 +32,21 @@
  *
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
-static const long double one = 1.0L, huge = 1e4900L;
+static const _Float128 one = 1, huge = L(1e4900);
 
-static const long double zero = 0.0L;
+static const _Float128 zero = 0;
 
-long double
-__ieee754_atanhl(long double x)
+_Float128
+__ieee754_atanhl(_Float128 x)
 {
-	long double t;
-	u_int32_t jx, ix;
+	_Float128 t;
+	uint32_t jx, ix;
 	ieee854_long_double_shape_type u;
 
 	u.value = x;
@@ -57,7 +60,11 @@ __ieee754_atanhl(long double x)
 	    else
 	      return (x-x)/(x-x);
 	  }
-	if(ix<0x3fc60000 && (huge+x)>zero) return x;	/* x < 2^-57 */
+	if(ix<0x3fc60000 && (huge+x)>zero)	/* x < 2^-57 */
+	  {
+	    math_check_force_underflow (x);
+	    return x;
+	  }
 
 	if(ix<0x3ffe0000) {		/* x < 0.5 */
 	    t = u.value+u.value;
@@ -66,4 +73,4 @@ __ieee754_atanhl(long double x)
 	    t = 0.5*__log1pl((u.value+u.value)/(one-u.value));
 	if(jx & 0x80000000) return -t; else return t;
 }
-strong_alias (__ieee754_atanhl, __atanhl_finite)
+libm_alias_finite (__ieee754_atanhl, __atanhl)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,9 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -24,15 +23,13 @@
 #include <shlib-compat.h>
 
 int
-__pthread_attr_destroy (attr)
-     pthread_attr_t *attr;
+__pthread_attr_destroy (pthread_attr_t *attr)
 {
   struct pthread_attr *iattr;
 
-  assert (sizeof (*attr) >= sizeof (struct pthread_attr));
   iattr = (struct pthread_attr *) attr;
 
-#if SHLIB_COMPAT(libpthread, GLIBC_2_0, GLIBC_2_1)
+#if SHLIB_COMPAT(libc, GLIBC_2_0, GLIBC_2_1)
   /* In old struct pthread_attr, neither next nor cpuset are
      present.  */
   if (__builtin_expect ((iattr->flags & ATTR_FLAG_OLDATTR), 0) == 0)

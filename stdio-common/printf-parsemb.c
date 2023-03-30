@@ -1,5 +1,5 @@
 /* Helper functions for parsing printf format strings.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of th GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <limits.h>
@@ -79,6 +79,7 @@ __parse_one_specmb (const UCHAR_T *format, size_t posn,
   spec->info.extra = 0;
   spec->info.pad = ' ';
   spec->info.wide = sizeof (UCHAR_T) > 1;
+  spec->info.is_binary128 = 0;
 
   /* Test for positional argument.  */
   if (ISDIGIT (*format))

@@ -1,5 +1,5 @@
 /* Return backtrace of current program state.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <execinfo.h>
 #include <stddef.h>
 #include <string.h>
 #include <signal.h>
-#include <bits/libc-vdso.h>
+#include <libc-vdso.h>
 
 /* This is the stack layout we see with every stack frame.
    Note that every routine is required by the ABI to lay out the stack
@@ -51,31 +51,31 @@ struct signal_frame_32 {
   /* We don't care about the rest, since IP value is at 'mctx' field.  */
 };
 
-static inline int
-is_sigtramp_address (unsigned int nip)
+static inline bool
+is_sigtramp_address (void *nip)
 {
-#ifdef SHARED
-  if (nip == (unsigned int)__vdso_sigtramp32)
-    return 1;
+#ifdef HAVE_SIGTRAMP_RT32
+  if (nip == GLRO (dl_vdso_sigtramp_32))
+    return true;
 #endif
-  return 0;
+  return false;
 }
 
 struct rt_signal_frame_32 {
   char               dummy[SIGNAL_FRAMESIZE + 16];
   siginfo_t          info;
-  struct ucontext    uc;
+  ucontext_t         uc;
   /* We don't care about the rest, since IP value is at 'uc' field.  */
 };
 
-static inline int
-is_sigtramp_address_rt (unsigned int nip)
+static inline bool
+is_sigtramp_address_rt (void * nip)
 {
-#ifdef SHARED
-  if (nip == (unsigned int)__vdso_sigtramp_rt32)
-    return 1;
+#ifdef HAVE_SIGTRAMP_32
+  if (nip == GLRO (dl_vdso_sigtramp_rt32))
+    return true;
 #endif
-  return 0;
+  return false;
 }
 
 int
@@ -100,20 +100,25 @@ __backtrace (void **array, int size)
 
       /* Check if the symbol is the signal trampoline and get the interrupted
        * symbol address from the trampoline saved area.  */
-      if (is_sigtramp_address ((unsigned int)current->return_address))
+      if (is_sigtramp_address (current->return_address))
 	{
 	  struct signal_frame_32 *sigframe =
 	    (struct signal_frame_32*) current;
           gregset = &sigframe->mctx.gregs;
         }
-      else if (is_sigtramp_address_rt ((unsigned int)current->return_address))
+      else if (is_sigtramp_address_rt (current->return_address))
 	{
 	  struct rt_signal_frame_32 *sigframe =
             (struct rt_signal_frame_32*) current;
           gregset = &sigframe->uc.uc_mcontext.uc_regs->gregs;
         }
       if (gregset)
-	array[++count] = (void*)((*gregset)[PT_NIP]);
+	{
+	  if (count + 1 == size)
+	    break;
+	  array[++count] = (void*)((*gregset)[PT_NIP]);
+	  current = (void*)((*gregset)[PT_R1]);
+	}
     }
 
   /* It's possible the second-last stack frame can't return

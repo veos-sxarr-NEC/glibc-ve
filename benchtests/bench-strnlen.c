@@ -1,5 +1,5 @@
 /* Measure strlen functions.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,31 +14,44 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
-#define TEST_NAME "strnlen"
+#ifndef WIDE
+# define TEST_NAME "strnlen"
+#else
+# define TEST_NAME "wcsnlen"
+# define generic_strnlen generic_wcsnlen
+# define memchr_strnlen wcschr_wcsnlen
+#endif /* WIDE */
 #include "bench-string.h"
 
-typedef size_t (*proto_t) (const char *, size_t);
-size_t simple_strnlen (const char *, size_t);
+#define BIG_CHAR MAX_CHAR
 
-IMPL (simple_strnlen, 0)
-IMPL (strnlen, 1)
+#ifndef WIDE
+# define MIDDLE_CHAR 127
+#else
+# define MIDDLE_CHAR 1121
+#endif /* WIDE */
+
+typedef size_t (*proto_t) (const CHAR *, size_t);
+size_t generic_strnlen (const CHAR *, size_t);
 
 size_t
-simple_strnlen (const char *s, size_t maxlen)
+memchr_strnlen (const CHAR *s, size_t maxlen)
 {
-  size_t i;
-
-  for (i = 0; i < maxlen && s[i]; ++i);
-  return i;
+  const CHAR *s1 = MEMCHR (s, 0, maxlen);
+  return (s1 == NULL) ? maxlen : s1 - s;
 }
 
+IMPL (STRNLEN, 1)
+IMPL (memchr_strnlen, 0)
+IMPL (generic_strnlen, 0)
+
 static void
-do_one_test (impl_t *impl, const char *s, size_t maxlen, size_t exp_len)
+do_one_test (impl_t *impl, const CHAR *s, size_t maxlen, size_t exp_len)
 {
-  size_t len = CALL (impl, s, maxlen), i, iters = INNER_LOOP_ITERS;
+  size_t len = CALL (impl, s, maxlen), i, iters = INNER_LOOP_ITERS_LARGE;
   timing_t start, stop, cur;
 
   if (len != exp_len)
@@ -66,18 +79,20 @@ do_test (size_t align, size_t len, size_t maxlen, int max_char)
 {
   size_t i;
 
-  align &= 7;
-  if (align + len >= page_size)
+  align &= 63;
+  if ((align + len) * sizeof (CHAR) >= page_size)
     return;
 
+  CHAR *buf = (CHAR *) (buf1);
+
   for (i = 0; i < len; ++i)
-    buf1[align + i] = 1 + 7 * i % max_char;
-  buf1[align + len] = 0;
+    buf[align + i] = 1 + 7 * i % max_char;
+  buf[align + len] = 0;
 
   printf ("Length %4zd, alignment %2zd:", len, align);
 
   FOR_EACH_IMPL (impl, 0)
-    do_one_test (impl, (char *) (buf1 + align), maxlen, MIN (len, maxlen));
+    do_one_test (impl, (CHAR *) (buf + align), maxlen, MIN (len, maxlen));
 
   putchar ('\n');
 }
@@ -96,37 +111,47 @@ test_main (void)
 
   for (i = 1; i < 8; ++i)
     {
-      do_test (0, i, i - 1, 127);
-      do_test (0, i, i, 127);
-      do_test (0, i, i + 1, 127);
+      do_test (0, i, i - 1, MIDDLE_CHAR);
+      do_test (0, i, i, MIDDLE_CHAR);
+      do_test (0, i, i + 1, MIDDLE_CHAR);
     }
 
   for (i = 1; i < 8; ++i)
     {
-      do_test (i, i, i - 1, 127);
-      do_test (i, i, i, 127);
-      do_test (i, i, i + 1, 127);
+      do_test (i, i, i - 1, MIDDLE_CHAR);
+      do_test (i, i, i, MIDDLE_CHAR);
+      do_test (i, i, i + 1, MIDDLE_CHAR);
     }
 
   for (i = 2; i <= 10; ++i)
     {
-      do_test (0, 1 << i, 5000, 127);
-      do_test (1, 1 << i, 5000, 127);
+      do_test (0, 1 << i, 5000, MIDDLE_CHAR);
+      do_test (1, 1 << i, 5000, MIDDLE_CHAR);
     }
 
   for (i = 1; i < 8; ++i)
-    do_test (0, i, 5000, 255);
+    do_test (0, i, 5000, BIG_CHAR);
 
   for (i = 1; i < 8; ++i)
-    do_test (i, i, 5000, 255);
+    do_test (i, i, 5000, BIG_CHAR);
 
   for (i = 2; i <= 10; ++i)
     {
-      do_test (0, 1 << i, 5000, 255);
-      do_test (1, 1 << i, 5000, 255);
+      do_test (0, 1 << i, 5000, BIG_CHAR);
+      do_test (1, 1 << i, 5000, BIG_CHAR);
     }
 
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>
+
+#define libc_hidden_def(X)
+#ifndef WIDE
+# undef STRNLEN
+# define STRNLEN generic_strnlen
+# include <string/strnlen.c>
+#else
+# define WCSNLEN generic_strnlen
+# include <wcsmbs/wcsnlen.c>
+#endif

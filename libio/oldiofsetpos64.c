@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -32,9 +32,7 @@
 
 int
 attribute_compat_text_section
-_IO_old_fsetpos64 (fp, posp)
-     _IO_FILE *fp;
-     const _IO_fpos64_t *posp;
+_IO_old_fsetpos64 (FILE *fp, const __fpos64_t *posp)
 {
   int result;
   CHECK_FILE (fp, EOF);
@@ -44,10 +42,8 @@ _IO_old_fsetpos64 (fp, posp)
     {
       /* ANSI explicitly requires setting errno to a positive value on
 	 failure.  */
-#ifdef EIO
       if (errno == 0)
 	__set_errno (EIO);
-#endif
       result = EOF;
     }
   else
@@ -56,10 +52,8 @@ _IO_old_fsetpos64 (fp, posp)
   return result;
 }
 
-#ifdef weak_alias
 compat_symbol (libc, _IO_old_fsetpos64, _IO_fsetpos64, GLIBC_2_1);
 strong_alias (_IO_old_fsetpos64, __old_fsetpos64)
 compat_symbol (libc, __old_fsetpos64, fsetpos64, GLIBC_2_1);
-#endif
 
 #endif

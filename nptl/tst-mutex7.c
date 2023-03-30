@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -22,25 +22,41 @@
 #include <stdlib.h>
 #include <time.h>
 
-
+/* This test is a template for other tests to use.  Other tests define
+   the following macros to change the behaviour of the template test.
+   The test is very simple, it configures N threads given the parameters
+   below and then proceeds to go through mutex lock and unlock
+   operations in each thread as described before for the thread
+   function.  */
 #ifndef TYPE
 # define TYPE PTHREAD_MUTEX_DEFAULT
 #endif
-
+#ifndef ROBUST
+# define ROBUST PTHREAD_MUTEX_STALLED
+#endif
+#ifndef DELAY_NSEC
+# define DELAY_NSEC 11000
+#endif
+#ifndef ROUNDS
+# define ROUNDS 1000
+#endif
+#ifndef N
+# define N 100
+#endif
 
 static pthread_mutex_t lock;
 
-
-#define ROUNDS 1000
-#define N 100
-
-
+/* Each thread locks and the subsequently unlocks the lock, yielding
+   the smallest critical section possible.  After the unlock the thread
+   waits DELAY_NSEC nanoseconds before doing the lock and unlock again.
+   Every thread does this ROUNDS times.  The lock and unlock are
+   checked for errors.  */
 static void *
 tf (void *arg)
 {
   int nr = (long int) arg;
   int cnt;
-  struct timespec ts = { .tv_sec = 0, .tv_nsec = 11000 };
+  struct timespec ts = { .tv_sec = 0, .tv_nsec = DELAY_NSEC };
 
   for (cnt = 0; cnt < ROUNDS; ++cnt)
     {
@@ -56,13 +72,16 @@ tf (void *arg)
 	  return (void *) 1l;
 	}
 
-      nanosleep (&ts, NULL);
+      if ((ts.tv_sec > 0) || (ts.tv_nsec > 0))
+	nanosleep (&ts, NULL);
     }
 
   return NULL;
 }
 
-
+/* Setup and run N threads, where each thread does as described
+   in the above thread function.  The threads are given a minimal 1MiB
+   stack since they don't do anything between the lock and unlock.  */
 static int
 do_test (void)
 {
@@ -77,6 +96,12 @@ do_test (void)
   if (pthread_mutexattr_settype (&a, TYPE) != 0)
     {
       puts ("mutexattr_settype failed");
+      exit (1);
+    }
+
+  if (pthread_mutexattr_setrobust (&a, ROBUST) != 0)
+    {
+      puts ("mutexattr_setrobust failed");
       exit (1);
     }
 

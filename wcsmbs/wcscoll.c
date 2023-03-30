@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -14,18 +14,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <wchar.h>
 #include "../locale/coll-lookup.h"
 
 #define STRING_TYPE wchar_t
 #define USTRING_TYPE wint_t
-#define STRCOLL wcscoll
+#define STRCOLL __wcscoll
 #define STRCOLL_L __wcscoll_l
+#define USE_HIDDEN_DEF
 
 #include "../string/strcoll.c"
 
 #ifndef USE_IN_EXTENDED_LOCALE_MODEL
-libc_hidden_weak (wcscoll)
+weak_alias (__wcscoll, wcscoll)
 #endif

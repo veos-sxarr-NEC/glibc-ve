@@ -1,5 +1,5 @@
 /* Internal function for converting integers to ASCII.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Torbjorn Granlund <tege@matematik.su.se>
    and Ulrich Drepper <drepper@gnu.org>.
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <gmp-mparam.h>
 #include <gmp.h>
@@ -191,11 +191,8 @@ _itoa_word (_ITOA_WORD_TYPE value, char *buflim,
 
 #if _ITOA_NEEDED
 char *
-_itoa (value, buflim, base, upper_case)
-     unsigned long long int value;
-     char *buflim;
-     unsigned int base;
-     int upper_case;
+_itoa (unsigned long long int value, char *buflim, unsigned int base,
+       int upper_case)
 {
   const char *digits = (upper_case
 			? _itoa_upper_digits

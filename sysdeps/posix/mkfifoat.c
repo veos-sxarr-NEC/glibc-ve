@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/stat.h>
 
@@ -21,10 +21,7 @@
 /* Create a new FIFO with permission bits MODE.  But interpret
    relative PATH names relative to the directory associated with FD.  */
 int
-mkfifoat (fd, file, mode)
-     int fd;
-     const char *file;
-     mode_t mode;
+mkfifoat (int fd, const char *file, mode_t mode)
 {
   dev_t dev = 0;
   return __xmknodat (_MKNOD_VER, fd, file, mode | S_IFIFO, &dev);

@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -29,19 +29,19 @@
    complain about the mismatch when we do the alias below.  */
 #define _IO_new_fsetpos64 __renamed__IO_new_fsetpos64
 #define _IO_fsetpos64 __renamed__IO_fsetpos64
+#define fsetpos64 __renamed_fsetpos64
 
 #include <libioP.h>
 
 #undef _IO_new_fsetpos64
 #undef _IO_fsetpos64
+#undef fsetpos64
 
 #include <errno.h>
 #include <shlib-compat.h>
 
 int
-_IO_new_fsetpos (fp, posp)
-     _IO_FILE *fp;
-     const _IO_fpos_t *posp;
+_IO_new_fsetpos (FILE *fp, const __fpos_t *posp)
 {
   int result;
   CHECK_FILE (fp, EOF);
@@ -51,17 +51,14 @@ _IO_new_fsetpos (fp, posp)
     {
       /* ANSI explicitly requires setting errno to a positive value on
 	 failure.  */
-#ifdef EIO
       if (errno == 0)
 	__set_errno (EIO);
-#endif
       result = EOF;
     }
   else
     {
       result = 0;
-      if (fp->_mode > 0
-	  && (*fp->_codecvt->__codecvt_do_encoding) (fp->_codecvt) < 0)
+      if (fp->_mode > 0 && __libio_codecvt_encoding (fp->_codecvt) < 0)
 	/* This is a stateful encoding, restore the state.  */
 	fp->_wide_data->_IO_state = posp->__state;
     }

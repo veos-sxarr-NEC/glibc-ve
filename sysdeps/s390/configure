@@ -4,71 +4,6 @@
 $as_echo "#define PI_STATIC_AND_HIDDEN 1" >>confdefs.h
 
 
-for ac_prog in $AS
-do
-  # Extract the first word of "$ac_prog", so it can be a program name with args.
-set dummy $ac_prog; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_AS+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$AS"; then
-  ac_cv_prog_AS="$AS" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_AS="$ac_prog"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-fi
-fi
-AS=$ac_cv_prog_AS
-if test -n "$AS"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $AS" >&5
-$as_echo "$AS" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-  test -n "$AS" && break
-done
-
-if test -z "$AS"; then
-  ac_verc_fail=yes
-else
-  # Found it, now check the version.
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking version of $AS" >&5
-$as_echo_n "checking version of $AS... " >&6; }
-  ac_prog_version=`$AS --version 2>&1 | sed -n 's/^.*GNU assembler.* \([0-9]*\.[0-9.]*\).*$/\1/p'`
-  case $ac_prog_version in
-    '') ac_prog_version="v. ?.??, bad"; ac_verc_fail=yes;;
-    2.2[4-9]*|2.[3-9][0-9]*|[3-9].*|[1-9][0-9]*)
-       ac_prog_version="$ac_prog_version, ok"; ac_verc_fail=no;;
-    *) ac_prog_version="$ac_prog_version, bad"; ac_verc_fail=yes;;
-
-  esac
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_prog_version" >&5
-$as_echo "$ac_prog_version" >&6; }
-fi
-if test $ac_verc_fail = yes; then
-  critic_missing="$critic_missing The program AS is required in version >= 2.24 for target S390."
-fi
-
-
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_tbegin" >&5
 $as_echo_n "checking for __builtin_tbegin... " >&6; }
 if ${libc_cv_gcc_builtin_tbegin+:} false; then :
@@ -100,8 +35,265 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_gcc_builtin_tbegin" >&5
 $as_echo "$libc_cv_gcc_builtin_tbegin" >&6; }
 
-if test "$enable_lock_elision" = yes && test "$libc_cv_gcc_builtin_tbegin" = no ; then
+if test "$libc_cv_gcc_builtin_tbegin" = no ; then
    critic_missing="$critic_missing The used GCC has no support for __builtin_tbegin, which is needed for lock-elision on target S390."
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 vector instruction support" >&5
+$as_echo_n "checking for S390 vector instruction support... " >&6; }
+if ${libc_cv_asm_s390_vx+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+void testvecinsn ()
+{
+    __asm__ (".machine \"z13\" \n\t"
+	     ".machinemode \"zarch_nohighgprs\" \n\t"
+	     "vistrbs %%v16,%%v17 \n\t"
+	     "locghie %%r1,0" : :);
+}
+EOF
+if { ac_try='${CC-cc} --shared conftest.c -o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_asm_s390_vx=yes
+else
+  libc_cv_asm_s390_vx=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_asm_s390_vx" >&5
+$as_echo "$libc_cv_asm_s390_vx" >&6; }
+
+if test "$libc_cv_asm_s390_vx" = yes ;
+then
+  $as_echo "#define HAVE_S390_VX_ASM_SUPPORT 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Use binutils with vector-support in order to use optimized implementations." >&5
+$as_echo "$as_me: WARNING: Use binutils with vector-support in order to use optimized implementations." >&2;}
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 vector support in gcc" >&5
+$as_echo_n "checking for S390 vector support in gcc... " >&6; }
+if ${libc_cv_gcc_s390_vx+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+void testvecclobber ()
+{
+  __asm__ ("" : : : "v16");
+}
+EOF
+if { ac_try='${CC-cc} --shared conftest.c -o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_gcc_s390_vx=yes
+else
+  libc_cv_gcc_s390_vx=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_gcc_s390_vx" >&5
+$as_echo "$libc_cv_gcc_s390_vx" >&6; }
+
+if test "$libc_cv_gcc_s390_vx" = yes ;
+then
+  $as_echo "#define HAVE_S390_VX_GCC_SUPPORT 1" >>confdefs.h
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 arch13 zarch instruction support" >&5
+$as_echo_n "checking for S390 arch13 zarch instruction support... " >&6; }
+if ${libc_cv_asm_s390_arch13+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+void testinsn (char *buf)
+{
+    __asm__ (".machine \"arch13\" \n\t"
+	     ".machinemode \"zarch_nohighgprs\" \n\t"
+	     "lghi %%r0,16 \n\t"
+	     "mvcrl 0(%0),32(%0)" : : "a" (buf) : "memory", "r0");
+}
+EOF
+if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS --shared conftest.c
+			-o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_asm_s390_arch13=yes
+else
+  libc_cv_asm_s390_arch13=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_asm_s390_arch13" >&5
+$as_echo "$libc_cv_asm_s390_arch13" >&6; }
+if test "$libc_cv_asm_s390_arch13" = yes ;
+then
+  $as_echo "#define HAVE_S390_ARCH13_ASM_SUPPORT 1" >>confdefs.h
+
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 z10 zarch instruction support as default" >&5
+$as_echo_n "checking for S390 z10 zarch instruction support as default... " >&6; }
+if ${libc_cv_asm_s390_min_z10_zarch+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+void testinsn (void *a, void *b, int n)
+{
+    __asm__ ("exrl %2,1f \n\t"
+	     "j 2f \n\t"
+	     "1: mvc 0(1,%0),0(%1) \n\t"
+	     "2:"
+	     : : "a" (a), "a" (b), "d" (n)
+	     : "memory", "cc");
+}
+EOF
+if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS --shared conftest.c
+			-o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_asm_s390_min_z10_zarch=yes
+else
+  libc_cv_asm_s390_min_z10_zarch=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_asm_s390_min_z10_zarch" >&5
+$as_echo "$libc_cv_asm_s390_min_z10_zarch" >&6; }
+
+if test "$libc_cv_asm_s390_min_z10_zarch" = yes ;
+then
+  $as_echo "#define HAVE_S390_MIN_Z10_ZARCH_ASM_SUPPORT 1" >>confdefs.h
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 z196 zarch instruction support as default" >&5
+$as_echo_n "checking for S390 z196 zarch instruction support as default... " >&6; }
+if ${libc_cv_asm_s390_min_z196_zarch+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+float testinsn (double e)
+{
+    float d;
+    __asm__ ("ledbra %0,5,%1,4" : "=f" (d) : "f" (e) );
+    return d;
+}
+EOF
+if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS --shared conftest.c
+			-o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_asm_s390_min_z196_zarch=yes
+else
+  libc_cv_asm_s390_min_z196_zarch=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_asm_s390_min_z196_zarch" >&5
+$as_echo "$libc_cv_asm_s390_min_z196_zarch" >&6; }
+
+if test "$libc_cv_asm_s390_min_z196_zarch" = yes ;
+then
+  $as_echo "#define HAVE_S390_MIN_Z196_ZARCH_ASM_SUPPORT 1" >>confdefs.h
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 z13 zarch instruction support as default" >&5
+$as_echo_n "checking for S390 z13 zarch instruction support as default... " >&6; }
+if ${libc_cv_asm_s390_min_z13_zarch+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+int testinsn (void)
+{
+    int i;
+    __asm__ ("vl %%v16,0(%%r15)\n\t"
+	     "vlgvf %0,%%v16,0"
+	     : "=d" (i) : : "memory", "v16");
+    return i;
+}
+EOF
+if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS --shared conftest.c
+			-o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_asm_s390_min_z13_zarch=yes
+else
+  libc_cv_asm_s390_min_z13_zarch=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_asm_s390_min_z13_zarch" >&5
+$as_echo "$libc_cv_asm_s390_min_z13_zarch" >&6; }
+
+if test "$libc_cv_asm_s390_min_z13_zarch" = yes ;
+then
+  $as_echo "#define HAVE_S390_MIN_Z13_ZARCH_ASM_SUPPORT 1" >>confdefs.h
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for S390 arch13 zarch instruction support as default" >&5
+$as_echo_n "checking for S390 arch13 zarch instruction support as default... " >&6; }
+if ${libc_cv_asm_s390_min_arch13_zarch+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat > conftest.c <<\EOF
+void testinsn (char *buf)
+{
+    __asm__ ("lghi %%r0,16 \n\t"
+	     "mvcrl 0(%0),32(%0)" : : "a" (buf) : "memory", "r0");
+}
+EOF
+if { ac_try='${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS --shared conftest.c
+			-o conftest.o &> /dev/null'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; } ;
+then
+  libc_cv_asm_s390_min_arch13_zarch=yes
+else
+  libc_cv_asm_s390_min_arch13_zarch=no
+fi
+rm -f conftest*
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libc_cv_asm_s390_min_arch13_zarch" >&5
+$as_echo "$libc_cv_asm_s390_min_arch13_zarch" >&6; }
+if test "$libc_cv_asm_s390_min_arch13_zarch" = yes ;
+then
+  $as_echo "#define HAVE_S390_MIN_ARCH13_ZARCH_ASM_SUPPORT 1" >>confdefs.h
+
 fi
 
 test -n "$critic_missing" && as_fn_error $? "

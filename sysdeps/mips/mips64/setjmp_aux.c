@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Brendan Kehoe (brendan@zen.org).
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <setjmp.h>
 #include <sgidefs.h>
@@ -24,7 +24,12 @@
    pointer.  We do things this way because it's difficult to reliably
    access them in C.  */
 
+/* Stack protection is disabled to avoid changing s0 (or any other
+   caller-save register) before storing it to environment.
+   See BZ #22624.  */
+
 int
+inhibit_stack_protector
 __sigsetjmp_aux (jmp_buf env, int savemask, long long sp, long long fp,
 		 long long gp)
 {

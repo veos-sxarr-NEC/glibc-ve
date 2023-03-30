@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Ho hum, if fxstatat == fxstatat64 we must get rid of the prototype or gcc
    will complain since they don't strictly match.  */
@@ -42,16 +42,14 @@ __fxstatat (int vers, int fd, const char *file, struct stat *st, int flag)
   struct stat64 st64;
 
   result = INTERNAL_SYSCALL (fstatat64, err, 4, fd, file, &st64, flag);
-  if (!__builtin_expect (INTERNAL_SYSCALL_ERROR_P (result, err), 1))
-    return __xstat32_conv (vers, &st64, st);
+  if (__glibc_unlikely (INTERNAL_SYSCALL_ERROR_P (result, err)))
+    return INLINE_SYSCALL_ERROR_RETURN_VALUE (INTERNAL_SYSCALL_ERRNO (result,
+								      err));
   else
-    {
-      __set_errno (INTERNAL_SYSCALL_ERRNO (result, err));
-      return -1;
-    }
+    return __xstat32_conv (vers, &st64, st);
 }
 libc_hidden_def (__fxstatat)
-#ifdef XSTAT_IS_XSTAT64
+#if XSTAT_IS_XSTAT64
 # undef __fxstatat64
 strong_alias (__fxstatat, __fxstatat64);
 libc_hidden_ver (__fxstatat, __fxstatat64)

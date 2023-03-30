@@ -1,5 +1,5 @@
 /* Thread Priority Protect helpers.
-   Copyright (C) 2006-2015 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2006.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <atomic.h>
@@ -43,9 +43,9 @@ void
 __init_sched_fifo_prio (void)
 {
   atomic_store_relaxed (&__sched_fifo_max_prio,
-			sched_get_priority_max (SCHED_FIFO));
+			__sched_get_priority_max (SCHED_FIFO));
   atomic_store_relaxed (&__sched_fifo_min_prio,
-			sched_get_priority_min (SCHED_FIFO));
+			__sched_get_priority_min (SCHED_FIFO));
 }
 
 int
@@ -114,6 +114,7 @@ __pthread_tpp_change_priority (int previous_prio, int new_prio)
   if (priomax == newpriomax)
     return 0;
 
+  /* See CREATE THREAD NOTES in nptl/pthread_create.c.  */
   lll_lock (self->lock, LLL_PRIVATE);
 
   tpp->priomax = newpriomax;
@@ -165,6 +166,7 @@ __pthread_current_priority (void)
 
   int result = 0;
 
+  /* See CREATE THREAD NOTES in nptl/pthread_create.c.  */
   lll_lock (self->lock, LLL_PRIVATE);
 
   if ((self->flags & ATTR_FLAG_SCHED_SET) == 0)

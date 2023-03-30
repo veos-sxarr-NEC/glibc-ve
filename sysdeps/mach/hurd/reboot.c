@@ -1,4 +1,4 @@
-/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,11 +13,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
 #include <hurd.h>
+#include <hurd/paths.h>
 #include <hurd/startup.h>
 #include <sys/reboot.h>
 
@@ -33,8 +34,8 @@ reboot (int howto)
   if (err)
     return __hurd_fail (EPERM);
 
-  err = __USEPORT (PROC, __proc_getmsgport (port, 1, &init));
-  if (!err)
+  init = __file_name_lookup (_SERVERS_STARTUP, 0, 0);
+  if (init != MACH_PORT_NULL)
     {
       err = __startup_reboot (init, hostpriv, howto);
       __mach_port_deallocate (__mach_task_self (), init);

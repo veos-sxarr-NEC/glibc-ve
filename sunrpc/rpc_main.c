@@ -956,7 +956,7 @@ mkfile_output (struct commandline *cmd)
       mkfilename = alloc (strlen ("Makefile.") + strlen (cmd->infile) + 1);
       if (mkfilename == NULL)
 	abort ();
-      temp = rindex (cmd->infile, '.');
+      temp = strrchr (cmd->infile, '.');
       cp = stpcpy (mkfilename, "Makefile.");
       if (temp != NULL)
 	*((char *) stpncpy (cp, cmd->infile, temp - cmd->infile)) = '\0';
@@ -1341,15 +1341,6 @@ parseargs (int argc, const char *argv[], struct commandline *cmd)
   cmd->Scflag = flag['C'];
   cmd->makefileflag = flag['M'];
 
-#ifndef _RPC_THREAD_SAFE_
-  if (mtflag || newstyle)
-    {
-      /* glibc doesn't support these flags.  */
-      f_print (stderr,
-	       _("This implementation doesn't support newstyle or MT-safe code!\n"));
-      return (0);
-    }
-#endif
   if (tirpcflag)
     {
       pmflag = inetdflag ? 0 : 1;    /* pmflag or inetdflag is always TRUE */

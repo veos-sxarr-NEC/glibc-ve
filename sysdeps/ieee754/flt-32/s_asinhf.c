@@ -13,8 +13,11 @@
  * ====================================================
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-float.h>
 
 static const float
 one =  1.0000000000e+00, /* 0x3F800000 */
@@ -29,6 +32,7 @@ __asinhf(float x)
 	GET_FLOAT_WORD(hx,x);
 	ix = hx&0x7fffffff;
 	if(__builtin_expect(ix< 0x38000000, 0)) {	/* |x|<2**-14 */
+	    math_check_force_underflow (x);
 	    if(huge+x>one) return x;	/* return x inexact except 0 */
 	}
 	if(__builtin_expect(ix>0x47000000, 0)) {	/* |x| > 2**14 */
@@ -37,12 +41,12 @@ __asinhf(float x)
 	} else {
 	    float xa = fabsf(x);
 	    if (ix>0x40000000) {	/* 2**14 > |x| > 2.0 */
-		w = __ieee754_logf(2.0f*xa+one/(__ieee754_sqrtf(xa*xa+one)+xa));
+		w = __ieee754_logf(2.0f*xa+one/(sqrtf(xa*xa+one)+xa));
 	    } else {		/* 2.0 > |x| > 2**-14 */
 		float t = xa*xa;
-		w =__log1pf(xa+t/(one+__ieee754_sqrtf(one+t)));
+		w =__log1pf(xa+t/(one+sqrtf(one+t)));
 	    }
 	}
-	return __copysignf(w, x);
+	return copysignf(w, x);
 }
-weak_alias (__asinhf, asinhf)
+libm_alias_float (__asinh, asinh)

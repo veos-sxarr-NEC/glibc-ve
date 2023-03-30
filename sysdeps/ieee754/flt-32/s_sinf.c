@@ -1,25 +1,27 @@
-/* s_sinf.c -- float version of s_sin.c.
- * Conversion to float by Ian Lance Taylor, Cygnus Support, ian@cygnus.com.
- */
+/* Compute sine of argument.
+   Copyright (C) 2018-2020 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
 
-/*
- * ====================================================
- * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
- *
- * Developed at SunPro, a Sun Microsystems, Inc. business.
- * Permission to use, copy, modify, and distribute this
- * software is freely granted, provided that this notice
- * is preserved.
- * ====================================================
- */
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_sinf.c,v 1.4 1995/05/10 20:48:16 jtc Exp $";
-#endif
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
 
-#include <errno.h>
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <https://www.gnu.org/licenses/>.  */
+
+#include <stdint.h>
 #include <math.h>
-#include <math_private.h>
+#include <math-barriers.h>
+#include <libm-alias-float.h>
+#include "math_config.h"
+#include "s_sincosf.h"
 
 #ifndef SINF
 # define SINF_FUNC __sinf
@@ -27,37 +29,64 @@ static char rcsid[] = "$NetBSD: s_sinf.c,v 1.4 1995/05/10 20:48:16 jtc Exp $";
 # define SINF_FUNC SINF
 #endif
 
-float SINF_FUNC(float x)
+/* Fast sinf implementation.  Worst-case ULP is 0.5607, maximum relative
+   error is 0.5303 * 2^-23.  A single-step range reduction is used for
+   small values.  Large inputs have their range reduced using fast integer
+   arithmetic.
+*/
+float
+SINF_FUNC (float y)
 {
-	float y[2],z=0.0;
-	int32_t n, ix;
+  double x = y;
+  double s;
+  int n;
+  const sincos_t *p = &__sincosf_table[0];
 
-	GET_FLOAT_WORD(ix,x);
+  if (abstop12 (y) < abstop12 (pio4))
+    {
+      s = x * x;
 
-    /* |x| ~< pi/4 */
-	ix &= 0x7fffffff;
-	if(ix <= 0x3f490fd8) return __kernel_sinf(x,z,0);
+      if (__glibc_unlikely (abstop12 (y) < abstop12 (0x1p-12f)))
+      {
+	/* Force underflow for tiny y.  */
+	if (__glibc_unlikely (abstop12 (y) < abstop12 (0x1p-126f)))
+	  math_force_eval ((float)s);
+	return y;
+      }
 
-    /* sin(Inf or NaN) is NaN */
-	else if (ix>=0x7f800000) {
-	  if (ix == 0x7f800000)
-	    __set_errno (EDOM);
-	  return x-x;
-	}
+      return sinf_poly (x, s, p, 0);
+    }
+  else if (__glibc_likely (abstop12 (y) < abstop12 (120.0f)))
+    {
+      x = reduce_fast (x, p, &n);
 
-    /* argument reduction needed */
-	else {
-	    n = __ieee754_rem_pio2f(x,y);
-	    switch(n&3) {
-		case 0: return  __kernel_sinf(y[0],y[1],1);
-		case 1: return  __kernel_cosf(y[0],y[1]);
-		case 2: return -__kernel_sinf(y[0],y[1],1);
-		default:
-			return -__kernel_cosf(y[0],y[1]);
-	    }
-	}
+      /* Setup the signs for sin and cos.  */
+      s = p->sign[n & 3];
+
+      if (n & 2)
+	p = &__sincosf_table[1];
+
+      return sinf_poly (x * s, x * x, p, n);
+    }
+  else if (abstop12 (y) < abstop12 (INFINITY))
+    {
+      uint32_t xi = asuint (y);
+      int sign = xi >> 31;
+
+      x = reduce_large (xi, &n);
+
+      /* Setup signs for sin and cos - include original sign.  */
+      s = p->sign[(n + sign) & 3];
+
+      if ((n + sign) & 2)
+	p = &__sincosf_table[1];
+
+      return sinf_poly (x * s, x * x, p, n);
+    }
+  else
+    return __math_invalidf (y);
 }
 
 #ifndef SINF
-weak_alias (__sinf, sinf)
+libm_alias_float (__sin, sin)
 #endif

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
@@ -24,9 +24,7 @@
 /* Seek to position POS in DIRP.  */
 /* XXX should be __seekdir ? */
 void
-seekdir (dirp, pos)
-     DIR *dirp;
-     long int pos;
+seekdir (DIR *dirp, long int pos)
 {
   __libc_lock_lock (dirp->lock);
   (void) __lseek (dirp->fd, pos, SEEK_SET);

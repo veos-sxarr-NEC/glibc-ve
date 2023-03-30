@@ -1,5 +1,5 @@
 /* Convert string representing a number to float value, using given locale.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,13 +15,30 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <xlocale.h>
+#include <bits/floatn.h>
 
-extern double ____strtod_l_internal (const char *, char **, int, __locale_t);
-extern unsigned long long int ____strtoull_l_internal (const char *, char **,
-						       int, int, __locale_t);
+#ifdef FLOAT
+# define BUILD_DOUBLE 0
+#else
+# define BUILD_DOUBLE 1
+#endif
+
+#if BUILD_DOUBLE
+# if __HAVE_FLOAT64 && !__HAVE_DISTINCT_FLOAT64
+#  define strtof64_l __hide_strtof64_l
+#  define wcstof64_l __hide_wcstof64_l
+# endif
+# if __HAVE_FLOAT32X && !__HAVE_DISTINCT_FLOAT32X
+#  define strtof32x_l __hide_strtof32x_l
+#  define wcstof32x_l __hide_wcstof32x_l
+# endif
+#endif
+
+#include <locale.h>
+
+extern double ____strtod_l_internal (const char *, char **, int, locale_t);
 
 /* Configuration part.  These macros are defined by `strtold.c',
    `strtof.c', `wcstod.c', `wcstold.c', and `wcstof.c' to produce the
@@ -33,30 +50,24 @@ extern unsigned long long int ____strtoull_l_internal (const char *, char **,
 # ifdef USE_WIDE_CHAR
 #  define STRTOF	wcstod_l
 #  define __STRTOF	__wcstod_l
+#  define STRTOF_NAN	__wcstod_nan
 # else
 #  define STRTOF	strtod_l
 #  define __STRTOF	__strtod_l
+#  define STRTOF_NAN	__strtod_nan
 # endif
 # define MPN2FLOAT	__mpn_construct_double
 # define FLOAT_HUGE_VAL	HUGE_VAL
-# define SET_MANTISSA(flt, mant) \
-  do { union ieee754_double u;						      \
-       u.d = (flt);							      \
-       u.ieee_nan.mantissa0 = (mant) >> 32;				      \
-       u.ieee_nan.mantissa1 = (mant);					      \
-       if ((u.ieee.mantissa0 | u.ieee.mantissa1) != 0)			      \
-	 (flt) = u.d;							      \
-  } while (0)
 #endif
 /* End of configuration part.  */
 
 #include <ctype.h>
 #include <errno.h>
 #include <float.h>
-#include <ieee754.h>
 #include "../locale/localeinfo.h"
-#include <locale.h>
 #include <math.h>
+#include <math-barriers.h>
+#include <math-narrow-eval.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -104,7 +115,6 @@ extern unsigned long long int ____strtoull_l_internal (const char *, char **,
 # define TOLOWER_C(Ch) __towlower_l ((Ch), _nl_C_locobj_ptr)
 # define STRNCASECMP(S1, S2, N) \
   __wcsncasecmp_l ((S1), (S2), (N), _nl_C_locobj_ptr)
-# define STRTOULL(S, E, B) ____wcstoull_l_internal ((S), (E), (B), 0, loc)
 #else
 # define STRING_TYPE char
 # define CHAR_TYPE char
@@ -116,7 +126,6 @@ extern unsigned long long int ____strtoull_l_internal (const char *, char **,
 # define TOLOWER_C(Ch) __tolower_l ((Ch), _nl_C_locobj_ptr)
 # define STRNCASECMP(S1, S2, N) \
   __strncasecmp_l ((S1), (S2), (N), _nl_C_locobj_ptr)
-# define STRTOULL(S, E, B) ____strtoull_l_internal ((S), (E), (B), 0, loc)
 #endif
 
 
@@ -181,10 +190,8 @@ static FLOAT
 overflow_value (int negative)
 {
   __set_errno (ERANGE);
-#if FLT_EVAL_METHOD != 0
-  volatile
-#endif
-  FLOAT result = (negative ? -MAX_VALUE : MAX_VALUE) * MAX_VALUE;
+  FLOAT result = math_narrow_eval ((negative ? -MAX_VALUE : MAX_VALUE)
+				   * MAX_VALUE);
   return result;
 }
 
@@ -195,10 +202,8 @@ static FLOAT
 underflow_value (int negative)
 {
   __set_errno (ERANGE);
-#if FLT_EVAL_METHOD != 0
-  volatile
-#endif
-  FLOAT result = (negative ? -MIN_VALUE : MIN_VALUE) * MIN_VALUE;
+  FLOAT result = math_narrow_eval ((negative ? -MIN_VALUE : MIN_VALUE)
+				   * MIN_VALUE);
   return result;
 }
 
@@ -275,11 +280,12 @@ round_and_return (mp_limb_t *retval, intmax_t exponent, int negative,
 		  mp_limb_t cy = __mpn_add_1 (retval_normal, retval,
 					      RETURN_LIMB_SIZE, 1);
 
-		  if (((MANT_DIG % BITS_PER_MP_LIMB) == 0 && cy) ||
-		      ((MANT_DIG % BITS_PER_MP_LIMB) != 0 &&
-		       ((retval_normal[RETURN_LIMB_SIZE - 1]
-			& (((mp_limb_t) 1) << (MANT_DIG % BITS_PER_MP_LIMB)))
-			!= 0)))
+		  if (((MANT_DIG % BITS_PER_MP_LIMB) == 0 && cy)
+		      || ((MANT_DIG % BITS_PER_MP_LIMB) != 0
+			  && ((retval_normal[RETURN_LIMB_SIZE - 1]
+			       & (((mp_limb_t) 1)
+				  << (MANT_DIG % BITS_PER_MP_LIMB)))
+			      != 0)))
 		    is_tiny = false;
 		}
 	    }
@@ -300,27 +306,30 @@ round_and_return (mp_limb_t *retval, intmax_t exponent, int negative,
 	      || (round_limb & ((((mp_limb_t) 1) << round_bit) - 1)) != 0))
 	{
 	  __set_errno (ERANGE);
-	  volatile FLOAT force_underflow_exception = MIN_VALUE * MIN_VALUE;
-	  (void) force_underflow_exception;
+	  FLOAT force_underflow = MIN_VALUE * MIN_VALUE;
+	  math_force_eval (force_underflow);
 	}
     }
 
-  if (exponent > MAX_EXP)
+  if (exponent >= MAX_EXP)
     goto overflow;
 
+  bool half_bit = (round_limb & (((mp_limb_t) 1) << round_bit)) != 0;
+  bool more_bits_nonzero
+    = (more_bits
+       || (round_limb & ((((mp_limb_t) 1) << round_bit) - 1)) != 0);
   if (round_away (negative,
 		  (retval[0] & 1) != 0,
-		  (round_limb & (((mp_limb_t) 1) << round_bit)) != 0,
-		  (more_bits
-		   || (round_limb & ((((mp_limb_t) 1) << round_bit) - 1)) != 0),
+		  half_bit,
+		  more_bits_nonzero,
 		  mode))
     {
       mp_limb_t cy = __mpn_add_1 (retval, retval, RETURN_LIMB_SIZE, 1);
 
-      if (((MANT_DIG % BITS_PER_MP_LIMB) == 0 && cy) ||
-	  ((MANT_DIG % BITS_PER_MP_LIMB) != 0 &&
-	   (retval[RETURN_LIMB_SIZE - 1]
-	    & (((mp_limb_t) 1) << (MANT_DIG % BITS_PER_MP_LIMB))) != 0))
+      if (((MANT_DIG % BITS_PER_MP_LIMB) == 0 && cy)
+	  || ((MANT_DIG % BITS_PER_MP_LIMB) != 0
+	      && (retval[RETURN_LIMB_SIZE - 1]
+		  & (((mp_limb_t) 1) << (MANT_DIG % BITS_PER_MP_LIMB))) != 0))
 	{
 	  ++exponent;
 	  (void) __mpn_rshift (retval, retval, RETURN_LIMB_SIZE, 1);
@@ -335,10 +344,15 @@ round_and_return (mp_limb_t *retval, intmax_t exponent, int negative,
 	exponent = MIN_EXP - 1;
     }
 
-  if (exponent > MAX_EXP)
+  if (exponent >= MAX_EXP)
   overflow:
     return overflow_value (negative);
 
+  if (half_bit || more_bits_nonzero)
+    {
+      FLOAT force_inexact = (FLOAT) 1 + MIN_VALUE;
+      math_force_eval (force_inexact);
+    }
   return MPN2FLOAT (retval, exponent, negative);
 }
 
@@ -490,11 +504,8 @@ str_to_mpn (const STRING_TYPE *str, int digcnt, mp_limb_t *n, mp_size_t *nsize,
    return 0.0.  If the number is too big to be represented, set `errno' to
    ERANGE and return HUGE_VAL with the appropriate sign.  */
 FLOAT
-____STRTOF_INTERNAL (nptr, endptr, group, loc)
-     const STRING_TYPE *nptr;
-     STRING_TYPE **endptr;
-     int group;
-     __locale_t loc;
+____STRTOF_INTERNAL (const STRING_TYPE *nptr, STRING_TYPE **endptr, int group,
+		     locale_t loc)
 {
   int negative;			/* The sign of the number.  */
   MPN_VAR (num);		/* MP representation of the number.  */
@@ -655,39 +666,20 @@ ____STRTOF_INTERNAL (nptr, endptr, group, loc)
 	  if (*cp == L_('('))
 	    {
 	      const STRING_TYPE *startp = cp;
-	      do
-		++cp;
-	      while ((*cp >= L_('0') && *cp <= L_('9'))
-		     || ({ CHAR_TYPE lo = TOLOWER (*cp);
-			   lo >= L_('a') && lo <= L_('z'); })
-		     || *cp == L_('_'));
-
-	      if (*cp != L_(')'))
-		/* The closing brace is missing.  Only match the NAN
-		   part.  */
-		cp = startp;
+	      STRING_TYPE *endp;
+	      retval = STRTOF_NAN (cp + 1, &endp, L_(')'));
+	      if (*endp == L_(')'))
+		/* Consume the closing parenthesis.  */
+		cp = endp + 1;
 	      else
-		{
-		  /* This is a system-dependent way to specify the
-		     bitmask used for the NaN.  We expect it to be
-		     a number which is put in the mantissa of the
-		     number.  */
-		  STRING_TYPE *endp;
-		  unsigned long long int mant;
-
-		  mant = STRTOULL (startp + 1, &endp, 0);
-		  if (endp == cp)
-		    SET_MANTISSA (retval, mant);
-
-		  /* Consume the closing brace.  */
-		  ++cp;
-		}
+		/* Only match the NAN part.  */
+		cp = startp;
 	    }
 
 	  if (endptr != NULL)
 	    *endptr = (STRING_TYPE *) cp;
 
-	  return retval;
+	  return negative ? -retval : retval;
 	}
 
       /* It is really a text we do not recognize.  */
@@ -870,9 +862,9 @@ ____STRTOF_INTERNAL (nptr, endptr, group, loc)
     {
       cp += decimal_len;
       c = *cp;
-      while ((c >= L_('0') && c <= L_('9')) ||
-	     (base == 16 && ({ CHAR_TYPE lo = TOLOWER (c);
-			       lo >= L_('a') && lo <= L_('f'); })))
+      while ((c >= L_('0') && c <= L_('9'))
+	     || (base == 16 && ({ CHAR_TYPE lo = TOLOWER (c);
+				  lo >= L_('a') && lo <= L_('f'); })))
 	{
 	  if (c != L_('0') && lead_zero == (size_t) -1)
 	    lead_zero = dig_no - int_no;
@@ -1189,7 +1181,16 @@ ____STRTOF_INTERNAL (nptr, endptr, group, loc)
   if (__glibc_unlikely (exponent > MAX_10_EXP + 1 - (intmax_t) int_no))
     return overflow_value (negative);
 
-  if (__glibc_unlikely (exponent < MIN_10_EXP - (DIG + 1)))
+  /* 10^(MIN_10_EXP-1) is not normal.  Thus, 10^(MIN_10_EXP-1) /
+     2^MANT_DIG is below half the least subnormal, so anything with a
+     base-10 exponent less than the base-10 exponent (which is
+     MIN_10_EXP - 1 - ceil(MANT_DIG*log10(2))) of that value
+     underflows.  DIG is floor((MANT_DIG-1)log10(2)), so an exponent
+     below MIN_10_EXP - (DIG + 3) underflows.  But EXPONENT is
+     actually an exponent multiplied only by a fractional part, not an
+     integer part, so an exponent below MIN_10_EXP - (DIG + 2)
+     underflows.  */
+  if (__glibc_unlikely (exponent < MIN_10_EXP - (DIG + 2)))
     return underflow_value (negative);
 
   if (int_no > 0)
@@ -1356,7 +1357,7 @@ ____STRTOF_INTERNAL (nptr, endptr, group, loc)
 
     assert (dig_no > int_no
 	    && exponent <= 0
-	    && exponent >= MIN_10_EXP - (DIG + 1));
+	    && exponent >= MIN_10_EXP - (DIG + 2));
 
     /* We need to compute MANT_DIG - BITS fractional bits that lie
        within the mantissa of the result, the following bit for
@@ -1778,10 +1779,7 @@ FLOAT
 #ifdef weak_function
 weak_function
 #endif
-__STRTOF (nptr, endptr, loc)
-     const STRING_TYPE *nptr;
-     STRING_TYPE **endptr;
-     __locale_t loc;
+__STRTOF (const STRING_TYPE *nptr, STRING_TYPE **endptr, locale_t loc)
 {
   return ____STRTOF_INTERNAL (nptr, endptr, 0, loc);
 }
@@ -1804,6 +1802,27 @@ compat_symbol (libc, __strtod_l, __strtold_l, GLIBC_2_1);
 compat_symbol (libc, wcstod_l, wcstold_l, GLIBC_2_3);
 #  else
 compat_symbol (libc, strtod_l, strtold_l, GLIBC_2_3);
+#  endif
+# endif
+#endif
+
+#if BUILD_DOUBLE
+# if __HAVE_FLOAT64 && !__HAVE_DISTINCT_FLOAT64
+#  undef strtof64_l
+#  undef wcstof64_l
+#  ifdef USE_WIDE_CHAR
+weak_alias (wcstod_l, wcstof64_l)
+#  else
+weak_alias (strtod_l, strtof64_l)
+#  endif
+# endif
+# if __HAVE_FLOAT32X && !__HAVE_DISTINCT_FLOAT32X
+#  undef strtof32x_l
+#  undef wcstof32x_l
+#  ifdef USE_WIDE_CHAR
+weak_alias (wcstod_l, wcstof32x_l)
+#  else
+weak_alias (strtod_l, strtof32x_l)
 #  endif
 # endif
 #endif

@@ -1,4 +1,4 @@
-# Copyright (C) 2002-2015 Free Software Foundation, Inc.
+# Copyright (C) 2002-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Makefile for NPTL debug library subdirectory of GNU C Library.
 
@@ -26,7 +26,7 @@ nptl_db-version = 1.0
 extra-libs = libthread_db
 extra-libs-others := $(extra-libs)
 
-headers         = thread_db.h sys/procfs.h
+headers         = proc_service.h thread_db.h sys/procfs.h
 
 libthread_db-routines = td_init td_log td_ta_new td_ta_delete \
 			td_ta_get_nthreads td_ta_get_ph \

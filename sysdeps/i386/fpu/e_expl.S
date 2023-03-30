@@ -22,19 +22,19 @@
  * -- moshier@na-net.ornl.gov
  */
 
+#include <libm-alias-ldouble.h>
 #include <machine/asm.h>
+#include <i386-math-asm.h>
+#include <libm-alias-finite.h>
 
 #ifdef USE_AS_EXP10L
 # define IEEE754_EXPL __ieee754_exp10l
-# define EXPL_FINITE __exp10l_finite
 # define FLDLOG fldl2t
 #elif defined USE_AS_EXPM1L
 # define IEEE754_EXPL __expm1l
-# undef EXPL_FINITE
 # define FLDLOG fldl2e
 #else
 # define IEEE754_EXPL __ieee754_expl
-# define EXPL_FINITE __expl_finite
 # define FLDLOG fldl2e
 #endif
 
@@ -65,6 +65,7 @@ c1:	.byte 0x20, 0xfa, 0xee, 0xc2, 0x5f, 0x70, 0xa5, 0xec, 0xed, 0x3f
 csat:	.byte 0, 0, 0, 0, 0, 0, 0, 0x80, 0x0e, 0x40
 	.byte 0, 0, 0, 0, 0, 0
 	ASM_SIZE_DIRECTIVE(csat)
+DEFINE_LDBL_MIN
 #endif
 
 #ifdef PIC
@@ -100,7 +101,7 @@ ENTRY(IEEE754_EXPL)
 	/* Below -64.0 (may be -NaN or -Inf). */
 	andb	%ah, %dh
 	cmpb	$0x01, %dh
-	je	2f		/* Is +-NaN, jump.  */
+	je	6f		/* Is +-NaN, jump.  */
 	jmp	1f		/* -large, possibly -Inf.  */
 
 4:	/* In range -64.0 to 64.0 (may be +-0 but not NaN or +-Inf).  */
@@ -118,6 +119,12 @@ ENTRY(IEEE754_EXPL)
 	   normal.  */
 	cmpl	$0x0001, %eax
 	jge	2f
+	/* Force underflow and return the argument, to avoid wrong signs
+	   of zero results from the code below in some rounding modes.  */
+	fld	%st
+	fmul	%st
+	fstp	%st
+	jmp	2f
 #else
 	movzwl	4+8(%esp), %eax
 	andl	$0x7fff, %eax
@@ -136,7 +143,7 @@ ENTRY(IEEE754_EXPL)
 	cmpb	$0x05, %dh
 	je	1f		/* Is +-Inf, jump.    */
 	cmpb	$0x01, %dh
-	je	2f		/* Is +-NaN, jump.    */
+	je	6f		/* Is +-NaN, jump.    */
 	/* Overflow or underflow; saturate.  */
 	fstp	%st
 	fldt	MO(csat)
@@ -189,6 +196,7 @@ ENTRY(IEEE754_EXPL)
 	fstp	%st(1)		/* 2  */
 	fscale			/* 2 scale factor is st(1); base^x */
 	fstp	%st(1)		/* 1  */
+	LDBL_CHECK_FORCE_UFLOW_NONNEG
 #endif
 	fstp	%st(1)		/* 0  */
 	jmp	2f
@@ -205,10 +213,16 @@ ENTRY(IEEE754_EXPL)
 	fldz			/* Set result to 0.  */
 #endif
 2:	ret
+6:	/* NaN argument.  */
+	fadd	%st
+	ret
 END(IEEE754_EXPL)
+
 #ifdef USE_AS_EXPM1L
 libm_hidden_def (__expm1l)
-weak_alias (__expm1l, expm1l)
+libm_alias_ldouble (__expm1, expm1)
+#elif defined USE_AS_EXP10L
+libm_alias_finite (__ieee754_exp10l, __exp10l)
 #else
-strong_alias (IEEE754_EXPL, EXPL_FINITE)
+libm_alias_finite (__ieee754_expl, __expl)
 #endif

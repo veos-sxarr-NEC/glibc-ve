@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+#ifndef _SIGCONTEXTINFO_H
+#define _SIGCONTEXTINFO_H
 
 #include <signal.h>
 
-#define SIGCONTEXT struct sigcontext *
-#define SIGCONTEXT_EXTRA_ARGS
-#define GET_PC(ctx)	((void *)((ctx)->regs->nip))
-#define GET_FRAME(ctx)	(*(void **)((ctx)->regs->gpr[1]))
-#define GET_STACK(ctx)	((void *)((ctx)->regs->gpr[1]))
-#define CALL_SIGHANDLER(handler, signo, ctx) \
-  (handler)((signo), SIGCONTEXT_EXTRA_ARGS (ctx))
+static inline uintptr_t
+sigcontext_get_pc (const ucontext_t *ctx)
+{
+#ifdef __powerpc64__
+  return ctx->uc_mcontext.gp_regs[PT_NIP];
+#else
+  return ctx->uc_mcontext.uc_regs->gregs[PT_NIP];
+#endif
+}
+
+#endif

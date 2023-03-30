@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,10 +28,8 @@
 #include <stdio_ext.h>
 
 int
-_IO_vdprintf (d, format, arg)
-     int d;
-     const char *format;
-     _IO_va_list arg;
+__vdprintf_internal (int d, const char *format, va_list arg,
+		     unsigned int mode_flags)
 {
   struct _IO_FILE_plus tmpfil;
   struct _IO_wide_data wd;
@@ -42,10 +40,7 @@ _IO_vdprintf (d, format, arg)
 #endif
   _IO_no_init (&tmpfil.file, _IO_USER_LOCK, 0, &wd, &_IO_wfile_jumps);
   _IO_JUMPS (&tmpfil) = &_IO_file_jumps;
-  _IO_file_init (&tmpfil);
-#if  !_IO_UNIFIED_JUMPTABLES
-  tmpfil.vtable = NULL;
-#endif
+  _IO_new_file_init_internal (&tmpfil);
   if (_IO_file_attach (&tmpfil.file, d) == NULL)
     {
       _IO_un_link (&tmpfil);
@@ -56,7 +51,7 @@ _IO_vdprintf (d, format, arg)
   _IO_mask_flags (&tmpfil.file, _IO_NO_READS,
 		  _IO_NO_READS+_IO_NO_WRITES+_IO_IS_APPENDING);
 
-  done = _IO_vfprintf (&tmpfil.file, format, arg);
+  done = __vfprintf_internal (&tmpfil.file, format, arg, mode_flags);
 
   if (done != EOF && _IO_do_flush (&tmpfil.file) == EOF)
     done = EOF;
@@ -65,4 +60,10 @@ _IO_vdprintf (d, format, arg)
 
   return done;
 }
-ldbl_weak_alias (_IO_vdprintf, vdprintf)
+
+int
+__vdprintf (int d, const char *format, va_list arg)
+{
+  return __vdprintf_internal (d, format, arg, 0);
+}
+ldbl_weak_alias (__vdprintf, vdprintf)

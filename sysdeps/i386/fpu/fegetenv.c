@@ -1,5 +1,5 @@
 /* Store current floating-point environment.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <fenv.h>
 #include <unistd.h>
@@ -31,7 +31,7 @@ __fegetenv (fenv_t *envp)
      would block all exceptions.  */
   __asm__ ("fldenv %0" : : "m" (*envp));
 
-  if ((GLRO(dl_hwcap) & HWCAP_I386_XMM) != 0)
+  if (HAS_CPU_FEATURE (SSE))
     __asm__ ("stmxcsr %0" : "=m" (envp->__eip));
 
   /* Success.  */

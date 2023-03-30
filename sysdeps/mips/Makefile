@@ -9,10 +9,7 @@ endif
 
 ifeq ($(subdir),rt)
 librt-sysdep_routines += rt-sysdep
-endif
-
-ifeq ($(subdir),debug)
-CFLAGS-backtrace.c += -funwind-tables
+librt-shared-only-routines += rt-sysdep
 endif
 
 ifeq ($(subdir),csu)
@@ -26,6 +23,9 @@ CPPFLAGS-crtn.S += $(pic-ccflag)
 endif
 
 ASFLAGS-.os += $(pic-ccflag)
+# libc.a and libc_p.a must be compiled with -fPIE/-fpie for static PIE.
+ASFLAGS-.o += $(pie-default)
+ASFLAGS-.op += $(pie-default)
 
 ifeq ($(subdir),elf)
 ifneq ($(o32-fpabi),)
@@ -42,16 +42,22 @@ fpabi-modules-names += tst-abi-fpxxmod
 CFLAGS-tst-abi-fpxxmod.c += -mfpxx -mno-odd-spreg
 endif
 ifneq (,$(filter $(o32-fpabi),xx xxo))
+ifeq ($(has-modd-spreg),yes)
 fpabi-modules-names += tst-abi-fpxxomod
 CFLAGS-tst-abi-fpxxomod.c += -mfpxx -modd-spreg
 endif
+endif
 ifneq (,$(filter $(o32-fpabi),xx 64a))
+ifeq ($(has-mpf64),yes)
 fpabi-modules-names += tst-abi-fp64amod
 CFLAGS-tst-abi-fp64amod.c += -mfp64 -mno-odd-spreg
 endif
+endif
 ifneq (,$(filter $(o32-fpabi),xx xxo 64a 64))
+ifeq ($(has-mpf64)-$(has-modd-spreg),yes-yes)
 fpabi-modules-names += tst-abi-fp64mod
 CFLAGS-tst-abi-fp64mod.c += -mfp64 -modd-spreg
+endif
 endif
 modules-names += $(fpabi-modules-names)
 
@@ -75,4 +81,11 @@ $(objpfx)tst-mode-switch-1: $(shared-thread-library)
 $(objpfx)tst-mode-switch-2: $(shared-thread-library)
 endif
 endif
+endif
+
+ifeq ($(subdir),elf)
+tests += tst-undefined-weak
+modules-names += tst-undefined-weak-lib
+
+$(objpfx)tst-undefined-weak: $(objpfx)tst-undefined-weak-lib.so
 endif

@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for pwd portion of the library.
@@ -28,15 +28,15 @@ routines := fgetpwent getpw putpwent \
 	    getpwent getpwnam getpwuid \
 	    getpwent_r getpwnam_r getpwuid_r fgetpwent_r
 
-tests := tst-getpw
+tests := tst-getpw tst-putpwent
 
 include ../Rules
 
 ifeq ($(have-thread-library),yes)
 
-CFLAGS-getpwent_r.c = -fexceptions -O0
-CFLAGS-getpwent.c = -fexceptions
-CFLAGS-getpw.c = -fexceptions
-CFLAGS-fgetpwent_r.c = $(libio-mtsafe)
+CFLAGS-getpwent_r.c += -fexceptions -O0
+CFLAGS-getpwent.c += -fexceptions
+CFLAGS-getpw.c += -fexceptions
+CFLAGS-fgetpwent_r.c += $(libio-mtsafe)
 
 endif

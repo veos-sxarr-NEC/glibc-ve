@@ -4,7 +4,8 @@
  * Public domain.
  */
 
-#include <math_private.h>
+#define NO_MATH_REDIRECT
+#include <libm-alias-ldouble.h>
 
 long double
 __rintl (long double x)
@@ -15,4 +16,4 @@ __rintl (long double x)
   return res;
 }
 
-weak_alias (__rintl, rintl)
+libm_alias_ldouble (__rint, rint)

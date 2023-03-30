@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_HURD_H
 
@@ -41,11 +41,16 @@
 #include <hurd/port.h>
 
 #include <errno.h>
+#include <bits/types/error_t.h>
+#include <bits/types/sigset_t.h>
 
 #ifndef _HURD_H_EXTERN_INLINE
 #define _HURD_H_EXTERN_INLINE __extern_inline
 #endif
 
+extern int __hurd_fail (error_t err);
+
+#ifdef __USE_EXTERN_INLINES
 _HURD_H_EXTERN_INLINE int
 __hurd_fail (error_t err)
 {
@@ -54,15 +59,15 @@ __hurd_fail (error_t err)
     case EMACH_SEND_INVALID_DEST:
     case EMIG_SERVER_DIED:
       /* The server has disappeared!  */
-      err = EIEIO;
+      err = (error_t) EIEIO;
       break;
 
     case KERN_NO_SPACE:
-      err = ENOMEM;
+      err = (error_t) ENOMEM;
       break;
 
     case KERN_INVALID_ARGUMENT:
-      err = EINVAL;
+      err = (error_t) EINVAL;
       break;
 
     case 0:
@@ -75,6 +80,7 @@ __hurd_fail (error_t err)
   errno = err;
   return -1;
 }
+#endif
 
 /* Basic ports and info, initialized by startup.  */
 
@@ -141,8 +147,7 @@ extern struct mutex _hurd_brk_lock;
 
 extern int _hurd_set_brk (vm_address_t newbrk);
 
-#define __need_FILE
-#include <stdio.h>
+#include <bits/types/FILE.h>
 
 /* Calls to get and set basic ports.  */
 
@@ -241,12 +246,21 @@ extern FILE *fopenport (io_t port, const char *mode);
 extern FILE *__fopenport (io_t port, const char *mode);
 
 
-/* Execute a file, replacing TASK's current program image.  */
+/* Deprecated: use _hurd_exec_paths instead.  */
 
 extern error_t _hurd_exec (task_t task,
 			   file_t file,
 			   char *const argv[],
-			   char *const envp[]);
+			   char *const envp[]) __attribute_deprecated__;
+
+/* Execute a file, replacing TASK's current program image.  */
+
+extern error_t _hurd_exec_paths (task_t task,
+				 file_t file,
+				 const char *path,
+				 const char *abspath,
+				 char *const argv[],
+				 char *const envp[]);
 
 
 /* Inform the proc server we have exited with STATUS, and kill the

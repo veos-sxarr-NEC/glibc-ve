@@ -1,5 +1,5 @@
 /* memcpy optimized with SSE2 unaligned memory access instructions.
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if IS_IN (libc) \
     && (defined SHARED \
@@ -56,7 +56,7 @@
 # define RETURN	RETURN_END; CFI_PUSH (%ebx)
 
 	.section .text.sse2,"ax",@progbits
-# if !defined USE_AS_BCOPY
+# if !defined USE_AS_BCOPY && defined SHARED
 ENTRY (MEMCPY_CHK)
 	movl	12(%esp), %eax
 	cmpl	%eax, 16(%esp)
@@ -72,7 +72,7 @@ ENTRY (MEMCPY)
 	cmp	%edx, %eax
 
 # ifdef USE_AS_MEMMOVE
-	jg	L(check_forward)
+	ja	L(check_forward)
 
 L(mm_len_0_or_more_backward):
 /* Now do checks for lengths. We do [0..16], [16..32], [32..64], [64..128]
@@ -81,7 +81,7 @@ L(mm_len_0_or_more_backward):
 	jbe	L(mm_len_0_16_bytes_backward)
 
 	cmpl	$32, %ecx
-	jg	L(mm_len_32_or_more_backward)
+	ja	L(mm_len_32_or_more_backward)
 
 /* Copy [0..32] and return.  */
 	movdqu	(%eax), %xmm0
@@ -92,7 +92,7 @@ L(mm_len_0_or_more_backward):
 
 L(mm_len_32_or_more_backward):
 	cmpl	$64, %ecx
-	jg	L(mm_len_64_or_more_backward)
+	ja	L(mm_len_64_or_more_backward)
 
 /* Copy [0..64] and return.  */
 	movdqu	(%eax), %xmm0
@@ -107,7 +107,7 @@ L(mm_len_32_or_more_backward):
 
 L(mm_len_64_or_more_backward):
 	cmpl	$128, %ecx
-	jg	L(mm_len_128_or_more_backward)
+	ja	L(mm_len_128_or_more_backward)
 
 /* Copy [0..128] and return.  */
 	movdqu	(%eax), %xmm0
@@ -132,7 +132,7 @@ L(mm_len_128_or_more_backward):
 	add	%ecx, %eax
 	cmp	%edx, %eax
 	movl	SRC(%esp), %eax
-	jle	L(forward)
+	jbe	L(forward)
 	PUSH (%esi)
 	PUSH (%edi)
 	PUSH (%ebx)
@@ -157,7 +157,7 @@ L(mm_len_128_or_more_backward):
 # ifdef SHARED_CACHE_SIZE_HALF
 	cmp	$SHARED_CACHE_SIZE_HALF, %edi
 # else
-#  ifdef SHARED
+#  ifdef PIC
 	PUSH (%ebx)
 	SETUP_PIC_REG (bx)
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
@@ -269,7 +269,7 @@ L(check_forward):
 	add	%edx, %ecx
 	cmp	%eax, %ecx
 	movl	LEN(%esp), %ecx
-	jle	L(forward)
+	jbe	L(forward)
 
 /* Now do checks for lengths. We do [0..16], [0..32], [0..64], [0..128]
 	separately.  */
@@ -351,7 +351,7 @@ L(mm_len_128_or_more_forward):
 # ifdef SHARED_CACHE_SIZE_HALF
 	cmp	$SHARED_CACHE_SIZE_HALF, %edi
 # else
-#  ifdef SHARED
+#  ifdef PIC
 	PUSH (%ebx)
 	SETUP_PIC_REG(bx)
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
@@ -469,7 +469,7 @@ L(forward):
 # ifdef SHARED_CACHE_SIZE_HALF
 	cmp	$SHARED_CACHE_SIZE_HALF, %ecx
 # else
-#  ifdef SHARED
+#  ifdef PIC
 	SETUP_PIC_REG(bx)
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
 	cmp	__x86_shared_cache_size_half@GOTOFF(%ebx), %ecx

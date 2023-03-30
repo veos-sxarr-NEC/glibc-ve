@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* System V/AArch64 ABI compliant context switching support.  */
 
@@ -22,35 +22,57 @@
 #define _SYS_UCONTEXT_H	1
 
 #include <features.h>
-#include <signal.h>
-#include <sys/procfs.h>
 
-/* We need the signal context definitions even if they are not used
-   included in <signal.h>.  */
-#include <bits/sigcontext.h>
+#include <bits/types/sigset_t.h>
+#include <bits/types/stack_t.h>
 
-typedef int greg_t;
+#ifdef __USE_MISC
+# define __ctx(fld) fld
+#else
+# define __ctx(fld) __ ## fld
+#endif
+
+#ifdef __USE_MISC
+# include <sys/procfs.h>
+
+
+typedef elf_greg_t greg_t;
 
 /* Container for all general registers.  */
 typedef elf_gregset_t gregset_t;
 
 /* Structure to describe FPU registers.  */
 typedef elf_fpregset_t	fpregset_t;
+#endif
 
 /* Context to describe whole processor state.  This only describes
    the core registers; coprocessor registers get saved elsewhere
    (e.g. in uc_regspace, or somewhere unspecified on the stack
    during non-RT signal handlers).  */
-typedef struct sigcontext mcontext_t;
+typedef struct
+  {
+    unsigned long long int __ctx(fault_address);
+    unsigned long long int __ctx(regs)[31];
+    unsigned long long int __ctx(sp);
+    unsigned long long int __ctx(pc);
+    unsigned long long int __ctx(pstate);
+    /* This field contains extension records for additional processor
+       state such as the FP/SIMD state.  It has to match the definition
+       of the corresponding field in the sigcontext struct, see the
+       arch/arm64/include/uapi/asm/sigcontext.h linux header for details.  */
+    unsigned char __reserved[4096] __attribute__ ((__aligned__ (16)));
+  } mcontext_t;
 
 /* Userlevel context.  */
-typedef struct ucontext
+typedef struct ucontext_t
   {
-    unsigned long uc_flags;
-    struct ucontext *uc_link;
+    unsigned long __ctx(uc_flags);
+    struct ucontext_t *uc_link;
     stack_t uc_stack;
-    __sigset_t uc_sigmask;
+    sigset_t uc_sigmask;
     mcontext_t uc_mcontext;
   } ucontext_t;
+
+#undef __ctx
 
 #endif /* sys/ucontext.h */

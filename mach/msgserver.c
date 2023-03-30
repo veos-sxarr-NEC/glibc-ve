@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Based on CMU's mach_msg_server.c revision 2.4 of 91/05/14, and thus
    under the following copyright.  Rewritten by Roland McGrath (FSF)
@@ -187,10 +187,10 @@ __mach_msg_server_timeout (boolean_t (*demux) (mach_msg_header_t *request,
 weak_alias (__mach_msg_server_timeout, mach_msg_server_timeout)
 
 mach_msg_return_t
-__mach_msg_server (demux, max_size, rcv_name)
-     boolean_t (*demux) (mach_msg_header_t *in, mach_msg_header_t *out);
-     mach_msg_size_t max_size;
-     mach_port_t rcv_name;
+__mach_msg_server (boolean_t (*demux) (mach_msg_header_t *in,
+				       mach_msg_header_t *out),
+		   mach_msg_size_t max_size,
+		   mach_port_t rcv_name)
 {
   return __mach_msg_server_timeout (demux, max_size, rcv_name,
 				    MACH_MSG_OPTION_NONE,

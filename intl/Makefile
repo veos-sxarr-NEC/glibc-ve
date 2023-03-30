@@ -1,4 +1,4 @@
-# Copyright (C) 1995-2015 Free Software Foundation, Inc.
+# Copyright (C) 1995-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Makefile for intl subdirectory: message handling code from GNU gettext.
 
@@ -36,16 +36,16 @@ tests = tst-ngettext
 
 before-compile += $(objpfx)msgs.h
 
-install-others = $(inst_msgcatdir)/locale.alias
+install-others = $(inst_localedir)/locale.alias
 
-generated += msgs.h mtrace-tst-gettext.out tst-gettext.mtrace
+generated += msgs.h mtrace-tst-gettext.out tst-gettext.mtrace plural.c
 generated-dirs += domaindir localedir
 
-ifneq (no,$(BISON))
-plural.c: plural.y
+$(objpfx)plural.c: plural.y
+	$(make-target-directory)
 	$(BISON) $(BISONFLAGS) $@ $^
-endif
-$(objpfx)plural.o: plural.c
+
+$(objpfx)plural.o: $(objpfx)plural.c
 
 ifeq ($(run-built-tests),yes)
 ifeq (yes,$(build-shared))
@@ -83,47 +83,63 @@ $(objpfx)mtrace-tst-gettext.out: $(objpfx)tst-gettext.out
 $(objpfx)tst-gettext.out: tst-gettext.sh $(objpfx)tst-gettext
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
 	  '$(run-program-env)' '$(test-program-prefix-after-env)' \
-	  $(common-objpfx)intl/ $(objpfx)tst-gettext.mtrace; \
+	  $(common-objpfx)intl/ $(objpfx)tst-gettext.mtrace > $@; \
 	$(evaluate-test)
-
 $(objpfx)tst-translit.out: tst-translit.sh $(objpfx)tst-translit
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
 	'$(run-program-env)' \
-	$(common-objpfx)intl/; \
+	$(common-objpfx)intl/ > $@; \
 	$(evaluate-test)
 $(objpfx)tst-gettext2.out: tst-gettext2.sh $(objpfx)tst-gettext2
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
 	  '$(run-program-env)' '$(test-program-prefix-after-env)' \
-	  $(common-objpfx)intl/; \
+	  $(common-objpfx)intl/ > $@; \
 	$(evaluate-test)
 $(objpfx)tst-gettext4.out: tst-gettext4.sh $(objpfx)tst-gettext4
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
-	'$(run-program-env)' $(common-objpfx)intl/; \
+	'$(run-program-env)' $(common-objpfx)intl/ > $@; \
 	$(evaluate-test)
 $(objpfx)tst-gettext6.out: tst-gettext6.sh $(objpfx)tst-gettext6
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
 	'$(run-program-env)' \
-	 $(common-objpfx)intl/; \
+	$(common-objpfx)intl/ > $@; \
 	$(evaluate-test)
 
 $(objpfx)tst-codeset.out: $(codeset_mo)
 $(objpfx)tst-gettext3.out: $(codeset_mo)
 $(objpfx)tst-gettext5.out: $(codeset_mo)
 endif
+
+LOCALES := de_DE.ISO-8859-1 de_DE.UTF-8 en_US.ANSI_X3.4-1968 fr_FR.ISO-8859-1 \
+	   ja_JP.UTF-8
+include ../gen-locales.mk
+
+$(objpfx)tst-codeset.out: $(gen-locales)
+$(objpfx)tst-gettext.out: $(gen-locales)
+$(objpfx)tst-gettext2.out: $(gen-locales)
+$(objpfx)tst-gettext3.out: $(gen-locales)
+$(objpfx)tst-gettext4.out: $(gen-locales)
+$(objpfx)tst-gettext5.out: $(gen-locales)
+$(objpfx)tst-gettext6.out: $(gen-locales)
+$(objpfx)tst-translit.out: $(gen-locales)
 endif
 
-$(objpfx)msgs.h: po2test.awk ../po/de.po
+$(objpfx)tst-gettext-de.po: ../po/de.po
+	$(make-target-directory)
+	LC_ALL=C $(AWK) '!/^"POT-Creation-Date: [0-9-]+ [0-9:+-]+\\n"$$/' $^ > $@
+
+$(objpfx)msgs.h: po2test.awk $(objpfx)tst-gettext-de.po
 	$(make-target-directory)
 	LC_ALL=C $(AWK) -f $^ > $@
 
-CFLAGS-tst-gettext.c = -DTESTSTRS_H=\"$(objpfx)msgs.h\"
-CFLAGS-tst-translit.c = -DOBJPFX=\"$(objpfx)\"
-CFLAGS-tst-gettext2.c = -DOBJPFX=\"$(objpfx)\"
-CFLAGS-tst-codeset.c = -DOBJPFX=\"$(objpfx)\"
-CFLAGS-tst-gettext3.c = -DOBJPFX=\"$(objpfx)\"
-CFLAGS-tst-gettext4.c = -DOBJPFX=\"$(objpfx)\"
-CFLAGS-tst-gettext5.c = -DOBJPFX=\"$(objpfx)\"
-CFLAGS-tst-gettext6.c = -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-gettext.c += -DTESTSTRS_H=\"$(objpfx)msgs.h\"
+CFLAGS-tst-translit.c += -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-gettext2.c += -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-codeset.c += -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-gettext3.c += -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-gettext4.c += -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-gettext5.c += -DOBJPFX=\"$(objpfx)\"
+CFLAGS-tst-gettext6.c += -DOBJPFX=\"$(objpfx)\"
 
 ifeq ($(have-thread-library),yes)
 ifeq (yes,$(build-shared))
@@ -141,9 +157,9 @@ $(objpfx)tst-gettext4.out: $(objpfx)tst-gettext.out
 $(objpfx)tst-gettext5.out: $(objpfx)tst-gettext.out
 $(objpfx)tst-gettext6.out: $(objpfx)tst-gettext.out
 
-CPPFLAGS += -D'LOCALEDIR="$(msgcatdir)"' \
-	    -D'LOCALE_ALIAS_PATH="$(msgcatdir)"'
+CPPFLAGS += -D'LOCALEDIR="$(localedir)"' \
+	    -D'LOCALE_ALIAS_PATH="$(localedir)"'
 BISONFLAGS = --yacc --name-prefix=__gettext --output
 
-$(inst_msgcatdir)/locale.alias: locale.alias $(+force)
+$(inst_localedir)/locale.alias: locale.alias $(+force)
 	$(do-install)

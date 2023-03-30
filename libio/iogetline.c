@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -27,13 +27,9 @@
 #include "libioP.h"
 #include <string.h>
 
-_IO_size_t
-_IO_getline (fp, buf, n, delim, extract_delim)
-     _IO_FILE *fp;
-     char *buf;
-     _IO_size_t n;
-     int delim;
-     int extract_delim;
+size_t
+_IO_getline (FILE *fp, char *buf, size_t n, int delim,
+	     int extract_delim)
 {
   return _IO_getline_info (fp, buf, n, delim, extract_delim, (int *) 0);
 }
@@ -47,14 +43,9 @@ libc_hidden_def (_IO_getline)
    If extract_delim < 0, leave delimiter unread.
    If extract_delim > 0, insert delim in output. */
 
-_IO_size_t
-_IO_getline_info (fp, buf, n, delim, extract_delim, eof)
-     _IO_FILE *fp;
-     char *buf;
-     _IO_size_t n;
-     int delim;
-     int extract_delim;
-     int *eof;
+size_t
+_IO_getline_info (FILE *fp, char *buf, size_t n, int delim,
+		  int extract_delim, int *eof)
 {
   char *ptr = buf;
   if (eof != NULL)
@@ -63,7 +54,7 @@ _IO_getline_info (fp, buf, n, delim, extract_delim, eof)
     _IO_fwide (fp, -1);
   while (n != 0)
     {
-      _IO_ssize_t len = fp->_IO_read_end - fp->_IO_read_ptr;
+      ssize_t len = fp->_IO_read_end - fp->_IO_read_ptr;
       if (len <= 0)
 	{
 	  int c = __uflow (fp);
@@ -89,12 +80,12 @@ _IO_getline_info (fp, buf, n, delim, extract_delim, eof)
       else
 	{
 	  char *t;
-	  if ((_IO_size_t) len >= n)
+	  if ((size_t) len >= n)
 	    len = n;
 	  t = (char *) memchr ((void *) fp->_IO_read_ptr, delim, len);
 	  if (t != NULL)
 	    {
-	      _IO_size_t old_len = ptr-buf;
+	      size_t old_len = ptr-buf;
 	      len = t - fp->_IO_read_ptr;
 	      if (extract_delim >= 0)
 		{

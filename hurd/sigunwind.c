@@ -1,5 +1,5 @@
 /* longjmp cleanup function for unwinding past signal handlers.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <hurd.h>
 #include <thread_state.h>
+#include <hurd/threadvar.h>
 #include <jmpbuf-unwind.h>
 #include <assert.h>
 #include <stdint.h>
@@ -38,8 +39,7 @@ _hurdsig_longjmp_from_handler (void *data, jmp_buf env, int val)
     {
       /* Destroy the MiG reply port used by the signal handler, and restore
 	 the reply port in use by the thread when interrupted.  */
-      mach_port_t *reply_port =
-	(mach_port_t *) __hurd_threadvar_location (_HURD_THREADVAR_MIG_REPLY);
+      mach_port_t *reply_port = &__hurd_local_reply_port;
       if (*reply_port)
 	{
 	  mach_port_t port = *reply_port;
@@ -50,7 +50,8 @@ _hurdsig_longjmp_from_handler (void *data, jmp_buf env, int val)
 	  *reply_port = MACH_PORT_DEAD;
 	  __mach_port_destroy (__mach_task_self (), port);
 	}
-      *reply_port = scp->sc_reply_port;
+      if (scp->sc_reply_port)
+	__mach_port_destroy (__mach_task_self (), scp->sc_reply_port);
     }
 
   __spin_lock (&ss->lock);

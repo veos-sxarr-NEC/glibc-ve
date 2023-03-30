@@ -3,9 +3,23 @@
  */
 
 #include <machine/asm.h>
+#include <i386-math-asm.h>
+#include <libm-alias-finite.h>
 
+DEFINE_FLT_MIN
+
+#ifdef PIC
+# define MO(op) op##@GOTOFF(%ecx)
+#else
+# define MO(op) op
+#endif
+
+	.text
 /* 10^x = 2^(x * log2(10)) */
 ENTRY(__ieee754_exp10f)
+#ifdef  PIC
+	LOAD_PIC_REG (cx)
+#endif
 	flds	4(%esp)
 /* I added the following ugly construct because exp(+-Inf) resulted
    in NaN.  The ugliness results from the bright minds at Intel.
@@ -28,6 +42,7 @@ ENTRY(__ieee754_exp10f)
 	faddp				/* 2^(fract(x * log2(10))) */
 	fscale				/* e^x */
 	fstp	%st(1)
+	FLT_NARROW_EVAL_UFLOW_NONNEG_NAN
 	ret
 
 1:	testl	$0x200, %eax		/* Test sign.  */
@@ -36,4 +51,4 @@ ENTRY(__ieee754_exp10f)
 	fldz				/* Set result to 0.  */
 2:	ret
 END (__ieee754_exp10f)
-strong_alias (__ieee754_exp10f, __exp10f_finite)
+libm_alias_finite (__ieee754_exp10f, __exp10f)

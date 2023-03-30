@@ -1,5 +1,5 @@
 /* Load a shared object at run time.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -60,12 +60,12 @@ dlmopen_doit (void *a)
 	 must be the main one.  */
       if (args->file == NULL)
 # endif
-	GLRO(dl_signal_error) (EINVAL, NULL, NULL, N_("invalid namespace"));
+	_dl_signal_error (EINVAL, NULL, NULL, N_("invalid namespace"));
 
       /* It makes no sense to use RTLD_GLOBAL when loading a DSO into
 	 a namespace other than the base namespace.  */
       if (__glibc_unlikely (args->mode & RTLD_GLOBAL))
-	GLRO(dl_signal_error) (EINVAL, NULL, NULL, N_("invalid mode"));
+	_dl_signal_error (EINVAL, NULL, NULL, N_("invalid mode"));
     }
 
   args->new = GLRO(dl_open) (args->file ?: "", args->mode | __RTLD_DLOPEN,
@@ -79,7 +79,7 @@ void *
 __dlmopen (Lmid_t nsid, const char *file, int mode DL_CALLER_DECL)
 {
 # ifdef SHARED
-  if (__glibc_unlikely (_dlfcn_hook != NULL))
+  if (!rtld_active ())
     return _dlfcn_hook->dlmopen (nsid, file, mode, RETURN_ADDRESS (0));
 # endif
 

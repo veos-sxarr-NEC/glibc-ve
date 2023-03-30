@@ -28,7 +28,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __ieee754_j0(x), __ieee754_y0(x)
  * Bessel function of the first and second kinds of order zero.
@@ -72,7 +72,9 @@
  */
 
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static long double pzero (long double), qzero (long double);
 
@@ -108,7 +110,7 @@ __ieee754_j0l (long double x)
 {
   long double z, s, c, ss, cc, r, u, v;
   int32_t ix;
-  u_int32_t se;
+  uint32_t se;
 
   GET_LDOUBLE_EXP (se, x);
   ix = se & 0x7fff;
@@ -133,12 +135,12 @@ __ieee754_j0l (long double x)
        * y0(x) = 1/sqrt(pi) * (P(0,x)*ss + Q(0,x)*cc) / sqrt(x)
        */
       if (__glibc_unlikely (ix > 0x4080))      	/* 2^129 */
-	z = (invsqrtpi * cc) / __ieee754_sqrtl (x);
+	z = (invsqrtpi * cc) / sqrtl (x);
       else
 	{
 	  u = pzero (x);
 	  v = qzero (x);
-	  z = invsqrtpi * (u * cc - v * ss) / __ieee754_sqrtl (x);
+	  z = invsqrtpi * (u * cc - v * ss) / sqrtl (x);
 	}
       return z;
     }
@@ -164,7 +166,7 @@ __ieee754_j0l (long double x)
       return ((one + u) * (one - u) + z * (r / s));
     }
 }
-strong_alias (__ieee754_j0l, __j0l_finite)
+libm_alias_finite (__ieee754_j0l, __j0l)
 
 
 /* y0(x) = 2/pi ln(x) J0(x) + U(x^2)/V(x^2)
@@ -194,7 +196,7 @@ __ieee754_y0l (long double x)
 {
   long double z, s, c, ss, cc, u, v;
   int32_t ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
@@ -235,12 +237,12 @@ __ieee754_y0l (long double x)
 	    ss = z / cc;
 	}
       if (__glibc_unlikely (ix > 0x4080))      	/* 1e39 */
-	z = (invsqrtpi * ss) / __ieee754_sqrtl (x);
+	z = (invsqrtpi * ss) / sqrtl (x);
       else
 	{
 	  u = pzero (x);
 	  v = qzero (x);
-	  z = invsqrtpi * (u * ss + v * cc) / __ieee754_sqrtl (x);
+	  z = invsqrtpi * (u * ss + v * cc) / sqrtl (x);
 	}
       return z;
     }
@@ -255,7 +257,7 @@ __ieee754_y0l (long double x)
   v = V[0] + z * (V[1] + z * (V[2] + z * (V[3] + z * (V[4] + z))));
   return (u / v + tpi * (__ieee754_j0l (x) * __ieee754_logl (x)));
 }
-strong_alias (__ieee754_y0l, __y0l_finite)
+libm_alias_finite (__ieee754_y0l, __y0l)
 
 /* The asymptotic expansions of pzero is
  *	1 - 9/128 s^2 + 11025/98304 s^4 - ...,	where s = 1/x.
@@ -352,10 +354,11 @@ pzero (long double x)
   const long double *p, *q;
   long double z, r, s;
   int32_t ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
+  /* ix >= 0x4000 for all calls to this function.  */
   if (ix >= 0x4002)
     {
       p = pR8;
@@ -374,7 +377,7 @@ pzero (long double x)
 	  p = pR3;
 	  q = pS3;
 	}
-      else if (ix >= 0x4000)	/* x better be >= 2 */
+      else	/* x >= 2 */
 	{
 	  p = pR2;
 	  q = pS2;
@@ -489,10 +492,11 @@ qzero (long double x)
   const long double *p, *q;
   long double s, r, z;
   int32_t ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
+  /* ix >= 0x4000 for all calls to this function.  */
   if (ix >= 0x4002)		/* x >= 8 */
     {
       p = qR8;
@@ -511,7 +515,7 @@ qzero (long double x)
 	  p = qR3;
 	  q = qS3;
 	}
-      else if (ix >= 0x4000)	/* x better be >= 2 */
+      else	/* x >= 2 */
 	{
 	  p = qR2;
 	  q = qS2;

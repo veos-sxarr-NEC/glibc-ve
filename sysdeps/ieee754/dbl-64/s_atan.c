@@ -1,7 +1,7 @@
 /*
  * IBM Accurate Mathematical Library
  * written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2001-2020 Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,7 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 /************************************************************************/
 /*  MODULE_NAME: atnat.c                                                */
@@ -41,7 +41,12 @@
 #include "MathLib.h"
 #include "uatan.tbl"
 #include "atnat.h"
+#include <fenv.h>
+#include <float.h>
+#include <libm-alias-double.h>
 #include <math.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
 #include <stap-probe.h>
 
 void __mpatan (mp_no *, mp_no *, int);	/* see definition in mpatan.c */
@@ -51,14 +56,14 @@ static double atanMp (double, const int[]);
 static double
 __signArctan (double x, double y)
 {
-  return __copysign (y, x);
+  return copysign (y, x);
 }
 
 
 /* An ultimate atan() routine. Given an IEEE double machine number x,    */
 /* routine computes the correctly rounded (to nearest) value of atan(x). */
 double
-atan (double x)
+__atan (double x)
 {
   double cor, s1, ss1, s2, ss2, t1, t2, t3, t7, t8, t9, t10, u, u2, u3,
 	 v, vv, w, ww, y, yy, z, zz;
@@ -79,13 +84,17 @@ atan (double x)
     return x + x;
 
   /* Regular values of x, including denormals +-0 and +-INF */
+  SET_RESTORE_ROUND (FE_TONEAREST);
   u = (x < 0) ? -x : x;
   if (u < C)
     {
       if (u < B)
 	{
 	  if (u < A)
-	    return x;
+	    {
+	      math_check_force_underflow_nonneg (u);
+	      return x;
+	    }
 	  else
 	    {			/* A <= u < B */
 	      v = x * x;
@@ -316,6 +325,6 @@ atanMp (double x, const int pr[])
   return y1;			/*if impossible to do exact computing */
 }
 
-#ifdef NO_LONG_DOUBLE
-weak_alias (atan, atanl)
+#ifndef __atan
+libm_alias_double (__atan, atan)
 #endif

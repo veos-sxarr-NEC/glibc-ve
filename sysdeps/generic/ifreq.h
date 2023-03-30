@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,18 +22,6 @@
 #include <net/if.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-
-static inline struct ifreq *
-__if_nextreq (struct ifreq *ifr)
-{
-#ifdef _HAVE_SA_LEN
-  if (ifr->ifr_addr.sa_len > sizeof ifr->ifr_addr)
-    return (struct ifreq *) ((char *) &ifr->ifr_addr + ifr->ifr_addr.sa_len);
-#endif
-  return ifr + 1;
-}
-
-extern void __ifreq (struct ifreq **ifreqs, int *num_ifs, int sockfd);
 
 
 static inline void

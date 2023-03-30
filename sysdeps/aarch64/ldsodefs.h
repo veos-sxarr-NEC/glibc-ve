@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,12 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _AARCH64_LDSODEFS_H
 #define _AARCH64_LDSODEFS_H 1
 
 #include <elf.h>
+#include <cpu-features.h>
 
 struct La_aarch64_regs;
 struct La_aarch64_retval;

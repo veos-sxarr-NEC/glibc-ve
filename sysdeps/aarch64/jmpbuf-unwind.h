@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <setjmp.h>
 #include <jmpbuf-offsets.h>
@@ -27,7 +27,8 @@
   ((void *) (address) < (void *) demangle (jmpbuf[JB_SP]))
 
 #define _JMPBUF_CFA_UNWINDS_ADJ(jmpbuf, context, adj) \
-  _JMPBUF_UNWINDS_ADJ (jmpbuf, (void *) _Unwind_GetCFA (context), adj)
+  _JMPBUF_UNWINDS_ADJ (jmpbuf, (void *) (uintptr_t) _Unwind_GetCFA (context), \
+		       adj)
 
 #define _JMPBUF_UNWINDS_ADJ(_jmpbuf, _address, _adj) \
   ((uintptr_t) (_address) - (_adj) < _jmpbuf_sp (_jmpbuf) - (_adj))

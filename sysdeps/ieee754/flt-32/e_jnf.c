@@ -16,7 +16,11 @@
 #include <errno.h>
 #include <float.h>
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const float
 two   =  2.0000000000e+00, /* 0x40000000 */
@@ -27,6 +31,8 @@ static const float zero  =  0.0000000000e+00;
 float
 __ieee754_jnf(int n, float x)
 {
+    float ret;
+    {
 	int32_t i,hx,ix, sgn;
 	float a, b, temp, di;
 	float z, w;
@@ -47,8 +53,9 @@ __ieee754_jnf(int n, float x)
 	if(n==1) return(__ieee754_j1f(x));
 	sgn = (n&1)&(hx>>31);	/* even n -- 0, odd n -- sign(x) */
 	x = fabsf(x);
+	SET_RESTORE_ROUNDF (FE_TONEAREST);
 	if(__builtin_expect(ix==0||ix>=0x7f800000, 0))	/* if x is 0 or inf */
-	    b = zero;
+	    return sgn == 1 ? -zero : zero;
 	else if((float)n<=x) {
 		/* Safe to use J(n+1,x)=2n/x *J(n,x)-J(n-1,x) */
 	    a = __ieee754_j0f(x);
@@ -163,9 +170,19 @@ __ieee754_jnf(int n, float x)
 		  b = (t * w / a);
 	    }
 	}
-	if(sgn==1) return -b; else return b;
+	if(sgn==1) ret = -b; else ret = b;
+	ret = math_narrow_eval (ret);
+    }
+    if (ret == 0)
+      {
+	ret = math_narrow_eval (copysignf (FLT_MIN, ret) * FLT_MIN);
+	__set_errno (ERANGE);
+      }
+    else
+	math_check_force_underflow (ret);
+    return ret;
 }
-strong_alias (__ieee754_jnf, __jnf_finite)
+libm_alias_finite (__ieee754_jnf, __jnf)
 
 float
 __ieee754_ynf(int n, float x)
@@ -173,7 +190,7 @@ __ieee754_ynf(int n, float x)
     float ret;
     {
 	int32_t i,hx,ix;
-	u_int32_t ib;
+	uint32_t ib;
 	int32_t sign;
 	float a, b, temp;
 
@@ -181,15 +198,15 @@ __ieee754_ynf(int n, float x)
 	ix = 0x7fffffff&hx;
     /* if Y(n,NaN) is NaN */
 	if(__builtin_expect(ix>0x7f800000, 0)) return x+x;
-	if(__builtin_expect(ix==0, 0))
-		return -HUGE_VALF+x;  /* -inf and overflow exception.  */
-	if(__builtin_expect(hx<0, 0)) return zero/(zero*x);
 	sign = 1;
 	if(n<0){
 		n = -n;
 		sign = 1 - ((n&1)<<1);
 	}
 	if(n==0) return(__ieee754_y0f(x));
+	if(__builtin_expect(ix==0, 0))
+		return -sign/zero;
+	if(__builtin_expect(hx<0, 0)) return zero/(zero*x);
 	SET_RESTORE_ROUNDF (FE_TONEAREST);
 	if(n==1) {
 	    ret = sign*__ieee754_y1f(x);
@@ -208,13 +225,13 @@ __ieee754_ynf(int n, float x)
 	    a = temp;
 	}
 	/* If B is +-Inf, set up errno accordingly.  */
-	if (! __finitef (b))
+	if (! isfinite (b))
 	  __set_errno (ERANGE);
 	if(sign>0) ret = b; else ret = -b;
     }
  out:
-    if (__isinff (ret))
-	ret = __copysignf (FLT_MAX, ret) * FLT_MAX;
+    if (isinf (ret))
+	ret = copysignf (FLT_MAX, ret) * FLT_MAX;
     return ret;
 }
-strong_alias (__ieee754_ynf, __ynf_finite)
+libm_alias_finite (__ieee754_ynf, __ynf)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Ulrich Drepper <drepper@gnu.org>, 1995.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 
 #include <assert.h>
@@ -24,13 +24,13 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/param.h>
+#include <libc-diag.h>
 
 #ifndef STRING_TYPE
 # define STRING_TYPE char
 # define USTRING_TYPE unsigned char
 # define STRCOLL __strcoll_l
 # define STRCMP strcmp
-# define STRLEN strlen
 # define WEIGHT_H "../locale/weight.h"
 # define SUFFIX	MB
 # define L(arg) arg
@@ -48,7 +48,6 @@ typedef struct
   int len;			/* Length of the current sequence.  */
   size_t val;			/* Position of the sequence relative to the
 				   previous non-ignored sequence.  */
-  size_t idxnow;		/* Current index in sequences.  */
   size_t idxmax;		/* Maximum index in sequences.  */
   size_t idxcnt;		/* Current count of indices.  */
   size_t backw;			/* Current Backward sequence index.  */
@@ -172,7 +171,19 @@ get_next_seq (coll_seq *seq, int nrules, const unsigned char *rulesets,
 	    }
 	}
 
+      /* With GCC 5.3 when compiling with -Os the compiler complains
+	 that idx, taken from seq->idx (seq1 or seq2 from STRCOLL) may
+	 be used uninitialized.  In general this can't possibly be true
+	 since seq1.idx and seq2.idx are initialized to zero in the
+	 outer function.  Only one case where seq->idx is restored from
+	 seq->save_idx might result in an uninitialized idx value, but
+	 it is guarded by a sequence of checks against backw_stop which
+	 ensures that seq->save_idx was saved to first and contains a
+	 valid value.  */
+      DIAG_PUSH_NEEDS_COMMENT;
+      DIAG_IGNORE_Os_NEEDS_COMMENT (5, "-Wmaybe-uninitialized");
       len = weights[idx++];
+      DIAG_POP_NEEDS_COMMENT;
       /* Skip over indices of previous levels.  */
       for (int i = 0; i < pass; i++)
 	{
@@ -244,7 +255,7 @@ out:
 }
 
 int
-STRCOLL (const STRING_TYPE *s1, const STRING_TYPE *s2, __locale_t l)
+STRCOLL (const STRING_TYPE *s1, const STRING_TYPE *s2, locale_t l)
 {
   struct __locale_data *current = l->__locales[LC_COLLATE];
   uint_fast32_t nrules = current->values[_NL_ITEM_INDEX (_NL_COLLATE_NRULES)].word;
@@ -281,9 +292,22 @@ STRCOLL (const STRING_TYPE *s1, const STRING_TYPE *s2, __locale_t l)
 
   int result = 0, rule = 0;
 
+  /* With GCC 7 when compiling with -Os the compiler warns that
+     seq1.back_us and seq2.back_us might be used uninitialized.
+     Sometimes this warning appears at locations in locale/weightwc.h
+     where the actual use is, but on architectures other than x86_64,
+     x86 and s390x, a warning appears at the definitions of seq1 and
+     seq2.  This uninitialized use is impossible for the same reason
+     as described in comments in locale/weightwc.h.  */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_Os_NEEDS_COMMENT (7, "-Wmaybe-uninitialized");
   coll_seq seq1, seq2;
-  memset (&seq1, 0, sizeof (seq1));
-  seq2 = seq1;
+  DIAG_POP_NEEDS_COMMENT;
+  seq1.len = 0;
+  seq1.idxmax = 0;
+  seq1.rule = 0;
+  seq2.len = 0;
+  seq2.idxmax = 0;
 
   for (int pass = 0; pass < nrules; ++pass)
     {

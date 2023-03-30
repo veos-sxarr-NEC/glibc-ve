@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Schwab (schwab@issan.informatik.uni-dortmund.de)
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -23,9 +23,6 @@
 #define _ERRNO_H	1
 #include <bits/errno.h>
 #include <tls.h>
-
-#define CLONE_VM      0x00000100
-#define CLONE_THREAD  0x00010000
 
 /* int clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg,
 	     void *parent_tidptr, void *tls, void *child_tidptr) */
@@ -91,33 +88,14 @@ ENTRY (__clone)
 
 	tstl	%d0
 	jmi	SYSCALL_ERROR_LABEL
-	jeq	thread_start
+	jeq	1f
 
 	rts
 
-thread_start:
+1:
 	cfi_startproc
 	cfi_undefined (pc)	/* Mark end of stack */
 	subl	%fp, %fp	/* terminate the stack frame */
-	/* Check and see if we need to reset the PID.  */
-	movel	%d1, %a1
-	andl	#CLONE_THREAD, %d1
-	jne	donepid
-	movel	%a1, %d1
-	movel	#-1, %d0
-	andl	#CLONE_VM, %d1
-	jne	gotpid
-	movel	#SYS_ify (getpid), %d0
-	trap	#0
-gotpid:
-	movel	%a0, -(%sp)
-	movel	%d0, -(%sp)
-	bsrl	__m68k_read_tp@PLTPC
-	movel	(%sp)+, %d0
-	movel	%d0, PID_OFFSET(%a0)
-	movel	%d0, TID_OFFSET(%a0)
-	movel	(%sp)+, %a0
-donepid:
 	jsr	(%a0)
 	movel	%d0, %d1
 	movel	#SYS_ify (exit), %d0
@@ -127,4 +105,5 @@ donepid:
 	cfi_startproc
 PSEUDO_END (__clone)
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

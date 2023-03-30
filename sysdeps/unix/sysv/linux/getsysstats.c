@@ -1,5 +1,5 @@
 /* Determine various system internal values, Linux version.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <assert.h>
@@ -85,7 +85,7 @@ next_line (int fd, char *const buffer, char **cp, char **re,
 	      *re = buffer + (*re - *cp);
 	      *cp = buffer;
 
-	      ssize_t n = read_not_cancel (fd, *re, buffer_end - *re);
+	      ssize_t n = __read_nocancel (fd, *re, buffer_end - *re);
 	      if (n < 0)
 		return NULL;
 
@@ -96,7 +96,7 @@ next_line (int fd, char *const buffer, char **cp, char **re,
 		{
 		  /* Truncate too long lines.  */
 		  *re = buffer + 3 * (buffer_end - buffer) / 4;
-		  n = read_not_cancel (fd, *re, buffer_end - *re);
+		  n = __read_nocancel (fd, *re, buffer_end - *re);
 		  if (n < 0)
 		    return NULL;
 
@@ -128,7 +128,7 @@ __get_nprocs (void)
   static int cached_result = -1;
   static time_t timestamp;
 
-  time_t now = time (NULL);
+  time_t now = time_now ();
   time_t prev = timestamp;
   atomic_read_barrier ();
   if (now == prev && cached_result > -1)
@@ -143,7 +143,7 @@ __get_nprocs (void)
   char *re = buffer_end;
 
   const int flags = O_RDONLY | O_CLOEXEC;
-  int fd = open_not_cancel_2 ("/sys/devices/system/cpu/online", flags);
+  int fd = __open_nocancel ("/sys/devices/system/cpu/online", flags);
   char *l;
   int result = 0;
   if (fd != -1)
@@ -180,7 +180,7 @@ __get_nprocs (void)
 	  }
 	while (l < re);
 
-      close_not_cancel_no_status (fd);
+      __close_nocancel_nostatus (fd);
 
       if (result > 0)
 	goto out;
@@ -188,10 +188,13 @@ __get_nprocs (void)
 
   cp = buffer_end;
   re = buffer_end;
-  result = 1;
+
+  /* Default to an SMP system in case we cannot obtain an accurate
+     number.  */
+  result = 2;
 
   /* The /proc/stat format is more uniform, use it by default.  */
-  fd = open_not_cancel_2 ("/proc/stat", flags);
+  fd = __open_nocancel ("/proc/stat", flags);
   if (fd != -1)
     {
       result = 0;
@@ -204,15 +207,15 @@ __get_nprocs (void)
 	else if (isdigit (l[3]))
 	  ++result;
 
-      close_not_cancel_no_status (fd);
+      __close_nocancel_nostatus (fd);
     }
   else
     {
-      fd = open_not_cancel_2 ("/proc/cpuinfo", flags);
+      fd = __open_nocancel ("/proc/cpuinfo", flags);
       if (fd != -1)
 	{
 	  GET_NPROCS_PARSER (fd, buffer, cp, re, buffer_end, result);
-	  close_not_cancel_no_status (fd);
+	  __close_nocancel_nostatus (fd);
 	}
     }
 
@@ -223,6 +226,7 @@ __get_nprocs (void)
 
   return result;
 }
+libc_hidden_def (__get_nprocs)
 weak_alias (__get_nprocs, get_nprocs)
 
 
@@ -276,83 +280,58 @@ __get_nprocs_conf (void)
 
   return result;
 }
+libc_hidden_def (__get_nprocs_conf)
 weak_alias (__get_nprocs_conf, get_nprocs_conf)
 
-/* General function to get information about memory status from proc
-   filesystem.  */
+
+/* Compute (num*mem_unit)/pagesize, but avoid overflowing long int.
+   In practice, mem_unit is never bigger than the page size, so after
+   the first loop it is 1.  [In the kernel, it is initialized to
+   PAGE_SIZE in mm/page_alloc.c:si_meminfo(), and then in
+   kernel.sys.c:do_sysinfo() it is set to 1 if unsigned long can
+   represent all the sizes measured in bytes].  */
 static long int
-internal_function
-phys_pages_info (const char *format)
+sysinfo_mempages (unsigned long int num, unsigned int mem_unit)
 {
-  char buffer[8192];
-  long int result = -1;
+  unsigned long int ps = __getpagesize ();
 
-  /* If we haven't found an appropriate entry return 1.  */
-  FILE *fp = fopen ("/proc/meminfo", "rce");
-  if (fp != NULL)
+  while (mem_unit > 1 && ps > 1)
     {
-      /* No threads use this stream.  */
-      __fsetlocking (fp, FSETLOCKING_BYCALLER);
-
-      result = 0;
-      /* Read all lines and count the lines starting with the
-	 string "processor".  We don't have to fear extremely long
-	 lines since the kernel will not generate them.  8192
-	 bytes are really enough.  */
-      while (__fgets_unlocked (buffer, sizeof buffer, fp) != NULL)
-	if (sscanf (buffer, format, &result) == 1)
-	  {
-	    result /= (__getpagesize () / 1024);
-	    break;
-	  }
-
-      fclose (fp);
+      mem_unit >>= 1;
+      ps >>= 1;
     }
-
-  if (result == -1)
-    /* We cannot get the needed value: signal an error.  */
-    __set_errno (ENOSYS);
-
-  return result;
+  num *= mem_unit;
+  while (ps > 1)
+    {
+      ps >>= 1;
+      num >>= 1;
+    }
+  return num;
 }
 
-
-/* Return the number of pages of physical memory in the system.  There
-   is currently (as of version 2.0.21) no system call to determine the
-   number.  It is planned for the 2.1.x series to add this, though.
-
-   One possibility to implement it for systems using Linux 2.0 is to
-   examine the pseudo file /proc/cpuinfo.  Here we have one entry for
-   each processor.
-
-   But not all systems have support for the /proc filesystem.  If it
-   is not available we return -1 as an error signal.  */
+/* Return the number of pages of total/available physical memory in
+   the system.  This used to be done by parsing /proc/meminfo, but
+   that's unnecessarily expensive (and /proc is not always available).
+   The sysinfo syscall provides the same information, and has been
+   available at least since kernel 2.3.48.  */
 long int
 __get_phys_pages (void)
 {
-  /* XXX Here will come a test for the new system call.  */
+  struct sysinfo info;
 
-  return phys_pages_info ("MemTotal: %ld kB");
+  __sysinfo (&info);
+  return sysinfo_mempages (info.totalram, info.mem_unit);
 }
+libc_hidden_def (__get_phys_pages)
 weak_alias (__get_phys_pages, get_phys_pages)
 
-
-/* Return the number of available pages of physical memory in the
-   system.  There is currently (as of version 2.0.21) no system call
-   to determine the number.  It is planned for the 2.1.x series to add
-   this, though.
-
-   One possibility to implement it for systems using Linux 2.0 is to
-   examine the pseudo file /proc/cpuinfo.  Here we have one entry for
-   each processor.
-
-   But not all systems have support for the /proc filesystem.  If it
-   is not available we return -1 as an error signal.  */
 long int
 __get_avphys_pages (void)
 {
-  /* XXX Here will come a test for the new system call.  */
+  struct sysinfo info;
 
-  return phys_pages_info ("MemFree: %ld kB");
+  __sysinfo (&info);
+  return sysinfo_mempages (info.freeram, info.mem_unit);
 }
+libc_hidden_def (__get_avphys_pages)
 weak_alias (__get_avphys_pages, get_avphys_pages)

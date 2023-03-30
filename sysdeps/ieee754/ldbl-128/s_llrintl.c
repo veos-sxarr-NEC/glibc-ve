@@ -1,6 +1,6 @@
 /* Round argument to nearest integral value according to current rounding
    direction.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997 and
 		  Jakub Jelinek <jj@ultra.linux.cz>, 1999.
@@ -17,25 +17,29 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <fenv.h>
+#include <limits.h>
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
+#include <fix-fp-int-convert-overflow.h>
 
-static const long double two112[2] =
+static const _Float128 two112[2] =
 {
-  5.19229685853482762853049632922009600E+33L, /* 0x406F000000000000, 0 */
- -5.19229685853482762853049632922009600E+33L  /* 0xC06F000000000000, 0 */
+  L(5.19229685853482762853049632922009600E+33), /* 0x406F000000000000, 0 */
+ L(-5.19229685853482762853049632922009600E+33)  /* 0xC06F000000000000, 0 */
 };
 
 long long int
-__llrintl (long double x)
+__llrintl (_Float128 x)
 {
   int32_t j0;
-  u_int64_t i0,i1;
-  volatile long double w;
-  long double t;
+  uint64_t i0,i1;
+  _Float128 w;
+  _Float128 t;
   long long int result;
   int sx;
 
@@ -47,8 +51,21 @@ __llrintl (long double x)
 
   if (j0 < (int32_t) (8 * sizeof (long long int)) - 1)
     {
-      w = two112[sx] + x;
-      t = w - two112[sx];
+#if defined FE_INVALID || defined FE_INEXACT
+      /* X < LLONG_MAX + 1 implied by J0 < 63.  */
+      if (x > (_Float128) LLONG_MAX)
+	{
+	  /* In the event of overflow we must raise the "invalid"
+	     exception, but not "inexact".  */
+	  t = __nearbyintl (x);
+	  feraiseexcept (t == LLONG_MAX ? FE_INEXACT : FE_INVALID);
+	}
+      else
+#endif
+	{
+	  w = two112[sx] + x;
+	  t = w - two112[sx];
+	}
       GET_LDOUBLE_WORDS64 (i0, i1, t);
       j0 = ((i0 >> 48) & 0x7fff) - 0x3fff;
       i0 &= 0x0000ffffffffffffLL;
@@ -63,12 +80,30 @@ __llrintl (long double x)
     }
   else
     {
-      /* The number is too large.  It is left implementation defined
-	 what happens.  */
+      /* The number is too large.  Unless it rounds to LLONG_MIN,
+	 FE_INVALID must be raised and the return value is
+	 unspecified.  */
+#if defined FE_INVALID || defined FE_INEXACT
+      if (x < (_Float128) LLONG_MIN
+	  && x > (_Float128) LLONG_MIN - 1)
+	{
+	  /* If truncation produces LLONG_MIN, the cast will not raise
+	     the exception, but may raise "inexact".  */
+	  t = __nearbyintl (x);
+	  feraiseexcept (t == LLONG_MIN ? FE_INEXACT : FE_INVALID);
+	  return LLONG_MIN;
+	}
+      else if (FIX_LDBL_LLONG_CONVERT_OVERFLOW && x != (_Float128) LLONG_MIN)
+	{
+	  feraiseexcept (FE_INVALID);
+	  return sx == 0 ? LLONG_MAX : LLONG_MIN;
+	}
+
+#endif
       return (long long int) x;
     }
 
   return sx ? -result : result;
 }
 
-weak_alias (__llrintl, llrintl)
+libm_alias_ldouble (__llrint, llrint)

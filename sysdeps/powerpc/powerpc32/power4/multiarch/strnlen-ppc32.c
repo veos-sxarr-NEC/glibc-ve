@@ -1,5 +1,5 @@
 /* Default strnlen implementation for PowerPC32.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define STRNLEN  __strnlen_ppc
 #ifdef SHARED
 # undef libc_hidden_def
 # define libc_hidden_def(name)  \
-    __hidden_ver1 (__strnlen_ppc, __GI_strnlen, __strnlen_ppc);
+    __hidden_ver1 (__strnlen_ppc, __GI_strnlen, __strnlen_ppc); \
+    strong_alias (__strnlen_ppc, __strnlen_ppc_1); \
+    __hidden_ver1 (__strnlen_ppc_1, __GI___strnlen, __strnlen_ppc_1);
 #endif
 
 #include <string/strnlen.c>

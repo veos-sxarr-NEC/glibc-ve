@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1996.
 
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef _TOKEN_H
 #define _TOKEN_H
@@ -186,6 +186,8 @@ enum token_t
   tok_cal_direction,
   tok_timezone,
   tok_date_fmt,
+  tok_alt_mon,
+  tok_ab_alt_mon,
   tok_lc_messages,
   tok_yesexpr,
   tok_noexpr,

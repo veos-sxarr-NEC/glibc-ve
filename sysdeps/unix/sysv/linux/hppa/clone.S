@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David Huggins-Daines <dhd@debian.org>, 2000.
    Based on the Alpha version by Richard Henderson <rth@tamu.edu>, 1996.
@@ -15,12 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
 
-#include <asm/unistd.h>
 #include <sysdep.h>
 #define _ERRNO_H	1
 #include <bits/errno.h>
@@ -64,19 +63,27 @@
 ENTRY(__clone)
 	/* Prologue */
 	stwm	%r4, 64(%sp)
+	.cfi_def_cfa_offset -64
+	.cfi_offset 4, 0
 	stw	%sp, -4(%sp)
 #ifdef PIC
 	stw	%r19, -32(%sp)
+	.cfi_offset 19, 32
 #endif
 
 	/* Sanity check arguments.  */
-	comib,=,n  0, %arg0, .LerrorSanity        /* no NULL function pointers */
-	comib,=,n  0, %arg1, .LerrorSanity        /* no NULL stack pointers */
+	comib,=,n	0,%arg0,.LerrorSanity	/* no NULL function pointers */
+	comib,=,n	0,%arg1,.LerrorSanity	/* no NULL stack pointers */
+
+	/* Ensure stack argument is 8-byte aligned.  */
+	ldo		7(%r25),%r25
+	depi		0,31,3,%r25
 
 	/* Save the function pointer, arg, and flags on the new stack.  */
 	stwm    %r26, 64(%r25)
 	stw	%r23, -60(%r25)
 	stw     %r24, -56(%r25)
+
 	/* Clone arguments are (int flags, void * child_stack) */
 	copy	%r24, %r26		/* flags are first */
 	/* User stack pointer is in the correct register already */
@@ -132,24 +139,6 @@ ENTRY(__clone)
 	ldwm	-64(%sp), %r4
 
 .LthreadStart:
-# define CLONE_VM_BIT		23	/* 0x00000100  */
-# define CLONE_THREAD_BIT	15	/* 0x00010000  */
-	/* Load original clone flags.
-	   If CLONE_THREAD was passed, don't reset the PID/TID.
-	   If CLONE_VM was passed, we need to store -1 to PID/TID.
-	   If CLONE_VM and CLONE_THREAD were not set store the result
-	   of getpid to PID/TID.  */
-	ldw	-56(%sp), %r26
-	bb,<,n	%r26, CLONE_THREAD_BIT, 1f
-	bb,<	%r26, CLONE_VM_BIT, 2f
-	ldi	-1, %ret0
-	ble     0x100(%sr2, %r0)
-	ldi	__NR_getpid, %r20
-2:
-	mfctl	%cr27, %r26
-	stw	%ret0, PID_THREAD_OFFSET(%r26)
-	stw	%ret0, TID_THREAD_OFFSET(%r26)
-1:
 	/* Load up the arguments.  */
 	ldw	-60(%sp), %arg0
 	ldw     -64(%sp), %r22
@@ -165,14 +154,15 @@ ENTRY(__clone)
 #ifdef PIC
 	copy	%r4, %r19
 #endif
-	/* The call to _exit needs saved r19.  */
-	bl	_exit, %rp
-	copy	%ret0, %arg0
+	copy	%r28, %r26
+	ble     0x100(%sr2, %r0)
+	ldi	__NR_exit, %r20
 
-	/* We should not return from _exit.
+	/* We should not return from exit.
            We do not restore r4, or the stack state.  */
 	iitlbp	%r0, (%sr0, %r0)
 
 PSEUDO_END(__clone)
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

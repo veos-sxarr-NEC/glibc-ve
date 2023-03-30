@@ -1,4 +1,4 @@
-/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,37 +13,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Alan Modra <amodra@bigpond.net.au> rewrote the INLINE_SYSCALL macro */
 
 #ifndef _LINUX_POWERPC_SYSDEP_H
 #define _LINUX_POWERPC_SYSDEP_H 1
 
+#include <sysdeps/unix/sysv/linux/powerpc/sysdep.h>
+#include <sysdeps/unix/sysv/linux/sysdep.h>
 #include <sysdeps/unix/powerpc/sysdep.h>
 #include <tls.h>
 
 /* Define __set_errno() for INLINE_SYSCALL macro below.  */
 #ifndef __ASSEMBLER__
 #include <errno.h>
-#endif
-
-/* Some systen calls got renamed over time, but retained the same semantics.
-   Handle them here so they can be catched by both C and assembler stubs in
-   glibc.  */
-
-#ifdef __NR_pread64
-# ifdef __NR_pread
-#  error "__NR_pread and __NR_pread64 both defined???"
-# endif
-# define __NR_pread __NR_pread64
-#endif
-
-#ifdef __NR_pwrite64
-# ifdef __NR_pwrite
-#  error "__NR_pwrite and __NR_pwrite64 both defined???"
-# endif
-# define __NR_pwrite __NR_pwrite64
 #endif
 
 /* For Linux we can use the system call table in the header file
@@ -61,90 +45,13 @@
 
 #endif /* __ASSEMBLER__ */
 
-/* This version is for kernels that implement system calls that
-   behave like function calls as far as register saving.
-   It falls back to the syscall in the case that the vDSO doesn't
-   exist or fails for ENOSYS */
-#ifdef SHARED
-# define INLINE_VSYSCALL(name, nr, args...) \
-  ({									      \
-    __label__ out;							      \
-    __label__ iserr;							      \
-    INTERNAL_SYSCALL_DECL (sc_err);					      \
-    long int sc_ret;							      \
-									      \
-    if (__vdso_##name != NULL)						      \
-      {									      \
-	sc_ret =							      \
-	  INTERNAL_VSYSCALL_NCS (__vdso_##name, sc_err, long int, nr, ##args);\
-	if (!INTERNAL_SYSCALL_ERROR_P (sc_ret, sc_err))			      \
-	  goto out;							      \
-	if (INTERNAL_SYSCALL_ERRNO (sc_ret, sc_err) != ENOSYS)		      \
-	  goto iserr;							      \
-      }									      \
-									      \
-    sc_ret = INTERNAL_SYSCALL (name, sc_err, nr, ##args);		      \
-    if (INTERNAL_SYSCALL_ERROR_P (sc_ret, sc_err))			      \
-      {									      \
-      iserr:								      \
-        __set_errno (INTERNAL_SYSCALL_ERRNO (sc_ret, sc_err));		      \
-        sc_ret = -1L;							      \
-      }									      \
-  out:									      \
-    sc_ret;								      \
-  })
-#else
-# define INLINE_VSYSCALL(name, nr, args...) \
-  INLINE_SYSCALL (name, nr, ##args)
-#endif
-
-#ifdef SHARED
-# define INTERNAL_VSYSCALL(name, err, nr, args...) \
-  ({									      \
-    __label__ out;							      \
-    long int v_ret;							      \
-									      \
-    if (__vdso_##name != NULL)						      \
-      {									      \
-	v_ret =								      \
-	  INTERNAL_VSYSCALL_NCS (__vdso_##name, err, long int, nr, ##args);   \
-	if (!INTERNAL_SYSCALL_ERROR_P (v_ret, err)			      \
-	    || INTERNAL_SYSCALL_ERRNO (v_ret, err) != ENOSYS)		      \
-	  goto out;							      \
-      }									      \
-    v_ret = INTERNAL_SYSCALL (name, err, nr, ##args);			      \
-  out:									      \
-    v_ret;								      \
-  })
-#else
-# define INTERNAL_VSYSCALL(name, err, nr, args...) \
-  INTERNAL_SYSCALL (name, err, nr, ##args)
-#endif
-
-/* This version is for internal uses when there is no desire
-   to set errno */
-#define INTERNAL_VSYSCALL_NO_SYSCALL_FALLBACK(name, err, type, nr, args...)   \
-  ({									      \
-    type sc_ret = ENOSYS;						      \
-									      \
-    if (__vdso_##name != NULL)						      \
-      sc_ret = INTERNAL_VSYSCALL_NCS (__vdso_##name, err, type, nr, ##args);  \
-    else								      \
-      err = 1 << 28;							      \
-    sc_ret;								      \
-  })
-
-/* List of system calls which are supported as vsyscalls.  */
-#define HAVE_CLOCK_GETRES_VSYSCALL	1
-#define HAVE_CLOCK_GETTIME_VSYSCALL	1
-
 /* Define a macro which expands inline into the wrapper code for a system
    call. This use is for internal calls that do not need to handle errors
    normally. It will never touch errno. This returns just what the kernel
    gave back in the non-error (CR0.SO cleared) case, otherwise (CR0.SO set)
    the negation of the return value in the kernel gets reverted.  */
 
-#define INTERNAL_VSYSCALL_NCS(funcptr, err, type, nr, args...) \
+#define INTERNAL_VSYSCALL_CALL_TYPE(funcptr, err, type, nr, args...)    \
   ({									\
     register void *r0  __asm__ ("r0");					\
     register long int r3  __asm__ ("r3");				\
@@ -168,10 +75,12 @@
     rval;								\
   })
 
-#undef INLINE_SYSCALL
+#define INTERNAL_VSYSCALL_CALL(funcptr, err, nr, args...)		\
+  INTERNAL_VSYSCALL_CALL_TYPE(funcptr, err, long int, nr, args)
 
 /* This version is for kernels that implement system calls that
    behave like function calls as far as register saving.  */
+#undef INLINE_SYSCALL
 #define INLINE_SYSCALL(name, nr, args...)				\
   ({									\
     INTERNAL_SYSCALL_DECL (sc_err);					\
@@ -201,7 +110,6 @@
     register long int r7  __asm__ ("r7");				\
     register long int r8  __asm__ ("r8");				\
     LOADARGS_##nr (name, ##args);					\
-    ABORT_TRANSACTION;							\
     __asm__ __volatile__						\
       ("sc\n\t"								\
        "mfcr  %0\n\t"							\
@@ -305,5 +213,14 @@
 #  define PTR_DEMANGLE(var)	PTR_MANGLE (var)
 # endif
 #endif
+
+/* In the PowerPC64 ABI, the unadorned F_GETLK* opcodes should be used
+   even by largefile64 code.  */
+#define FCNTL_ADJUST_CMD(__cmd)				\
+  ({ int cmd_ = (__cmd);				\
+     if (cmd_ >= F_GETLK64 && cmd_ <= F_SETLKW64)	\
+       cmd_ -= F_GETLK64 - F_GETLK;			\
+     cmd_; })
+
 
 #endif /* linux/powerpc/powerpc64/sysdep.h */

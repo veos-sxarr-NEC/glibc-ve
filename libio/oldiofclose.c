@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -33,8 +33,7 @@
 
 int
 attribute_compat_text_section
-_IO_old_fclose (fp)
-     _IO_FILE *fp;
+_IO_old_fclose (FILE *fp)
 {
   int status;
 
@@ -47,11 +46,11 @@ _IO_old_fclose (fp)
     return _IO_new_fclose (fp);
 
   /* First unlink the stream.  */
-  if (fp->_IO_file_flags & _IO_IS_FILEBUF)
+  if (fp->_flags & _IO_IS_FILEBUF)
     _IO_un_link ((struct _IO_FILE_plus *) fp);
 
   _IO_acquire_lock (fp);
-  if (fp->_IO_file_flags & _IO_IS_FILEBUF)
+  if (fp->_flags & _IO_IS_FILEBUF)
     status = _IO_old_file_close_it (fp);
   else
     status = fp->_flags & _IO_ERR_SEEN ? -1 : 0;
@@ -59,12 +58,7 @@ _IO_old_fclose (fp)
   _IO_FINISH (fp);
   if (_IO_have_backup (fp))
     _IO_free_backup_area (fp);
-  if (fp != _IO_stdin && fp != _IO_stdout && fp != _IO_stderr)
-    {
-      fp->_IO_file_flags = 0;
-      free(fp);
-    }
-
+  _IO_deallocate_file (fp);
   return status;
 }
 

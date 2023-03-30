@@ -1,7 +1,7 @@
 /* strcspn (str, ss) -- Return the length of the initial segment of STR
 			which contains no characters from SS.
    For AMD x86-64.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>.
    Bug fixes by Alan Modra <Alan@SPRI.Levels.UniSA.Edu.Au>.
@@ -19,13 +19,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include "asm-syntax.h"
-
-/* BEWARE: `#ifdef strcspn' means that strcspn is redefined as `strpbrk' */
-#define STRPBRK_P (defined strcspn)
 
 	.text
 ENTRY (strcspn)
@@ -111,7 +108,7 @@ L(5):	incq %rax
 
 L(4):	addq $256, %rsp		/* remove skipset */
 	cfi_adjust_cfa_offset(-256)
-#if STRPBRK_P
+#ifdef USE_AS_STRPBRK
 	xorl %edx,%edx
 	orb %cl, %cl		/* was last character NUL? */
 	cmovzq %rdx, %rax	/* Yes:	return NULL */

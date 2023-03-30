@@ -1,5 +1,5 @@
 /* Tests for UTMP functions.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Mark Kettenis <kettenis@phys.uva.nl>, 1998.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <error.h>
@@ -39,8 +39,6 @@
 #endif
 
 
-#if _HAVE_UT_TYPE || defined UTMPX
-
 /* Prototype for our test function.  */
 static int do_test (int argc, char *argv[]);
 
@@ -62,24 +60,20 @@ do_prepare (int argc, char *argv[])
   size_t name_len;
 
   name_len = strlen (test_dir);
-  name = malloc (name_len + sizeof ("/utmpXXXXXX"));
+  name = xmalloc (name_len + sizeof ("/utmpXXXXXX"));
   mempcpy (mempcpy (name, test_dir, name_len),
 	   "/utmpXXXXXX", sizeof ("/utmpXXXXXX"));
-  add_temp_file (name);
 
   /* Open our test file.  */
   fd = mkstemp (name);
   if (fd == -1)
     error (EXIT_FAILURE, errno, "cannot open test file `%s'", name);
+  add_temp_file (name);
 }
 
 struct utmp entry[] =
 {
-#if _HAVE_UT_TV || defined UTMPX
 #define UT(a)  .ut_tv = { .tv_sec = (a)}
-#else
-#define UT(a)  .ut_time = (a)
-#endif
 
   { .ut_type = BOOT_TIME, .ut_pid = 1, UT(1000) },
   { .ut_type = RUN_LVL, .ut_pid = 1, UT(2000) },
@@ -132,8 +126,8 @@ do_check (void)
   n = 0;
   while ((ut = getutent ()))
     {
-      if (n < num_entries &&
-	  memcmp (ut, &entry[n], sizeof (struct utmp)))
+      if (n < num_entries
+	  && memcmp (ut, &entry[n], sizeof (struct utmp)))
 	{
 	  error (0, 0, "UTMP entry does not match");
 	  return 1;
@@ -160,18 +154,14 @@ simulate_login (const char *line, const char *user)
 
   for (n = 0; n < num_entries; n++)
     {
-      if (strcmp (line, entry[n].ut_line) == 0 ||
-	  entry[n].ut_type == DEAD_PROCESS)
+      if (strcmp (line, entry[n].ut_line) == 0
+	  || entry[n].ut_type == DEAD_PROCESS)
 	{
 	  if (entry[n].ut_pid == DEAD_PROCESS)
 	    entry[n].ut_pid = (entry_pid += 27);
 	  entry[n].ut_type = USER_PROCESS;
 	  strncpy (entry[n].ut_user, user, sizeof (entry[n].ut_user));
-#if _HAVE_UT_TV - 0 || defined UTMPX
 	  entry[n].ut_tv.tv_sec = (entry_time += 1000);
-#else
-          entry[n].ut_time = (entry_time += 1000);
-#endif
 	  setutent ();
 
 	  if (pututline (&entry[n]) == NULL)
@@ -201,11 +191,7 @@ simulate_logout (const char *line)
 	{
 	  entry[n].ut_type = DEAD_PROCESS;
 	  strncpy (entry[n].ut_user, "", sizeof (entry[n].ut_user));
-#if _HAVE_UT_TV - 0 || defined UTMPX
           entry[n].ut_tv.tv_sec = (entry_time += 1000);
-#else
-          entry[n].ut_time = (entry_time += 1000);
-#endif
 	  setutent ();
 
 	  if (pututline (&entry[n]) == NULL)
@@ -390,14 +376,3 @@ do_test (int argc, char *argv[])
 
   return result;
 }
-
-#else
-
-/* No field 'ut_type' in struct utmp.  */
-int
-main (void)
-{
-  return 0;
-}
-
-#endif

@@ -4,7 +4,7 @@
  * There are two sets of procedures here.  The xprt routines are
  * for handling transport handles.  The svc routines handle the
  * list of service routines.
- *  Copyright (C) 2002-2015 Free Software Foundation, Inc.
+ *  Copyright (C) 2002-2020 Free Software Foundation, Inc.
  *  This file is part of the GNU C Library.
  *  Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
  *
@@ -20,7 +20,7 @@
  *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with the GNU C Library; if not, see
- *  <http://www.gnu.org/licenses/>.
+ *  <https://www.gnu.org/licenses/>.
  *
  * Copyright (c) 2010, Oracle America, Inc.
  *
@@ -59,12 +59,9 @@
 #include <rpc/pmap_clnt.h>
 #include <sys/poll.h>
 #include <time.h>
+#include <shlib-compat.h>
 
-#ifdef _RPC_THREAD_SAFE_
 #define xports RPC_THREAD_VARIABLE(svc_xports_s)
-#else
-static SVCXPRT **xports;
-#endif
 
 #define NULL_SVC ((struct svc_callout *)0)
 #define	RQCRED_SIZE	400	/* this size is excessive */
@@ -80,11 +77,7 @@ struct svc_callout {
   void (*sc_dispatch) (struct svc_req *, SVCXPRT *);
   bool_t sc_mapped;
 };
-#ifdef _RPC_THREAD_SAFE_
 #define svc_head RPC_THREAD_VARIABLE(svc_head_s)
-#else
-static struct svc_callout *svc_head;
-#endif
 
 /* ***************  SVCXPRT related stuff **************** */
 
@@ -97,8 +90,8 @@ xprt_register (SVCXPRT *xprt)
 
   if (xports == NULL)
     {
-      xports = (SVCXPRT **) malloc (_rpc_dtablesize () * sizeof (SVCXPRT *));
-      if (xports == NULL) /* Don´t add handle */
+      xports = (SVCXPRT **) calloc (_rpc_dtablesize (), sizeof (SVCXPRT *));
+      if (xports == NULL) /* Don't add handle */
 	return;
     }
 
@@ -182,17 +175,6 @@ done:
   return s;
 }
 
-
-static bool_t
-svc_is_mapped (rpcprog_t prog, rpcvers_t vers)
-{
-  struct svc_callout *prev;
-  register struct svc_callout *s;
-  s = svc_find (prog, vers, &prev);
-  return s!= NULL_SVC && s->sc_mapped;
-}
-
-
 /* Add a service program to the callout list.
    The dispatch routine will be called when a rpc request for this
    program number comes in. */
@@ -248,6 +230,7 @@ svc_unregister (rpcprog_t prog, rpcvers_t vers)
 
   if ((s = svc_find (prog, vers, &prev)) == NULL_SVC)
     return;
+  bool is_mapped = s->sc_mapped;
 
   if (prev == NULL_SVC)
     svc_head = s->sc_next;
@@ -257,7 +240,7 @@ svc_unregister (rpcprog_t prog, rpcvers_t vers)
   s->sc_next = NULL_SVC;
   mem_free ((char *) s, (u_int) sizeof (struct svc_callout));
   /* now unregister the information with the local binder service */
-  if (! svc_is_mapped (prog, vers))
+  if (is_mapped)
     pmap_unset (prog, vers);
 }
 libc_hidden_nolink_sunrpc (svc_unregister, GLIBC_2_0)
@@ -577,7 +560,6 @@ __svc_accept_failed (void)
     }
 }
 
-#ifdef _RPC_THREAD_SAFE_
 
 void
 __rpc_thread_svc_cleanup (void)
@@ -587,5 +569,3 @@ __rpc_thread_svc_cleanup (void)
   while ((svcp = svc_head) != NULL)
     svc_unregister (svcp->sc_prog, svcp->sc_vers);
 }
-
-#endif /* _RPC_THREAD_SAFE_ */

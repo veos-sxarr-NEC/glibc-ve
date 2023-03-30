@@ -1,2 +1,3 @@
 #define	FUNC	log1pf
-#include <s_atanf.c>
+#define float_type float
+#include <s_log1p.c>

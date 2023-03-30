@@ -1,4 +1,4 @@
-/* Copyright (C) 1990-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1990-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Torbjorn Granlund (tege@sics.se).
 
@@ -14,15 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <malloc.h>
+#include <support/support.h>
 
-int
-main (void)
+static int
+do_test (void)
 {
   char *mem, *memp;
   char *rand_mem;
@@ -34,10 +34,10 @@ main (void)
 
   max_size = 256;
 
-  mem = malloc (max_size + 2 * max_size + 2 * space_around);
-  rand_mem = malloc (max_size);
-  lo_around = malloc (space_around);
-  hi_around = malloc (space_around);
+  mem = xmalloc (max_size + 2 * max_size + 2 * space_around);
+  rand_mem = xmalloc (max_size);
+  lo_around = xmalloc (space_around);
+  hi_around = xmalloc (space_around);
   memp = mem + space_around;
 
   /* Fill RAND_MEM with random bytes, each non-zero.  */
@@ -105,3 +105,5 @@ main (void)
 
   return 0;
 }
+
+#include <support/test-driver.c>

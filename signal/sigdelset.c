@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,22 +13,25 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include "sigsetops.h"
+#include <errno.h>
+#include <signal.h>
+#include <sigsetops.h>
+#include <internal-signals.h>
 
 /* Add SIGNO to SET.  */
 int
-sigdelset (set, signo)
-     sigset_t *set;
-     int signo;
+sigdelset (sigset_t *set, int signo)
 {
-  if (set == NULL || signo <= 0 || signo >= NSIG)
+  if (set == NULL || signo <= 0 || signo >= NSIG
+      || __is_internal_signal (signo))
     {
       __set_errno (EINVAL);
       return -1;
     }
 
-  return __sigdelset (set, signo);
+  __sigdelset (set, signo);
+  return 0;
 }
 libc_hidden_def (sigdelset)

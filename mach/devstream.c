@@ -1,6 +1,6 @@
 /* stdio on a Mach device port.
    Translates \n to \r\n on output, echos and translates \r to \n on input.
-   Copyright (C) 1992-2015 Free Software Foundation, Inc.
+   Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,13 +15,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <mach.h>
 #include <device/device.h>
 #include <errno.h>
 #include <string.h>
+#include <libioP.h>
 
 
 static ssize_t
@@ -111,7 +112,7 @@ devstream_read (void *cookie, char *buffer, size_t to_read)
 static int
 dealloc_ref (void *cookie)
 {
-  if (mach_port_deallocate (mach_task_self (), (mach_port_t) cookie))
+  if (__mach_port_deallocate (mach_task_self (), (mach_port_t) cookie))
     {
       errno = EINVAL;
       return -1;
@@ -130,13 +131,13 @@ mach_open_devstream (mach_port_t dev, const char *mode)
       return NULL;
     }
 
-  stream = fopencookie ((void *) dev, mode,
-			(cookie_io_functions_t) { write: devstream_write,
-						  read: devstream_read,
-						  close: dealloc_ref });
+  stream = _IO_fopencookie ((void *) dev, mode,
+			    (cookie_io_functions_t) { write: devstream_write,
+						      read: devstream_read,
+						      close: dealloc_ref });
   if (stream == NULL)
     {
-      mach_port_deallocate (mach_task_self (), dev);
+      __mach_port_deallocate (mach_task_self (), dev);
       return NULL;
     }
 

@@ -1,5 +1,5 @@
 /* Handle loading/unloading of shared object for transformation.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <dlfcn.h>
@@ -23,7 +23,7 @@
 #include <search.h>
 #include <stdlib.h>
 #include <string.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <sys/param.h>
 
 #include <gconv_int.h>
@@ -64,7 +64,6 @@ known_compare (const void *p1, const void *p2)
 /* Open the gconv database if necessary.  A non-negative return value
    means success.  */
 struct __gconv_loaded_object *
-internal_function
 __gconv_find_shlib (const char *name)
 {
   struct __gconv_loaded_object *found;
@@ -131,10 +130,8 @@ __gconv_find_shlib (const char *name)
 
 #ifdef PTR_MANGLE
 		  PTR_MANGLE (found->fct);
-		  if (found->init_fct != NULL)
-		    PTR_MANGLE (found->init_fct);
-		  if (found->end_fct !=  NULL)
-		    PTR_MANGLE (found->end_fct);
+		  PTR_MANGLE (found->init_fct);
+		  PTR_MANGLE (found->end_fct);
 #endif
 
 		  /* We have succeeded in loading the shared object.  */
@@ -152,15 +149,10 @@ __gconv_find_shlib (const char *name)
   return found;
 }
 
-
-/* This is very ugly but the tsearch functions provide no way to pass
-   information to the walker function.  So we use a global variable.
-   It is MT safe since we use a lock.  */
-static struct __gconv_loaded_object *release_handle;
-
 static void
-do_release_shlib (void *nodep, VISIT value, int level)
+do_release_shlib (const void *nodep, VISIT value, void *closure)
 {
+  struct __gconv_loaded_object *release_handle = closure;
   struct __gconv_loaded_object *obj = *(struct __gconv_loaded_object **) nodep;
 
   if (value != preorder && value != leaf)
@@ -185,16 +177,12 @@ do_release_shlib (void *nodep, VISIT value, int level)
 
 /* Notify system that a shared object is not longer needed.  */
 void
-internal_function
 __gconv_release_shlib (struct __gconv_loaded_object *handle)
 {
-  /* Urgh, this is ugly but we have no other possibility.  */
-  release_handle = handle;
-
   /* Process all entries.  Please note that we also visit entries
      with release counts <= 0.  This way we can finally unload them
      if necessary.  */
-  __twalk (loaded, (__action_fn_t) do_release_shlib);
+  __twalk_r (loaded, do_release_shlib, handle);
 }
 
 
@@ -219,19 +207,22 @@ libc_freeres_fn (free_mem)
 
 
 #ifdef DEBUG
+
+#include <stdio.h>
+
 static void
 do_print (const void *nodep, VISIT value, int level)
 {
   struct __gconv_loaded_object *obj = *(struct __gconv_loaded_object **) nodep;
 
   printf ("%10s: \"%s\", %d\n",
-	  value == leaf ? "leaf" :
-	  value == preorder ? "preorder" :
-	  value == postorder ? "postorder" : "endorder",
+	  value == leaf ? "leaf"
+	  : value == preorder ? "preorder"
+	  : value == postorder ? "postorder" : "endorder",
 	  obj->name, obj->counter);
 }
 
-static void
+static void __attribute__ ((used))
 print_all (void)
 {
   __twalk (loaded, do_print);

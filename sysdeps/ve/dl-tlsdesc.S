@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 /* Thread-local storage handling in the ELF dynamic linker. VE version. */
@@ -138,8 +138,7 @@ _dl_tlsdesc_dynamic:
 	as JUMPTARGET which will further expand into name##@PLT
 	defined in sysdep.h */
 
-	lea     %s35, __tls_get_addr@plt_lo(-24)
-        and     %s35, %s35, (32)0
+        addi %s35,-16,__tls_get_addr@PLT_LO
         sic     %s36
         lea.sl  %s35, __tls_get_addr@plt_hi(%s35,%s36)
         xor     %s36, %s36, %s36
@@ -188,8 +187,7 @@ _dl_tlsdesc_resolve_rela:
 	st	%s4, 232(,%sp) 
 
 	lea     %sp, -176(0, %sp)
-	lea     %s12, _dl_tlsdesc_resolve_rela_fixup@PC_LO(-24)
-        and     %s12, %s12,(32)0
+        addi %s12,-16,_dl_tlsdesc_resolve_rela_fixup@PC_LO
         sic     %s62
         lea.sl  %s12, _dl_tlsdesc_resolve_rela_fixup@PC_HI(%s12,%s62)
 	bsic    %lr, (%s12)
@@ -233,8 +231,7 @@ _dl_tlsdesc_resolve_hold:
 
 	/* Pass _dl_tlsdesc_resolve_hold's address in %s2.  */
 	lea     %sp, -176(0, %sp)
-	lea     %s2, _dl_tlsdesc_resolve_hold@PC_LO(-24)
-        and     %s2, %s2, (32)0
+        addi %s2,-16,_dl_tlsdesc_resolve_hold@PC_LO
         sic     %s35
         lea.sl  %s2, _dl_tlsdesc_resolve_hold@PC_LO(%s2, %s35)
         bsic    %lr, (%s12)
@@ -248,8 +245,7 @@ _dl_tlsdesc_resolve_hold:
 	st      %s4, 232(%sp)
 
 	lea     %sp, -176(0, %sp)
-	lea     %s12, _dl_tlsdesc_resolve_hold_fixup@PC_LO(-24)
-        and     %s12, %s12,(32)0
+        addi %s12,-16,_dl_tlsdesc_resolve_hold_fixup@PC_LO
         sic     %s62
         lea.sl  %s12, _dl_tlsdesc_resolve_hold_fixup@PC_HI(%s12,%s62)
         bsic    %lr, (%s12)

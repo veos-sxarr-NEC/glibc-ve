@@ -19,9 +19,15 @@ You need to be familiar with concepts relating to process creation
 Handling}) in order to understand this material presented in this
 chapter.
 
+@vindex _POSIX_JOB_CONTROL
+Some old systems do not support job control, but @gnusystems{} always
+have, and it is a required feature in the 2001 revision of POSIX.1
+(@pxref{POSIX}).  If you need to be portable to old systems, you can
+use the @code{_POSIX_JOB_CONTROL} macro to test at compile-time
+whether the system supports job control.  @xref{System Options}.
+
 @menu
 * Concepts of Job Control::     Jobs can be controlled by a shell.
-* Job Control is Optional::     Not all POSIX systems support job control.
 * Controlling Terminal::        How a process gets its controlling terminal.
 * Access to the Terminal::      How processes share the controlling terminal.
 * Orphaned Process Groups::     Jobs left after the user logs out.
@@ -29,7 +35,7 @@ chapter.
 * Functions for Job Control::   Functions to control process groups.
 @end menu
 
-@node Concepts of Job Control, Job Control is Optional,  , Job Control
+@node Concepts of Job Control
 @section Concepts of Job Control
 
 @cindex shell
@@ -100,32 +106,9 @@ for allowing the user to interactively continue stopped jobs and switch
 jobs between foreground and background.
 
 @xref{Access to the Terminal}, for more information about I/O to the
-controlling terminal,
+controlling terminal.
 
-@node Job Control is Optional, Controlling Terminal, Concepts of Job Control , Job Control
-@section Job Control is Optional
-@cindex job control is optional
-
-Not all operating systems support job control.  @gnusystems{} do
-support job control, but if you are using @theglibc{} on some other
-system, that system may not support job control itself.
-
-You can use the @code{_POSIX_JOB_CONTROL} macro to test at compile-time
-whether the system supports job control.  @xref{System Options}.
-
-If job control is not supported, then there can be only one process
-group per session, which behaves as if it were always in the foreground.
-The functions for creating additional process groups simply fail with
-the error code @code{ENOSYS}.
-
-The macros naming the various job control signals (@pxref{Job Control
-Signals}) are defined even if job control is not supported.  However,
-the system never generates these signals, and attempts to send a job
-control signal or examine or specify their actions report errors or do
-nothing.
-
-
-@node Controlling Terminal, Access to the Terminal, Job Control is Optional, Job Control
+@node Controlling Terminal
 @section Controlling Terminal of a Process
 
 One of the attributes of a process is its controlling terminal.  Child
@@ -1036,9 +1019,8 @@ The function @code{ctermid} is declared in the header file
 @file{stdio.h}.
 @pindex stdio.h
 
-@comment stdio.h
-@comment POSIX.1
 @deftypefun {char *} ctermid (char *@var{string})
+@standards{POSIX.1, stdio.h}
 @safety{@prelim{}@mtsafe{@mtsposix{/!string}}@assafe{}@acsafe{}}
 @c This function is a stub by default; the actual implementation, for
 @c posix systems, returns a pointer to a string literal if passed a NULL
@@ -1057,9 +1039,8 @@ any reason.  Even if a file name is returned, access to the file it
 represents is not guaranteed.
 @end deftypefun
 
-@comment stdio.h
-@comment POSIX.1
 @deftypevr Macro int L_ctermid
+@standards{POSIX.1, stdio.h}
 The value of this macro is an integer constant expression that
 represents the size of a string large enough to hold the file name
 returned by @code{ctermid}.
@@ -1078,9 +1059,8 @@ Your program should include the header files @file{sys/types.h} and
 @pindex unistd.h
 @pindex sys/types.h
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun pid_t setsid (void)
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c This is usually a direct syscall, but if a syscall is not available,
 @c we use a stub, or Hurd- and BSD-specific implementations.  The former
@@ -1107,9 +1087,8 @@ already another process group around that has the same process group ID.
 @end table
 @end deftypefun
 
-@comment unistd.h
-@comment SVID
 @deftypefun pid_t getsid (pid_t @var{pid})
+@standards{SVID, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Stub or direct syscall, except on hurd, where it is equally safe.
 
@@ -1132,17 +1111,15 @@ from the calling process.
 @end table
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun pid_t getpgrp (void)
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 The @code{getpgrp} function returns the process group ID of
 the calling process.
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int getpgid (pid_t @var{pid})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Stub or direct syscall, except on hurd, where it is equally safe.
 
@@ -1164,17 +1141,13 @@ process.
 @end table
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int setpgid (pid_t @var{pid}, pid_t @var{pgid})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Stub or direct syscall, except on hurd, where it is equally safe.
 The @code{setpgid} function puts the process @var{pid} into the process
 group @var{pgid}.  As a special case, either @var{pid} or @var{pgid} can
 be zero to indicate the process ID of the calling process.
-
-This function fails on a system that does not support job control.
-@xref{Job Control is Optional}, for more information.
 
 If the operation is successful, @code{setpgid} returns zero.  Otherwise
 it returns @code{-1}.  The following @code{errno} error conditions are
@@ -1203,9 +1176,8 @@ process or a child of the calling process.
 @end table
 @end deftypefun
 
-@comment unistd.h
-@comment BSD
 @deftypefun int setpgrp (pid_t @var{pid}, pid_t @var{pgid})
+@standards{BSD, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Direct syscall or setpgid wrapper.
 This is the BSD Unix name for @code{setpgid}.  Both functions do exactly
@@ -1227,9 +1199,8 @@ Although these functions take a file descriptor argument to specify
 the terminal device, the foreground job is associated with the terminal
 file itself and not a particular open file descriptor.
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun pid_t tcgetpgrp (int @var{filedes})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Stub, or ioctl on BSD and GNU/Linux.
 This function returns the process group ID of the foreground process
@@ -1257,9 +1228,8 @@ controlling terminal of the calling process.
 @end table
 @end deftypefun
 
-@comment unistd.h
-@comment POSIX.1
 @deftypefun int tcsetpgrp (int @var{filedes}, pid_t @var{pgid})
+@standards{POSIX.1, unistd.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Stub, or ioctl on BSD and GNU/Linux.
 This function is used to set a terminal's foreground process group ID.
@@ -1298,15 +1268,14 @@ process.
 @end table
 @end deftypefun
 
-@comment termios.h
-@comment Unix98
 @deftypefun pid_t tcgetsid (int @var{fildes})
+@standards{Unix98, termios.h}
 @safety{@prelim{}@mtsafe{}@assafe{}@acsafe{}}
 @c Ioctl call, if available, or tcgetpgrp followed by getsid.
 This function is used to obtain the process group ID of the session
 for which the terminal specified by @var{fildes} is the controlling terminal.
 If the call is successful the group ID is returned.  Otherwise the
-return value is @code{(pid_t) -1} and the global variable @var{errno}
+return value is @code{(pid_t) -1} and the global variable @code{errno}
 is set to the following value:
 @table @code
 @item EBADF

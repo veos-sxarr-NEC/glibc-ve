@@ -1,15 +1,11 @@
-/* This is the sigaction struction from the Linux 2.1.20 kernel.  */
+#include <sysdeps/unix/sysv/linux/kernel_sigaction.h>
 
-struct old_kernel_sigaction {
-	__sighandler_t k_sa_handler;
-	unsigned long sa_mask;
-	unsigned int sa_flags;
-};
+void __syscall_rt_sigreturn (void) attribute_hidden;
+void __syscall_sigreturn (void) attribute_hidden;
 
-/* This is the sigaction structure from the Linux 2.1.68 kernel.  */
-
-struct kernel_sigaction {
-	__sighandler_t k_sa_handler;
-	unsigned int sa_flags;
-	sigset_t sa_mask;
-};
+#define STUB(act, sigsetsize) \
+  (sigsetsize),						\
+  (act) ? ((unsigned long)((act->sa_flags & SA_SIGINFO)	\
+			    ? &__syscall_rt_sigreturn	\
+			    : &__syscall_sigreturn))	\
+	: 0

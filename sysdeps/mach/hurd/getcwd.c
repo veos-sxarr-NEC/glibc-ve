@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/types.h>
@@ -37,7 +37,7 @@
    a slash to indicate that it is relative to some unknown root directory.  */
 
 char *
-_hurd_canonicalize_directory_name_internal (file_t thisdir,
+__hurd_canonicalize_directory_name_internal (file_t thisdir,
 					    char *buf,
 					    size_t size)
 {
@@ -148,8 +148,8 @@ _hurd_canonicalize_directory_name_internal (file_t thisdir,
       dirdata = dirbuf;
       dirdatasize = dirbufsize;
       while (!(err = __dir_readdir (parent, &dirdata, &dirdatasize,
-				    direntry, -1, 0, &nentries)) &&
-	     nentries != 0)
+				    direntry, -1, 0, &nentries))
+	     && nentries != 0)
 	{
 	  /* We have a block of directory entries.  */
 
@@ -178,9 +178,9 @@ _hurd_canonicalize_directory_name_internal (file_t thisdir,
 	      offset += d->d_reclen;
 
 	      /* Ignore `.' and `..'.  */
-	      if (d->d_name[0] == '.' &&
-		  (d->d_namlen == 1 ||
-		   (d->d_namlen == 2 && d->d_name[1] == '.')))
+	      if (d->d_name[0] == '.'
+		  && (d->d_namlen == 1
+		      || (d->d_namlen == 2 && d->d_name[1] == '.')))
 		continue;
 
 	      if (mount_point || d->d_ino == thisino)
@@ -266,11 +266,6 @@ _hurd_canonicalize_directory_name_internal (file_t thisdir,
        So the root is our current directory.  */
     *--file_namep = '/';
 
-  if (thisid != rootid)
-    /* We did not get to our root directory. The returned name should
-       not begin with a slash.  */
-    ++file_namep;
-
   memmove (file_name, file_namep, file_name + size - file_namep);
   cleanup ();
   return file_name;
@@ -282,18 +277,17 @@ _hurd_canonicalize_directory_name_internal (file_t thisdir,
   cleanup ();
   return NULL;
 }
+strong_alias (__hurd_canonicalize_directory_name_internal, _hurd_canonicalize_directory_name_internal)
 
 char *
-__canonicalize_directory_name_internal (thisdir, buf, size)
-     const char *thisdir;
-     char *buf;
-     size_t size;
+__canonicalize_directory_name_internal (const char *thisdir, char *buf,
+					size_t size)
 {
   char *result;
   file_t port = __file_name_lookup (thisdir, 0, 0);
   if (port == MACH_PORT_NULL)
     return NULL;
-  result = _hurd_canonicalize_directory_name_internal (port, buf, size);
+  result = __hurd_canonicalize_directory_name_internal (port, buf, size);
   __mach_port_deallocate (__mach_task_self (), port);
   return result;
 }
@@ -308,15 +302,9 @@ __getcwd (char *buf, size_t size)
 {
   char *cwd =
     __USEPORT (CWDIR,
-	       _hurd_canonicalize_directory_name_internal (port,
-							   buf, size));
-  if (cwd && cwd[0] != '/')
-    {
-      /* `cwd' is an unknown root directory.  */
-      if (buf == NULL)
-	  free (cwd);
-      return __hurd_fail (EGRATUITOUS), NULL;
-    }
+	       __hurd_canonicalize_directory_name_internal (port,
+							    buf, size));
   return cwd;
 }
+libc_hidden_def (__getcwd)
 weak_alias (__getcwd, getcwd)

@@ -1,5 +1,5 @@
 /* Private header for thread debug library
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _THREAD_DBP_H
 #define _THREAD_DBP_H	1
@@ -29,18 +29,22 @@
 #include "thread_db.h"
 #include "../nptl/pthreadP.h"  	/* This is for *_BITMASK only.  */
 #include <list.h>
+#include <gnu/lib-names.h>
+#include <libc-diag.h>
 
 /* Indeces for the symbol names.  */
 enum
   {
 # define DB_STRUCT(type)		SYM_SIZEOF_##type,
 # define DB_STRUCT_FIELD(type, field)	SYM_##type##_FIELD_##field,
+# define DB_STRUCT_FLEXIBLE_ARRAY(type, field) DB_STRUCT_FIELD (type, field)
 # define DB_SYMBOL(name)		SYM_##name,
 # define DB_FUNCTION(name)		SYM_##name,
 # define DB_VARIABLE(name)		SYM_##name, SYM_DESC_##name,
 # include "structs.def"
 # undef DB_STRUCT
 # undef DB_STRUCT_FIELD
+# undef DB_STRUCT_FLEXIBLE_ARRAY
 # undef DB_SYMBOL
 # undef DB_FUNCTION
 # undef DB_VARIABLE
@@ -88,6 +92,7 @@ struct td_thragent
   uint32_t ta_sizeof_##type;
 # define DB_STRUCT_FIELD(type, field) \
   db_desc_t ta_field_##type##_##field;
+# define DB_STRUCT_FLEXIBLE_ARRAY(type, field) DB_STRUCT_FIELD (type, field)
 # define DB_SYMBOL(name) \
   psaddr_t ta_addr_##name;
 # define DB_FUNCTION(name) \
@@ -98,6 +103,7 @@ struct td_thragent
 # include "structs.def"
 # undef DB_STRUCT
 # undef DB_STRUCT_FIELD
+# undef DB_STRUCT_FLEXIBLE_ARRAY
 # undef DB_FUNCTION
 # undef DB_SYMBOL
 # undef DB_VARIABLE
@@ -139,11 +145,11 @@ ta_ok (const td_thragent_t *ta)
 }
 
 
-/* Internal wrapper around ps_pglobal_lookup.  */
-extern ps_err_e td_lookup (struct ps_prochandle *ps,
-			   int idx, psaddr_t *sym_addr) attribute_hidden;
-
-
+/* Internal wrappers around ps_pglobal_lookup.  */
+extern ps_err_e td_mod_lookup (struct ps_prochandle *ps, const char *modname,
+			       int idx, psaddr_t *sym_addr) attribute_hidden;
+#define td_lookup(ps, idx, sym_addr) \
+  td_mod_lookup ((ps), LIBPTHREAD_SO, (idx), (sym_addr))
 
 
 /* Store in psaddr_t VAR the address of inferior's symbol NAME.  */
@@ -159,10 +165,19 @@ extern ps_err_e td_lookup (struct ps_prochandle *ps,
 		   SYM_##type##_FIELD_##field, \
 		   (psaddr_t) 0 + (idx), (ptr), &(var))
 
+/* With GCC 5.3 when compiling with -Os the compiler emits a warning
+   that slot may be used uninitialized.  This is never the case since
+   the dynamic loader initializes the slotinfo list and
+   dtv_slotinfo_list will point slot at the first entry.  Therefore
+   when DB_GET_FIELD_ADDRESS is called with a slot for ptr, the slot is
+   always initialized.  */
+DIAG_PUSH_NEEDS_COMMENT;
+DIAG_IGNORE_Os_NEEDS_COMMENT (5, "-Wmaybe-uninitialized");
 #define DB_GET_FIELD_ADDRESS(var, ta, ptr, type, field, idx) \
   ((var) = (ptr), _td_locate_field ((ta), (ta)->ta_field_##type##_##field, \
 				    SYM_##type##_FIELD_##field, \
 				    (psaddr_t) 0 + (idx), &(var)))
+DIAG_POP_NEEDS_COMMENT;
 
 extern td_err_e _td_locate_field (td_thragent_t *ta,
 				  db_desc_t desc, int descriptor_name,

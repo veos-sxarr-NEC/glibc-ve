@@ -1,5 +1,5 @@
 /* Compute minimum of two numbers, regarding NaN as missing argument.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 2002.
 
@@ -15,9 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <libm-alias-double.h>
 
 	.text
 ENTRY(__fmin)
@@ -27,9 +28,26 @@ ENTRY(__fmin)
 	jmp	2f
 
 1:	ucomisd	%xmm1, %xmm1	// Is xmm1 a NaN?
-	jp	2f		// then return xmm0
+	jp	3f
+	// xmm0 is a NaN; xmm1 is not.  Test if xmm0 is signaling.
+	movsd	%xmm0, -8(%rsp)
+	testb	$0x8, -2(%rsp)
+	jz	4f
 	movsd	%xmm1, %xmm0	// otherwise return xmm1
+	ret
+
+3:	// xmm1 is a NaN; xmm0 may or may not be.
+	ucomisd	%xmm0, %xmm0
+	jp	4f
+	// xmm1 is a NaN; xmm0 is not.  Test if xmm1 is signaling.
+	movsd	%xmm1, -8(%rsp)
+	testb	$0x8, -2(%rsp)
+	jz	4f
+	ret
+
+4:	// Both arguments are NaNs, or one is a signaling NaN.
+	addsd	%xmm1, %xmm0
 
 2:	ret
 END(__fmin)
-weak_alias (__fmin, fmin)
+libm_alias_double (__fmin, fmin)

@@ -1,5 +1,5 @@
 /* Word-wrapping and line-truncating streams
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Miles Bader <miles@gnu.ai.mit.edu>.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This package emulates glibc `line_wrap_stream' semantics for systems that
    don't have that.  */
@@ -30,7 +30,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 
-#include "argp-fmtstream.h"
+#include <argp-fmtstream.h>
 #include "argp-namefrob.h"
 
 #ifndef ARGP_FMTSTREAM_USE_LINEWRAP
@@ -42,7 +42,6 @@
 #ifdef _LIBC
 # include <wchar.h>
 # include <libio/libioP.h>
-# define __vsnprintf(s, l, f, a) _IO_vsnprintf (s, l, f, a)
 #endif
 
 #define INIT_BUF_SIZE 200
@@ -100,7 +99,11 @@ __argp_fmtstream_free (argp_fmtstream_t fs)
   __argp_fmtstream_update (fs);
   if (fs->p > fs->buf)
     {
+#ifdef _LIBC
       __fxprintf (fs->stream, "%.*s", (int) (fs->p - fs->buf), fs->buf);
+#else
+      fwrite_unlocked (fs->buf, 1, fs->p - fs->buf, fs->stream);
+#endif
     }
   free (fs->buf);
   free (fs);
@@ -145,9 +148,11 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
 	      size_t i;
 	      for (i = 0; i < pad; i++)
 		{
+#ifdef _LIBC
 		  if (_IO_fwide (fs->stream, 0) > 0)
 		    putwc_unlocked (L' ', fs->stream);
 		  else
+#endif
 		    putc_unlocked (' ', fs->stream);
 		}
 	    }
@@ -308,9 +313,11 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
 	      *nl++ = ' ';
 	  else
 	    for (i = 0; i < fs->wmargin; ++i)
+#ifdef _LIBC
 	      if (_IO_fwide (fs->stream, 0) > 0)
 		putwc_unlocked (L' ', fs->stream);
 	      else
+#endif
 		putc_unlocked (' ', fs->stream);
 
 	  /* Copy the tail of the original buffer into the current buffer
@@ -405,7 +412,7 @@ __argp_fmtstream_printf (struct argp_fmtstream *fs, const char *fmt, ...)
 
       va_start (args, fmt);
       avail = fs->end - fs->p;
-      out = __vsnprintf (fs->p, avail, fmt, args);
+      out = __vsnprintf_internal (fs->p, avail, fmt, args, 0);
       va_end (args);
       if ((size_t) out >= avail)
 	size_guess = out + 1;

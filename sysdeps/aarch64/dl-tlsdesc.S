@@ -1,6 +1,6 @@
 /* Thread-local storage handling in the ELF dynamic linker.
    AArch64 version.
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <tls.h>
@@ -74,7 +74,8 @@
 	cfi_startproc
 	.align 2
 _dl_tlsdesc_return:
-	ldr	x0, [x0, #8]
+	DELOUSE (0)
+	ldr	PTR_REG (0), [x0, #PTR_SIZE]
 	RET
 	cfi_endproc
 	.size	_dl_tlsdesc_return, .-_dl_tlsdesc_return
@@ -95,12 +96,13 @@ _dl_tlsdesc_return:
 	.align  2
 _dl_tlsdesc_undefweak:
 	str	x1, [sp, #-16]!
-	cfi_adjust_cfa_offset(16)
-	ldr	x0, [x0, #8]
+	cfi_adjust_cfa_offset (16)
+	DELOUSE (0)
+	ldr	PTR_REG (0), [x0, #PTR_SIZE]
 	mrs	x1, tpidr_el0
-	sub	x0, x0, x1
+	sub	PTR_REG (0), PTR_REG (0), PTR_REG (1)
 	ldr	x1, [sp], #16
-	cfi_adjust_cfa_offset(16)
+	cfi_adjust_cfa_offset (-16)
 	RET
 	cfi_endproc
 	.size	_dl_tlsdesc_undefweak, .-_dl_tlsdesc_undefweak
@@ -121,7 +123,7 @@ _dl_tlsdesc_undefweak:
 	   _dl_tlsdesc_dynamic (struct tlsdesc *tdp)
 	   {
 	     struct tlsdesc_dynamic_arg *td = tdp->arg;
-	     dtv_t *dtv = *(dtv_t **)((char *)__thread_pointer + DTV_OFFSET);
+	     dtv_t *dtv = *(dtv_t **)((char *)__thread_pointer + TCBHEAD_DTV);
 	     if (__builtin_expect (td->gen_count <= dtv[0].counter
 		&& (dtv[td->tlsinfo.ti_module].pointer.val
 		    != TLS_DTV_UNALLOCATED),
@@ -140,39 +142,37 @@ _dl_tlsdesc_undefweak:
 	cfi_startproc
 	.align 2
 _dl_tlsdesc_dynamic:
-# define NSAVEXREGPAIRS 2
-	stp	x29, x30, [sp,#-(32+16*NSAVEXREGPAIRS)]!
-	cfi_adjust_cfa_offset (32+16*NSAVEXREGPAIRS)
-	mov	x29, sp
+	DELOUSE (0)
 
 	/* Save just enough registers to support fast path, if we fall
 	   into slow path we will save additional registers.  */
-
-	stp	x1,  x2, [sp, #32+16*0]
-	stp	x3,  x4, [sp, #32+16*1]
+	stp	x1,  x2, [sp, #-32]!
+	stp	x3,  x4, [sp, #16]
+	cfi_adjust_cfa_offset (32)
+	cfi_rel_offset (x1, 0)
+	cfi_rel_offset (x2, 8)
+	cfi_rel_offset (x3, 16)
+	cfi_rel_offset (x4, 24)
 
 	mrs	x4, tpidr_el0
-	ldr	x1, [x0,#8]
-	ldr	x0, [x4]
-	ldr	x3, [x1,#16]
-	ldr	x2, [x0]
-	cmp	x3, x2
+	ldr	PTR_REG (1), [x0,#TLSDESC_ARG]
+	ldr	PTR_REG (0), [x4,#TCBHEAD_DTV]
+	ldr	PTR_REG (3), [x1,#TLSDESC_GEN_COUNT]
+	ldr	PTR_REG (2), [x0,#DTV_COUNTER]
+	cmp	PTR_REG (3), PTR_REG (2)
 	b.hi	2f
-	ldr	x2, [x1]
-	add	x0, x0, x2, lsl #4
-	ldr	x0, [x0]
-	cmn	x0, #0x1
+	/* Load r2 = td->tlsinfo.ti_module and r3 = td->tlsinfo.ti_offset.  */
+	ldp	PTR_REG (2), PTR_REG (3), [x1,#TLSDESC_MODID]
+	add	PTR_REG (0), PTR_REG (0), PTR_REG (2), lsl #(PTR_LOG_SIZE + 1)
+	ldr	PTR_REG (0), [x0] /* Load val member of DTV entry.  */
+	cmp	PTR_REG (0), #TLS_DTV_UNALLOCATED
 	b.eq	2f
-	ldr	x1, [x1,#8]
-	add	x0, x0, x1
-	sub	x0, x0, x4
+	sub	PTR_REG (3), PTR_REG (3), PTR_REG (4)
+	add	PTR_REG (0), PTR_REG (0), PTR_REG (3)
 1:
-	ldp	 x1,  x2, [sp, #32+16*0]
-	ldp	 x3,  x4, [sp, #32+16*1]
-
-	ldp	x29, x30, [sp], #(32+16*NSAVEXREGPAIRS)
-	cfi_adjust_cfa_offset (32+16*NSAVEXREGPAIRS)
-# undef NSAVEXREGPAIRS
+	ldp	 x3,  x4, [sp, #16]
+	ldp	 x1,  x2, [sp], #32
+	cfi_adjust_cfa_offset (-32)
 	RET
 2:
 	/* This is the slow path. We need to call __tls_get_addr() which
@@ -180,15 +180,33 @@ _dl_tlsdesc_dynamic:
 	   callee will trash.  */
 
 	/* Save the remaining registers that we must treat as caller save.  */
-# define NSAVEXREGPAIRS 7
-	stp	 x5,  x6, [sp, #-16*NSAVEXREGPAIRS]!
+# define NSAVEXREGPAIRS 8
+	stp	x29, x30, [sp,#-16*NSAVEXREGPAIRS]!
 	cfi_adjust_cfa_offset (16*NSAVEXREGPAIRS)
-	stp	 x7,  x8, [sp, #16*1]
-	stp	 x9, x10, [sp, #16*2]
-	stp	x11, x12, [sp, #16*3]
-	stp	x13, x14, [sp, #16*4]
-	stp	x15, x16, [sp, #16*5]
-	stp	x17, x18, [sp, #16*6]
+	cfi_rel_offset (x29, 0)
+	cfi_rel_offset (x30, 8)
+	mov	x29, sp
+	stp	 x5,  x6, [sp, #16*1]
+	stp	 x7,  x8, [sp, #16*2]
+	stp	 x9, x10, [sp, #16*3]
+	stp	x11, x12, [sp, #16*4]
+	stp	x13, x14, [sp, #16*5]
+	stp	x15, x16, [sp, #16*6]
+	stp	x17, x18, [sp, #16*7]
+	cfi_rel_offset (x5, 16*1)
+	cfi_rel_offset (x6, 16*1+8)
+	cfi_rel_offset (x7, 16*2)
+	cfi_rel_offset (x8, 16*2+8)
+	cfi_rel_offset (x9, 16*3)
+	cfi_rel_offset (x10, 16*3+8)
+	cfi_rel_offset (x11, 16*4)
+	cfi_rel_offset (x12, 16*4+8)
+	cfi_rel_offset (x13, 16*5)
+	cfi_rel_offset (x14, 16*5+8)
+	cfi_rel_offset (x15, 16*6)
+	cfi_rel_offset (x16, 16*6+8)
+	cfi_rel_offset (x17, 16*7)
+	cfi_rel_offset (x18, 16*7+8)
 
 	SAVE_Q_REGISTERS
 
@@ -196,134 +214,24 @@ _dl_tlsdesc_dynamic:
 	bl	__tls_get_addr
 
 	mrs	x1, tpidr_el0
-	sub	x0, x0, x1
+	sub	PTR_REG (0), PTR_REG (0), PTR_REG (1)
 
 	RESTORE_Q_REGISTERS
 
-	ldp	 x7,  x8, [sp, #16*1]
-	ldp	 x9, x10, [sp, #16*2]
-	ldp	x11, x12, [sp, #16*3]
-	ldp	x13, x14, [sp, #16*4]
-	ldp	x15, x16, [sp, #16*5]
-	ldp	x17, x18, [sp, #16*6]
-	ldp	 x5,  x6, [sp], #16*NSAVEXREGPAIRS
+	ldp	 x5,  x6, [sp, #16*1]
+	ldp	 x7,  x8, [sp, #16*2]
+	ldp	 x9, x10, [sp, #16*3]
+	ldp	x11, x12, [sp, #16*4]
+	ldp	x13, x14, [sp, #16*5]
+	ldp	x15, x16, [sp, #16*6]
+	ldp	x17, x18, [sp, #16*7]
+
+	ldp	x29, x30, [sp], #16*NSAVEXREGPAIRS
 	cfi_adjust_cfa_offset (-16*NSAVEXREGPAIRS)
+	cfi_restore (x29)
+	cfi_restore (x30)
 	b	1b
 	cfi_endproc
 	.size	_dl_tlsdesc_dynamic, .-_dl_tlsdesc_dynamic
 # undef NSAVEXREGPAIRS
 #endif
-
-	/* This function is a wrapper for a lazy resolver for TLS_DESC
-	   RELA relocations.
-	   When the actual resolver returns, it will have adjusted the
-	   TLS descriptor such that we can tail-call it for it to return
-	   the TP offset of the symbol.  */
-
-	.hidden _dl_tlsdesc_resolve_rela
-	.global	_dl_tlsdesc_resolve_rela
-	.type	_dl_tlsdesc_resolve_rela,%function
-	cfi_startproc
-	.align 2
-_dl_tlsdesc_resolve_rela:
-#define	NSAVEXREGPAIRS 9
-	stp	x29, x30, [sp, #-(32+16*NSAVEXREGPAIRS)]!
-	cfi_adjust_cfa_offset (32+16*NSAVEXREGPAIRS)
-	mov	x29, sp
-	stp	 x1,  x4, [sp, #32+16*0]
-	stp	 x5,  x6, [sp, #32+16*1]
-	stp	 x7,  x8, [sp, #32+16*2]
-	stp	 x9, x10, [sp, #32+16*3]
-	stp	x11, x12, [sp, #32+16*4]
-	stp	x13, x14, [sp, #32+16*5]
-	stp	x15, x16, [sp, #32+16*6]
-	stp	x17, x18, [sp, #32+16*7]
-	str	x0,       [sp, #32+16*8]
-
-	SAVE_Q_REGISTERS
-
-	ldr	x1, [x3, #8]
-	bl	_dl_tlsdesc_resolve_rela_fixup
-
-	RESTORE_Q_REGISTERS
-
-	ldr	x0, [sp, #32+16*8]
-	ldr	x1, [x0]
-	blr	x1
-
-	ldp	 x1,  x4, [sp, #32+16*0]
-	ldp	 x5,  x6, [sp, #32+16*1]
-	ldp	 x7,  x8, [sp, #32+16*2]
-	ldp	 x9, x10, [sp, #32+16*3]
-	ldp	x11, x12, [sp, #32+16*4]
-	ldp	x13, x14, [sp, #32+16*5]
-	ldp	x15, x16, [sp, #32+16*6]
-	ldp	x17, x18, [sp, #32+16*7]
-	ldp	x29, x30, [sp], #(32+16*NSAVEXREGPAIRS)
-	cfi_adjust_cfa_offset (-32+16*NSAVEXREGPAIRS)
-	ldp	x2, x3, [sp], #16
-	cfi_adjust_cfa_offset (-16)
-	RET
-#undef NSAVEXREGPAIRS
-	cfi_endproc
-	.size	_dl_tlsdesc_resolve_rela, .-_dl_tlsdesc_resolve_rela
-
-	/* This function is a placeholder for lazy resolving of TLS
-	relocations.  Once some thread starts resolving a TLS
-	relocation, it sets up the TLS descriptor to use this
-	resolver, such that other threads that would attempt to
-	resolve it concurrently may skip the call to the original lazy
-	resolver and go straight to a condition wait.
-
-	When the actual resolver returns, it will have adjusted the
-	TLS descriptor such that we can tail-call it for it to return
-	the TP offset of the symbol.  */
-
-	.hidden _dl_tlsdesc_resolve_hold
-	.global	_dl_tlsdesc_resolve_hold
-	.type	_dl_tlsdesc_resolve_hold,%function
-	cfi_startproc
-	.align 2
-_dl_tlsdesc_resolve_hold:
-#define	NSAVEXREGPAIRS 10
-1:
-	stp	x29, x30, [sp, #-(32+16*NSAVEXREGPAIRS)]!
-	cfi_adjust_cfa_offset (32+16*NSAVEXREGPAIRS)
-	mov	x29, sp
-	stp	 x1,  x2, [sp, #32+16*0]
-	stp	 x3,  x4, [sp, #32+16*1]
-	stp	 x5,  x6, [sp, #32+16*2]
-	stp	 x7,  x8, [sp, #32+16*3]
-	stp	 x9, x10, [sp, #32+16*4]
-	stp	x11, x12, [sp, #32+16*5]
-	stp	x13, x14, [sp, #32+16*6]
-	stp	x15, x16, [sp, #32+16*7]
-	stp	x17, x18, [sp, #32+16*8]
-	str	x0,       [sp, #32+16*9]
-
-	SAVE_Q_REGISTERS
-
-	adr	x1, 1b
-	bl	_dl_tlsdesc_resolve_hold_fixup
-
-	RESTORE_Q_REGISTERS
-
-	ldr	x0, [sp, #32+16*9]
-	ldr	x1, [x0]
-	blr	x1
-
-	ldp	 x1,  x2, [sp, #32+16*0]
-	ldp	 x3,  x4, [sp, #32+16*1]
-	ldp	 x5,  x6, [sp, #32+16*2]
-	ldp	 x7,  x8, [sp, #32+16*3]
-	ldp	 x9, x10, [sp, #32+16*4]
-	ldp	x11, x12, [sp, #32+16*5]
-	ldp	x13, x14, [sp, #32+16*6]
-	ldp	x15, x16, [sp, #32+16*7]
-	ldp	x17, x18, [sp, #32+16*8]
-	ldp	x29, x30, [sp], #(32+16*NSAVEXREGPAIRS)
-	cfi_adjust_cfa_offset (-32+16*NSAVEXREGPAIRS)
-	RET
-	cfi_endproc
-	.size	_dl_tlsdesc_resolve_hold, .-_dl_tlsdesc_resolve_hold
-#undef NSAVEXREGPAIRS

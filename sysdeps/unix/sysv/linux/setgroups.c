@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <grp.h>
@@ -28,8 +28,9 @@ int
 setgroups (size_t n, const gid_t *groups)
 {
 #ifdef __NR_setgroups32
-# error "wrong setgroups.c file used"
-#endif
+  return INLINE_SETXID_SYSCALL (setgroups32, 2, n, groups);
+#else
   return INLINE_SETXID_SYSCALL (setgroups, 2, n, groups);
+#endif
 }
 libc_hidden_def (setgroups)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,12 +14,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This structure must have the same shape as the linux kernel
    equivalent.  */
 struct kernel_rt_sigframe
 {
   siginfo_t info;
-  struct ucontext uc;
+  ucontext_t uc;
 };

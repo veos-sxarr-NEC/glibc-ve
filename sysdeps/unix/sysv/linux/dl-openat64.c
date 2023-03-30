@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gmain.com>, 2003.
 
@@ -14,8 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -24,17 +23,9 @@
 
 
 int
-openat64 (dfd, file, oflag)
-     int dfd;
-     const char *file;
-     int oflag;
+openat64 (int dfd, const char *file, int oflag, ...)
 {
   assert (!__OPEN_NEEDS_MODE (oflag));
 
-#ifdef __NR_openat
   return INLINE_SYSCALL (openat, 3, dfd, file, oflag | O_LARGEFILE);
-#else
-  __set_errno (ENOSYS);
-  return -1;
-#endif
 }

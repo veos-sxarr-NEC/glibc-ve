@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /*
  *	POSIX Standard: 9.2.2 User Database Access	<pwd.h>
@@ -45,11 +45,12 @@ typedef __uid_t uid_t;
 # endif
 #endif
 
-/* The passwd structure.  */
+/* A record in the user database.  */
 struct passwd
 {
   char *pw_name;		/* Username.  */
-  char *pw_passwd;		/* Password.  */
+  char *pw_passwd;		/* Hashed passphrase, if shadow database
+                                   not in use (see shadow.h).  */
   __uid_t pw_uid;		/* User ID.  */
   __gid_t pw_gid;		/* Group ID.  */
   char *pw_gecos;		/* Real name.  */
@@ -59,25 +60,24 @@ struct passwd
 
 
 #ifdef __USE_MISC
-# define __need_FILE
-# include <stdio.h>
+# include <bits/types/FILE.h>
 #endif
 
 
 #if defined __USE_MISC || defined __USE_XOPEN_EXTENDED
-/* Rewind the password-file stream.
+/* Rewind the user database stream.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern void setpwent (void);
 
-/* Close the password-file stream.
+/* Close the user database stream.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern void endpwent (void);
 
-/* Read an entry from the password-file stream, opening it if necessary.
+/* Read an entry from the user database stream, opening it if necessary.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
@@ -85,15 +85,15 @@ extern struct passwd *getpwent (void);
 #endif
 
 #ifdef	__USE_MISC
-/* Read an entry from STREAM.
+/* Read a user database entry from STREAM.
 
    This function is not part of POSIX and therefore no official
    cancellation point.  But due to similarity with an POSIX interface
    or due to the implementation it is a cancellation point and
    therefore not marked with __THROW.  */
-extern struct passwd *fgetpwent (FILE *__stream);
+extern struct passwd *fgetpwent (FILE *__stream) __nonnull ((1));
 
-/* Write the given entry onto the given stream.
+/* Write a given user database entry onto the given stream.
 
    This function is not part of POSIX and therefore no official
    cancellation point.  But due to similarity with an POSIX interface
@@ -103,17 +103,17 @@ extern int putpwent (const struct passwd *__restrict __p,
 		     FILE *__restrict __f);
 #endif
 
-/* Search for an entry with a matching user ID.
+/* Retrieve the user database entry for the given user ID.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern struct passwd *getpwuid (__uid_t __uid);
 
-/* Search for an entry with a matching username.
+/* Retrieve the user database entry for the given username.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
-extern struct passwd *getpwnam (const char *__name);
+extern struct passwd *getpwnam (const char *__name) __nonnull ((1));
 
 #ifdef __USE_POSIX
 
@@ -138,23 +138,26 @@ extern struct passwd *getpwnam (const char *__name);
    therefore not marked with __THROW.  */
 extern int getpwent_r (struct passwd *__restrict __resultbuf,
 		       char *__restrict __buffer, size_t __buflen,
-		       struct passwd **__restrict __result);
+		       struct passwd **__restrict __result)
+		       __nonnull ((1, 2, 4));
 # endif
 
 extern int getpwuid_r (__uid_t __uid,
 		       struct passwd *__restrict __resultbuf,
 		       char *__restrict __buffer, size_t __buflen,
-		       struct passwd **__restrict __result);
+		       struct passwd **__restrict __result)
+		       __nonnull ((2, 3, 5));
 
 extern int getpwnam_r (const char *__restrict __name,
 		       struct passwd *__restrict __resultbuf,
 		       char *__restrict __buffer, size_t __buflen,
-		       struct passwd **__restrict __result);
+		       struct passwd **__restrict __result)
+		       __nonnull ((1, 2, 3, 5));
 
 
 # ifdef	__USE_MISC
-/* Read an entry from STREAM.  This function is not standardized and
-   probably never will.
+/* Read a user database entry from STREAM.  This function is not
+   standardized and probably never will.
 
    This function is not part of POSIX and therefore no official
    cancellation point.  But due to similarity with an POSIX interface
@@ -163,15 +166,16 @@ extern int getpwnam_r (const char *__restrict __name,
 extern int fgetpwent_r (FILE *__restrict __stream,
 			struct passwd *__restrict __resultbuf,
 			char *__restrict __buffer, size_t __buflen,
-			struct passwd **__restrict __result);
+			struct passwd **__restrict __result)
+			__nonnull ((1, 2, 3, 5));
 # endif
 
 #endif	/* POSIX or reentrant */
 
 #ifdef __USE_GNU
-/* Re-construct the password-file line for the given uid
-   in the given buffer.  This knows the format that the caller
-   will expect, but this need not be the format of the password file.
+/* Write a traditional /etc/passwd line, based on the user database
+   entry for the given UID, to BUFFER; space for BUFFER must be
+   allocated by the caller.
 
    This function is not part of POSIX and therefore no official
    cancellation point.  But due to similarity with an POSIX interface

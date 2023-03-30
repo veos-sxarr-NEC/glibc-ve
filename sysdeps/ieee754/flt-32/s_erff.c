@@ -20,7 +20,11 @@ static char rcsid[] = "$NetBSD: s_erff.c,v 1.4 1995/05/10 20:47:07 jtc Exp $";
 #include <errno.h>
 #include <float.h>
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-float.h>
+#include <fix-int-fp-convert-zero.h>
 
 static const float
 tiny	    = 1e-30,
@@ -103,7 +107,7 @@ float __erff(float x)
 	GET_FLOAT_WORD(hx,x);
 	ix = hx&0x7fffffff;
 	if(ix>=0x7f800000) {		/* erf(nan)=nan */
-	    i = ((u_int32_t)hx>>31)<<1;
+	    i = ((uint32_t)hx>>31)<<1;
 	    return (float)(1-i)+one/x;	/* erf(+-inf)=+-1 */
 	}
 
@@ -113,11 +117,7 @@ float __erff(float x)
 		  {
 		    /* Avoid spurious underflow.  */
 		    float ret = 0.0625f * (16.0f * x + (16.0f * efx) * x);
-		    if (fabsf (ret) < FLT_MIN)
-		      {
-			float force_underflow = ret * ret;
-			math_force_eval (force_underflow);
-		      }
+		    math_check_force_underflow (ret);
 		    return ret;
 		  }
 		return x + efx*x;
@@ -155,7 +155,7 @@ float __erff(float x)
 	r  =  __ieee754_expf(-z*z-(float)0.5625)*__ieee754_expf((z-x)*(z+x)+R/S);
 	if(hx>=0) return one-r/x; else return  r/x-one;
 }
-weak_alias (__erff, erff)
+libm_alias_float (__erf, erf)
 
 float __erfcf(float x)
 {
@@ -165,11 +165,14 @@ float __erfcf(float x)
 	ix = hx&0x7fffffff;
 	if(ix>=0x7f800000) {			/* erfc(nan)=nan */
 						/* erfc(+-inf)=0,2 */
-	    return (float)(((u_int32_t)hx>>31)<<1)+one/x;
+	    float ret = (float)(((uint32_t)hx>>31)<<1)+one/x;
+	    if (FIX_INT_FP_CONVERT_ZERO && ret == 0.0f)
+	      return 0.0f;
+	    return ret;
 	}
 
 	if(ix < 0x3f580000) {		/* |x|<0.84375 */
-	    if(ix < 0x23800000)  	/* |x|<2**-56 */
+	    if(ix < 0x32800000)  	/* |x|<2**-26 */
 		return one-x;
 	    z = x*x;
 	    r = pp0+z*(pp1+z*(pp2+z*(pp3+z*pp4)));
@@ -213,10 +216,7 @@ float __erfcf(float x)
 	    r  =  __ieee754_expf(-z*z-(float)0.5625)*
 			__ieee754_expf((z-x)*(z+x)+R/S);
 	    if(hx>0) {
-#if FLT_EVAL_METHOD != 0
-		volatile
-#endif
-		float ret = r/x;
+		float ret = math_narrow_eval (r/x);
 		if (ret == 0)
 		    __set_errno (ERANGE);
 		return ret;
@@ -230,4 +230,4 @@ float __erfcf(float x)
 		return two-tiny;
 	}
 }
-weak_alias (__erfcf, erfcf)
+libm_alias_float (__erfc, erfc)

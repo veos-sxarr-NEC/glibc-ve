@@ -1,6 +1,6 @@
-#! /bin/sh
+#!/bin/sh
 # Test of transliteration in gettext functions.
-# Copyright (C) 2000-2015 Free Software Foundation, Inc.
+# Copyright (C) 2000-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 set -e
 
@@ -23,7 +23,6 @@ common_objpfx=$1
 test_program_prefix_before_env=$2
 run_program_env=$3
 objpfx=$4
-
 
 # Create the locale directories.
 mkdir -p ${objpfx}localedir/existing-locale/LC_MESSAGES

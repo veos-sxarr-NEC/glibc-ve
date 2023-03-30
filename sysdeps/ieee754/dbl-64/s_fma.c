@@ -1,5 +1,5 @@
 /* Compute x * y + z as ternary operation.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2010.
 
@@ -15,13 +15,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <float.h>
 #include <math.h>
 #include <fenv.h>
 #include <ieee754.h>
-#include <math_private.h>
+#include <math-barriers.h>
+#include <fenv_private.h>
+#include <libm-alias-double.h>
 #include <tininess.h>
 
 /* This implementation uses rounding to odd to avoid problems with
@@ -66,7 +68,7 @@ __fma (double x, double y, double z)
       /* If fma will certainly overflow, compute as x * y.  */
       if (u.ieee.exponent + v.ieee.exponent > 0x7ff + IEEE754_DOUBLE_BIAS)
 	return x * y;
-      /* If x * y is less than 1/4 of DBL_DENORM_MIN, neither the
+      /* If x * y is less than 1/4 of DBL_TRUE_MIN, neither the
 	 result nor whether there is underflow depends on its exact
 	 value, only on its sign.  */
       if (u.ieee.exponent + v.ieee.exponent
@@ -90,8 +92,8 @@ __fma (double x, double y, double z)
 		     && w.ieee.mantissa1 == 0
 		     && w.ieee.mantissa0 == 0)))
 	    {
-	      volatile double force_underflow = x * y;
-	      (void) force_underflow;
+	      double force_underflow = x * y;
+	      math_force_eval (force_underflow);
 	    }
 	  return v.d * 0x1p-54;
 	}
@@ -117,7 +119,7 @@ __fma (double x, double y, double z)
 	     very small, adjust them up to avoid spurious underflows,
 	     rather than down.  */
 	  if (u.ieee.exponent + v.ieee.exponent
-	      <= IEEE754_DOUBLE_BIAS + DBL_MANT_DIG)
+	      <= IEEE754_DOUBLE_BIAS + 2 * DBL_MANT_DIG)
 	    {
 	      if (u.ieee.exponent > v.ieee.exponent)
 		u.ieee.exponent += 2 * DBL_MANT_DIG + 2;
@@ -175,7 +177,10 @@ __fma (double x, double y, double z)
 
   /* Ensure correct sign of exact 0 + 0.  */
   if (__glibc_unlikely ((x == 0 || y == 0) && z == 0))
-    return x * y + z;
+    {
+      x = math_opt_barrier (x);
+      return x * y + z;
+    }
 
   fenv_t env;
   libc_feholdexcept_setround (&env, FE_TONEAREST);
@@ -289,10 +294,5 @@ __fma (double x, double y, double z)
     }
 }
 #ifndef __fma
-weak_alias (__fma, fma)
-#endif
-
-#ifdef NO_LONG_DOUBLE
-strong_alias (__fma, __fmal)
-weak_alias (__fmal, fmal)
+libm_alias_double (__fma, fma)
 #endif

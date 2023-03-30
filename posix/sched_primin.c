@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sched.h>
@@ -26,6 +26,7 @@ __sched_get_priority_min (int algorithm)
   __set_errno (ENOSYS);
   return -1;
 }
+libc_hidden_def (__sched_get_priority_min)
 stub_warning (sched_get_priority_min)
 
 weak_alias (__sched_get_priority_min, sched_get_priority_min)

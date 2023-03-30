@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
@@ -22,9 +22,7 @@
 
 /* Change the protections of FILE to MODE.  */
 int
-__chmod (file, mode)
-     const char *file;
-     mode_t mode;
+__chmod (const char *file, mode_t mode)
 {
   error_t err;
   file_t port = __file_name_lookup (file, 0, 0);
@@ -37,4 +35,5 @@ __chmod (file, mode)
   return 0;
 }
 
+libc_hidden_def (__chmod)
 weak_alias (__chmod, chmod)

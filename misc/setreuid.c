@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -22,9 +22,7 @@
 /* Set the real user ID of the calling process to RUID,
    and the effective user ID of the calling process to EUID.  */
 int
-__setreuid (effective_uid, real_uid)
-     uid_t effective_uid;
-     uid_t real_uid;
+__setreuid (uid_t effective_uid, uid_t real_uid)
 {
   __set_errno (ENOSYS);
   return -1;

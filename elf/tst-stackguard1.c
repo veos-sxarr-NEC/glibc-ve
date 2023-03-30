@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2005.
 
@@ -14,9 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
+#include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -185,12 +186,20 @@ do_test (void)
 #define CMDLINE_OPTIONS	\
   { "command", required_argument, NULL, OPT_COMMAND },  \
   { "child", no_argument, NULL, OPT_CHILD },
-#define CMDLINE_PROCESS	\
-  case OPT_COMMAND:	\
-    command = optarg;	\
-    break;		\
-  case OPT_CHILD:	\
-    child = true;	\
-    break;
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
+
+static void __attribute__((used))
+cmdline_process_function (int c)
+{
+  switch (c)
+    {
+      case OPT_COMMAND:
+        command = optarg;
+        break;
+      case OPT_CHILD:
+        child = true;
+        break;
+    }
+}
+#define CMDLINE_PROCESS	cmdline_process_function
+
+#include <support/test-driver.c>

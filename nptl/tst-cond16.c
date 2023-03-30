@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2004.
 
@@ -14,9 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -27,7 +28,7 @@ pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 bool n, exiting;
 FILE *f;
-int count;
+enum { count = 8 };		/* Number of worker threads.  */
 
 void *
 tf (void *dummy)
@@ -70,16 +71,11 @@ do_test (void)
       return 1;
     }
 
-  count = sysconf (_SC_NPROCESSORS_ONLN);
-  if (count <= 0)
-    count = 1;
-  count *= 4;
-
   pthread_t th[count];
   pthread_attr_t attr;
   int i, ret, sz;
   pthread_attr_init (&attr);
-  sz = __getpagesize ();
+  sz = sysconf (_SC_PAGESIZE);
   if (sz < PTHREAD_STACK_MIN)
 	  sz = PTHREAD_STACK_MIN;
   pthread_attr_setstacksize (&attr, sz);

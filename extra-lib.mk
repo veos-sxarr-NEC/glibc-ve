@@ -5,6 +5,9 @@
 # The variable $($(lib)-routines) defines the list of modules
 # to be included in that library.  A sysdep Makefile can add to
 # $(lib)-sysdep_routines to include additional modules.
+#
+# Libraries listed in $(extra-libs-noinstall) are built, but not
+# installed.
 
 lib := $(firstword $(extra-libs-left))
 extra-libs-left := $(filter-out $(lib),$(extra-libs-left))
@@ -28,7 +31,9 @@ extra-objs := $(extra-objs)
 all-$(lib)-routines := $($(lib)-routines) $($(lib)-sysdep_routines)
 
 # Add each flavor of library to the lists of things to build and install.
+ifeq (,$(filter $(lib), $(extra-libs-noinstall)))
 install-lib += $(foreach o,$(object-suffixes-$(lib)),$(lib:lib%=$(libtype$o)))
+endif
 extra-objs += $(foreach o,$(filter-out .os .oS,$(object-suffixes-$(lib))),\
 			$(patsubst %,%$o,$(filter-out \
 					   $($(lib)-shared-only-routines),\
@@ -103,5 +108,5 @@ endif
 # This will define `libof-ROUTINE := LIB' for each of the routines.
 cpp-srcs-left := $($(lib)-routines) $($(lib)-sysdep_routines)
 ifneq (,$(cpp-srcs-left))
-include $(patsubst %,$(..)cppflags-iterator.mk,$(cpp-srcs-left))
+include $(patsubst %,$(..)libof-iterator.mk,$(cpp-srcs-left))
 endif

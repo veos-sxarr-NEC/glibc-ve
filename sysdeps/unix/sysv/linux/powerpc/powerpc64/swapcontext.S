@@ -1,5 +1,5 @@
 /* Save current context and install the given one.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <rtld-global-offsets.h>
@@ -149,20 +149,7 @@ ENTRY(__novec_swapcontext)
   cmpdi  r3,0
   bne   L(nv_error_exit)
 
-/*
- * If this new ucontext refers to the point where we were interrupted
- * by a signal, we have to use the rt_sigreturn system call to
- * return to the context so we get both LR and CTR restored.
- *
- * Otherwise, the context we are restoring is either just after
- * a procedure call (getcontext/swapcontext) or at the beginning
- * of a procedure call (makecontext), so we don't need to restore
- * msr and ctr.  We don't restore r13 since it will be used as
- * the TLS pointer.  */
-  ld	  r0,(SIGCONTEXT_GP_REGS+(PT_MSR*8))(r31)
-  cmpdi r0,0
-  bne	  L(nv_do_sigret)
-
+  ld	r8,.LC__dl_hwcap@toc(r2)
 # ifdef SHARED
 /* Load _rtld-global._dl_hwcap.  */
   ld    r8,RTLD_GLOBAL_RO_DL_HWCAP_OFFSET(r8)
@@ -173,24 +160,34 @@ ENTRY(__novec_swapcontext)
   lfd  fp0,(SIGCONTEXT_FP_REGS+(32*8))(r31)
   lfd  fp31,(SIGCONTEXT_FP_REGS+(PT_R31*8))(r31)
   lfd  fp30,(SIGCONTEXT_FP_REGS+(PT_R30*8))(r31)
+
 # ifdef _ARCH_PWR6
   /* Use the extended four-operand version of the mtfsf insn.  */
-  mtfsf  0xff,fp0,1,0
-# else
   .machine push
   .machine "power6"
+
+  mtfsf  0xff,fp0,1,0
+
+  .machine pop
+# else
   /* Availability of DFP indicates a 64-bit FPSCR.  */
   andi.  r6,r8,PPC_FEATURE_HAS_DFP
   beq    5f
-  /* Use the extended four-operand version of the mtfsf insn.  */
+
+  .machine push
+  .machine "power6"
+
   mtfsf  0xff,fp0,1,0
+
+  .machine pop
+
   b      6f
   /* Continue to operate on the FPSCR as if it were 32-bits.  */
 5:
   mtfsf  0xff,fp0
 6:
-  .machine pop
 #endif /* _ARCH_PWR6 */
+
   lfd  fp29,(SIGCONTEXT_FP_REGS+(PT_R29*8))(r31)
   lfd  fp28,(SIGCONTEXT_FP_REGS+(PT_R28*8))(r31)
   lfd  fp27,(SIGCONTEXT_FP_REGS+(PT_R27*8))(r31)
@@ -276,21 +273,6 @@ L(nv_error_exit):
   mtlr  r0
   ld    r31,-8(r1)
   blr
-
-  /* At this point we assume that the ucontext was created by a
-     rt_signal and we should use rt_sigreturn to restore the original
-     state.  As of the 2.4.21 kernel the ucontext is the first thing
-     (offset 0) in the rt_signal frame and rt_sigreturn expects the
-     ucontext address in R1.  Normally the rt-signal trampoline handles
-     this by popping dummy frame before the rt_signal syscall.  In our
-     case the stack may not be in its original (signal handler return with
-     R1 pointing at the dummy frame) state.  We do have the ucontext
-     address in R3, so simply copy R3 to R1 before the syscall.  */
-L(nv_do_sigret):
-  mr   r1,r3,
-  li   r0,SYS_ify(rt_sigreturn)
-  sc
-  /* No return.  */
 
 PSEUDO_END(__novec_swapcontext)
 
@@ -524,20 +506,6 @@ L(has_no_vec):
   cmpdi  r3,0
   bne   L(error_exit)
 
-/*
- * If this new ucontext refers to the point where we were interrupted
- * by a signal, we have to use the rt_sigreturn system call to
- * return to the context so we get both LR and CTR restored.
- *
- * Otherwise, the context we are restoring is either just after
- * a procedure call (getcontext/swapcontext) or at the beginning
- * of a procedure call (makecontext), so we don't need to restore
- * msr and ctr.  We don't restore r13 since it will be used as
- * the TLS pointer.  */
-  ld	  r0,(SIGCONTEXT_GP_REGS+(PT_MSR*8))(r31)
-  cmpdi r0,0
-  bne	  L(do_sigret)
-
   ld    r8,.LC__dl_hwcap@toc(r2)
   ld    r10,(SIGCONTEXT_V_REGS_PTR)(r31)
 # ifdef SHARED
@@ -652,24 +620,34 @@ L(has_no_vec2):
   lfd  fp0,(SIGCONTEXT_FP_REGS+(32*8))(r31)
   lfd  fp31,(SIGCONTEXT_FP_REGS+(PT_R31*8))(r31)
   lfd  fp30,(SIGCONTEXT_FP_REGS+(PT_R30*8))(r31)
+
 # ifdef _ARCH_PWR6
   /* Use the extended four-operand version of the mtfsf insn.  */
-  mtfsf  0xff,fp0,1,0
-# else
   .machine push
   .machine "power6"
+
+  mtfsf  0xff,fp0,1,0
+
+  .machine pop
+# else
   /* Availability of DFP indicates a 64-bit FPSCR.  */
   andi.  r6,r8,PPC_FEATURE_HAS_DFP
   beq    7f
-  /* Use the extended four-operand version of the mtfsf insn.  */
+
+  .machine push
+  .machine "power6"
+
   mtfsf  0xff,fp0,1,0
+
+  .machine pop
+
   b      8f
   /* Continue to operate on the FPSCR as if it were 32-bits.  */
 7:
   mtfsf  0xff,fp0
 8:
-  .machine pop
 #endif /* _ARCH_PWR6 */
+
   lfd  fp29,(SIGCONTEXT_FP_REGS+(PT_R29*8))(r31)
   lfd  fp28,(SIGCONTEXT_FP_REGS+(PT_R28*8))(r31)
   lfd  fp27,(SIGCONTEXT_FP_REGS+(PT_R27*8))(r31)
@@ -755,21 +733,6 @@ L(error_exit):
   mtlr  r0
   ld    r31,-8(r1)
   blr
-
-  /* At this point we assume that the ucontext was created by a
-     rt_signal and we should use rt_sigreturn to restore the original
-     state.  As of the 2.4.21 kernel the ucontext is the first thing
-     (offset 0) in the rt_signal frame and rt_sigreturn expects the
-     ucontext address in R1.  Normally the rt-signal trampoline handles
-     this by popping dummy frame before the rt_signal syscall.  In our
-     case the stack may not be in its original (signal handler return with
-     R1 pointing at the dummy frame) state.  We do have the ucontext
-     address in R3, so simply copy R3 to R1 before the syscall.  */
-L(do_sigret):
-  mr   r1,r3,
-  li   r0,SYS_ify(rt_sigreturn)
-  sc
-  /* No return.  */
 
 PSEUDO_END(__swapcontext)
 

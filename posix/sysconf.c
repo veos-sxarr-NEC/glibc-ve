@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <grp.h>
@@ -28,8 +28,7 @@
 
 /* Get the value of the system variable NAME.  */
 long int
-__sysconf (name)
-     int name;
+__sysconf (int name)
 {
   switch (name)
     {
@@ -38,7 +37,7 @@ __sysconf (name)
       return -1;
 
     case _SC_TZNAME_MAX:
-      return MAX (__tzname_max (), _POSIX_TZNAME_MAX);
+      return -1;
 
     case _SC_CHARCLASS_NAME_MAX:
 #ifdef	CHARCLASS_NAME_MAX

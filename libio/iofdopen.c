@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,25 +28,12 @@
 #include "libioP.h"
 #include <fcntl.h>
 
-#ifdef _LIBC
-# include <shlib-compat.h>
-#endif
+#include <shlib-compat.h>
 
-#ifndef _IO_fcntl
-#ifdef _LIBC
-#define _IO_fcntl __fcntl
-#else
-#define _IO_fcntl fcntl
-#endif
-#endif
-
-_IO_FILE *
-_IO_new_fdopen (fd, mode)
-     int fd;
-     const char *mode;
+FILE *
+_IO_new_fdopen (int fd, const char *mode)
 {
   int read_write;
-  int posix_mode = 0;
   struct locked_FILE
   {
     struct _IO_FILE_plus fp;
@@ -55,7 +42,6 @@ _IO_new_fdopen (fd, mode)
 #endif
     struct _IO_wide_data wd;
   } *new_f;
-  int fd_flags;
   int i;
   int use_mmap = 0;
 
@@ -73,11 +59,10 @@ _IO_new_fdopen (fd, mode)
       read_write = _IO_NO_READS;
       break;
     case 'a':
-      posix_mode = O_APPEND;
       read_write = _IO_NO_READS|_IO_IS_APPENDING;
       break;
     default:
-      MAYBE_SET_EINVAL;
+      __set_errno (EINVAL);
       return NULL;
   }
   for (i = 1; i < 5; ++i)
@@ -100,18 +85,14 @@ _IO_new_fdopen (fd, mode)
 	}
       break;
     }
-#ifdef F_GETFL
-  fd_flags = _IO_fcntl (fd, F_GETFL);
-#ifndef O_ACCMODE
-#define O_ACCMODE (O_RDONLY|O_WRONLY|O_RDWR)
-#endif
+  int fd_flags = __fcntl (fd, F_GETFL);
   if (fd_flags == -1)
     return NULL;
 
   if (((fd_flags & O_ACCMODE) == O_RDONLY && !(read_write & _IO_NO_WRITES))
       || ((fd_flags & O_ACCMODE) == O_WRONLY && !(read_write & _IO_NO_READS)))
     {
-      MAYBE_SET_EINVAL;
+      __set_errno (EINVAL);
       return NULL;
     }
 
@@ -120,9 +101,9 @@ _IO_new_fdopen (fd, mode)
      Realtime Extensions], Rationale B.8.3.3
      Open a Stream on a File Descriptor says:
 
-         Although not explicitly required by POSIX.1, a good
-         implementation of append ("a") mode would cause the
-         O_APPEND flag to be set.
+	 Although not explicitly required by POSIX.1, a good
+	 implementation of append ("a") mode would cause the
+	 O_APPEND flag to be set.
 
      (Historical implementations [such as Solaris2] do a one-time
      seek in fdopen.)
@@ -131,15 +112,12 @@ _IO_new_fdopen (fd, mode)
      though that would seem consistent) because that would be more
      likely to break historical programs.
      */
-  if ((posix_mode & O_APPEND) && !(fd_flags & O_APPEND))
+  if ((read_write & _IO_IS_APPENDING) && !(fd_flags & O_APPEND))
     {
       do_seek = true;
-#ifdef F_SETFL
-      if (_IO_fcntl (fd, F_SETFL, fd_flags | O_APPEND) == -1)
-#endif
+      if (__fcntl (fd, F_SETFL, fd_flags | O_APPEND) == -1)
 	return NULL;
     }
-#endif
 
   new_f = (struct locked_FILE *) malloc (sizeof (struct locked_FILE));
   if (new_f == NULL)
@@ -148,25 +126,22 @@ _IO_new_fdopen (fd, mode)
   new_f->fp.file._lock = &new_f->lock;
 #endif
   _IO_no_init (&new_f->fp.file, 0, 0, &new_f->wd,
-#ifdef _G_HAVE_MMAP
+#if _G_HAVE_MMAP
 	       (use_mmap && (read_write & _IO_NO_WRITES))
 	       ? &_IO_wfile_jumps_maybe_mmap :
 #endif
 	       &_IO_wfile_jumps);
   _IO_JUMPS (&new_f->fp) =
-#ifdef _G_HAVE_MMAP
+#if _G_HAVE_MMAP
     (use_mmap && (read_write & _IO_NO_WRITES)) ? &_IO_file_jumps_maybe_mmap :
 #endif
       &_IO_file_jumps;
-  _IO_file_init (&new_f->fp);
-#if  !_IO_UNIFIED_JUMPTABLES
-  new_f->fp.vtable = NULL;
-#endif
-  /* We only need to record the fd because _IO_file_init will have unset the
-     offset.  It is important to unset the cached offset because the real
-     offset in the file could change between now and when the handle is
-     activated and we would then mislead ftell into believing that we have a
-     valid offset.  */
+  _IO_new_file_init_internal (&new_f->fp);
+  /* We only need to record the fd because _IO_file_init_internal will
+     have unset the offset.  It is important to unset the cached
+     offset because the real offset in the file could change between
+     now and when the handle is activated and we would then mislead
+     ftell into believing that we have a valid offset.  */
   new_f->fp.file._fileno = fd;
   new_f->fp.file._flags &= ~_IO_DELETE_DONT_CLOSE;
 
@@ -179,7 +154,7 @@ _IO_new_fdopen (fd, mode)
   if (do_seek && ((read_write & (_IO_IS_APPENDING | _IO_NO_READS))
 		  == (_IO_IS_APPENDING | _IO_NO_READS)))
     {
-      _IO_off64_t new_pos = _IO_SYSSEEK (&new_f->fp.file, 0, _IO_seek_end);
+      off64_t new_pos = _IO_SYSSEEK (&new_f->fp.file, 0, _IO_seek_end);
       if (new_pos == _IO_pos_BAD && errno != ESPIPE)
 	return NULL;
     }

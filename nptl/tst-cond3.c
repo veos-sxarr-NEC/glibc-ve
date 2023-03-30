@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread.h>
 #include <stdio.h>
@@ -22,6 +22,10 @@
 #include <string.h>
 #include <unistd.h>
 
+static int do_test (void);
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
 
 /* Note that this test requires more than the standard.  It is
    required that there are no spurious wakeups if only more readers
@@ -50,7 +54,8 @@ tf (void *arg)
     }
 
   /* This call should never return.  */
-  pthread_cond_wait (&cond, &mut);
+  xpthread_cond_wait (&cond, &mut);
+  puts ("error: pthread_cond_wait in tf returned");
 
   /* We should never get here.  */
   exit (1);
@@ -96,17 +101,11 @@ do_test (void)
 	}
     }
 
-  /* Set an alarm for 1 second.  The wrapper will expect this.  */
-  alarm (1);
+  delayed_exit (1);
 
   /* This call should never return.  */
-  pthread_cond_wait (&cond, &mut);
+  xpthread_cond_wait (&cond, &mut);
 
-  puts ("cond_wait returned");
+  puts ("error: pthread_cond_wait in do_test returned");
   return 1;
 }
-
-
-#define EXPECTED_SIGNAL SIGALRM
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"

@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -25,44 +25,28 @@
    in files containing the exception.  */
 
 
-/* This file provides definitions of _IO_stdin, _IO_stdout, and _IO_stderr
-   for C code.  Compare stdstreams.cc.
-   (The difference is that here the vtable field is set to 0,
-   so the objects defined are not valid C++ objects.  On the other
-   hand, we don't need a C++ compiler to build this file.) */
+/* This file provides definitions of _IO_2_1_stdin_, _IO_2_1_stdout_,
+   and _IO_2_1_stderr_, the default values of stdin, stdout, stderr.
+   See oldstdfiles.c for glibc 2.0 legacy definitions without wide
+   character support.  */
 
 #include "libioP.h"
 
 #ifdef _IO_MTSAFE_IO
-# if defined _LIBC || defined _GLIBCPP_USE_WCHAR_T
-#  define DEF_STDFILE(NAME, FD, CHAIN, FLAGS) \
+# define DEF_STDFILE(NAME, FD, CHAIN, FLAGS) \
   static _IO_lock_t _IO_stdfile_##FD##_lock = _IO_lock_initializer; \
   static struct _IO_wide_data _IO_wide_data_##FD \
     = { ._wide_vtable = &_IO_wfile_jumps }; \
   struct _IO_FILE_plus NAME \
     = {FILEBUF_LITERAL(CHAIN, FLAGS, FD, &_IO_wide_data_##FD), \
        &_IO_file_jumps};
-# else
-#  define DEF_STDFILE(NAME, FD, CHAIN, FLAGS) \
-  static _IO_lock_t _IO_stdfile_##FD##_lock = _IO_lock_initializer; \
-  struct _IO_FILE_plus NAME \
-    = {FILEBUF_LITERAL(CHAIN, FLAGS, FD, NULL), \
-       &_IO_file_jumps};
-# endif
 #else
-# if defined _LIBC || defined _GLIBCPP_USE_WCHAR_T
-#  define DEF_STDFILE(NAME, FD, CHAIN, FLAGS) \
+# define DEF_STDFILE(NAME, FD, CHAIN, FLAGS) \
   static struct _IO_wide_data _IO_wide_data_##FD \
     = { ._wide_vtable = &_IO_wfile_jumps }; \
   struct _IO_FILE_plus NAME \
     = {FILEBUF_LITERAL(CHAIN, FLAGS, FD, &_IO_wide_data_##FD), \
        &_IO_file_jumps};
-# else
-#  define DEF_STDFILE(NAME, FD, CHAIN, FLAGS) \
-  struct _IO_FILE_plus NAME \
-    = {FILEBUF_LITERAL(CHAIN, FLAGS, FD, NULL), \
-       &_IO_file_jumps};
-# endif
 #endif
 
 DEF_STDFILE(_IO_2_1_stdin_, 0, 0, _IO_NO_WRITES);

@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Ulrich Drepper <drepper@cygnus.com>.
    Based on the single byte version by Per Bothner <bothner@cygnus.com>.
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -34,25 +34,14 @@
 #include <wchar.h>
 
 
-#ifndef _LIBC
-# define __wmemcpy(dst, src, n) wmemcpy (dst, src, n)
-#endif
-
-
-static int save_for_wbackup (_IO_FILE *fp, wchar_t *end_p) __THROW
-#ifdef _LIBC
-     internal_function
-#endif
-     ;
+static int save_for_wbackup (FILE *fp, wchar_t *end_p) __THROW;
 
 /* Return minimum _pos markers
    Assumes the current get area is the main get area. */
-_IO_ssize_t
-_IO_least_wmarker (fp, end_p)
-     _IO_FILE *fp;
-     wchar_t *end_p;
+ssize_t
+_IO_least_wmarker (FILE *fp, wchar_t *end_p)
 {
-  _IO_ssize_t least_so_far = end_p - fp->_wide_data->_IO_read_base;
+  ssize_t least_so_far = end_p - fp->_wide_data->_IO_read_base;
   struct _IO_marker *mark;
   for (mark = fp->_markers; mark != NULL; mark = mark->_next)
     if (mark->_pos < least_so_far)
@@ -63,8 +52,7 @@ libc_hidden_def (_IO_least_wmarker)
 
 /* Switch current get area from backup buffer to (start of) main get area. */
 void
-_IO_switch_to_main_wget_area (fp)
-     _IO_FILE *fp;
+_IO_switch_to_main_wget_area (FILE *fp)
 {
   wchar_t *tmp;
   fp->_flags &= ~_IO_IN_BACKUP;
@@ -84,8 +72,7 @@ libc_hidden_def (_IO_switch_to_main_wget_area)
 
 /* Switch current get area from main get area to (end of) backup area. */
 void
-_IO_switch_to_wbackup_area (fp)
-     _IO_FILE *fp;
+_IO_switch_to_wbackup_area (FILE *fp)
 {
   wchar_t *tmp;
   fp->_flags |= _IO_IN_BACKUP;
@@ -104,14 +91,10 @@ libc_hidden_def (_IO_switch_to_wbackup_area)
 
 
 void
-_IO_wsetb (f, b, eb, a)
-     _IO_FILE *f;
-     wchar_t *b;
-     wchar_t *eb;
-     int a;
+_IO_wsetb (FILE *f, wchar_t *b, wchar_t *eb, int a)
 {
   if (f->_wide_data->_IO_buf_base && !(f->_flags2 & _IO_FLAGS2_USER_WBUF))
-    FREE_BUF (f->_wide_data->_IO_buf_base, _IO_wblen (f) * sizeof (wchar_t));
+    free (f->_wide_data->_IO_buf_base);
   f->_wide_data->_IO_buf_base = b;
   f->_wide_data->_IO_buf_end = eb;
   if (a)
@@ -123,9 +106,7 @@ libc_hidden_def (_IO_wsetb)
 
 
 wint_t
-_IO_wdefault_pbackfail (fp, c)
-     _IO_FILE *fp;
-     wint_t c;
+_IO_wdefault_pbackfail (FILE *fp, wint_t c)
 {
   if (fp->_wide_data->_IO_read_ptr > fp->_wide_data->_IO_read_base
       && !_IO_in_backup (fp)
@@ -164,9 +145,9 @@ _IO_wdefault_pbackfail (fp, c)
       else if (fp->_wide_data->_IO_read_ptr <= fp->_wide_data->_IO_read_base)
 	{
 	  /* Increase size of existing backup buffer. */
-	  _IO_size_t new_size;
-	  _IO_size_t old_size = (fp->_wide_data->_IO_read_end
-				 - fp->_wide_data->_IO_read_base);
+	  size_t new_size;
+	  size_t old_size = (fp->_wide_data->_IO_read_end
+                             - fp->_wide_data->_IO_read_base);
 	  wchar_t *new_buf;
 	  new_size = 2 * old_size;
 	  new_buf = (wchar_t *) malloc (new_size * sizeof (wchar_t));
@@ -188,15 +169,12 @@ libc_hidden_def (_IO_wdefault_pbackfail)
 
 
 void
-_IO_wdefault_finish (fp, dummy)
-     _IO_FILE *fp;
-     int dummy;
+_IO_wdefault_finish (FILE *fp, int dummy)
 {
   struct _IO_marker *mark;
   if (fp->_wide_data->_IO_buf_base && !(fp->_flags2 & _IO_FLAGS2_USER_WBUF))
     {
-      FREE_BUF (fp->_wide_data->_IO_buf_base,
-		_IO_wblen (fp) * sizeof (wchar_t));
+      free (fp->_wide_data->_IO_buf_base);
       fp->_wide_data->_IO_buf_base = fp->_wide_data->_IO_buf_end = NULL;
     }
 
@@ -220,8 +198,7 @@ libc_hidden_def (_IO_wdefault_finish)
 
 
 wint_t
-_IO_wdefault_uflow (fp)
-     _IO_FILE *fp;
+_IO_wdefault_uflow (FILE *fp)
 {
   wint_t wch;
   wch = _IO_UNDERFLOW (fp);
@@ -233,9 +210,7 @@ libc_hidden_def (_IO_wdefault_uflow)
 
 
 wint_t
-__woverflow (f, wch)
-     _IO_FILE *f;
-     wint_t wch;
+__woverflow (FILE *f, wint_t wch)
 {
   if (f->_mode == 0)
     _IO_fwide (f, 1);
@@ -245,8 +220,7 @@ libc_hidden_def (__woverflow)
 
 
 wint_t
-__wuflow (fp)
-     _IO_FILE *fp;
+__wuflow (FILE *fp)
 {
   if (fp->_mode < 0 || (fp->_mode == 0 && _IO_fwide (fp, 1) != 1))
     return WEOF;
@@ -276,8 +250,7 @@ __wuflow (fp)
 libc_hidden_def (__wuflow)
 
 wint_t
-__wunderflow (fp)
-     _IO_FILE *fp;
+__wunderflow (FILE *fp)
 {
   if (fp->_mode < 0 || (fp->_mode == 0 && _IO_fwide (fp, 1) != 1))
     return WEOF;
@@ -307,34 +280,26 @@ __wunderflow (fp)
 libc_hidden_def (__wunderflow)
 
 
-_IO_size_t
-_IO_wdefault_xsputn (f, data, n)
-     _IO_FILE *f;
-     const void *data;
-     _IO_size_t n;
+size_t
+_IO_wdefault_xsputn (FILE *f, const void *data, size_t n)
 {
   const wchar_t *s = (const wchar_t *) data;
-  _IO_size_t more = n;
+  size_t more = n;
   if (more <= 0)
     return 0;
   for (;;)
     {
       /* Space available. */
-      _IO_ssize_t count = (f->_wide_data->_IO_write_end
-			   - f->_wide_data->_IO_write_ptr);
+      ssize_t count = (f->_wide_data->_IO_write_end
+                       - f->_wide_data->_IO_write_ptr);
       if (count > 0)
 	{
-	  if ((_IO_size_t) count > more)
+	  if ((size_t) count > more)
 	    count = more;
 	  if (count > 20)
 	    {
-#ifdef _LIBC
 	      f->_wide_data->_IO_write_ptr =
 		__wmempcpy (f->_wide_data->_IO_write_ptr, s, count);
-#else
-	      memcpy (f->_wide_data->_IO_write_ptr, s, count);
-	      f->_wide_data->_IO_write_ptr += count;
-#endif
 	      s += count;
             }
 	  else if (count <= 0)
@@ -342,7 +307,7 @@ _IO_wdefault_xsputn (f, data, n)
 	  else
 	    {
 	      wchar_t *p = f->_wide_data->_IO_write_ptr;
-	      _IO_ssize_t i;
+	      ssize_t i;
 	      for (i = count; --i >= 0; )
 		*p++ = *s++;
 	      f->_wide_data->_IO_write_ptr = p;
@@ -358,31 +323,23 @@ _IO_wdefault_xsputn (f, data, n)
 libc_hidden_def (_IO_wdefault_xsputn)
 
 
-_IO_size_t
-_IO_wdefault_xsgetn (fp, data, n)
-     _IO_FILE *fp;
-     void *data;
-     _IO_size_t n;
+size_t
+_IO_wdefault_xsgetn (FILE *fp, void *data, size_t n)
 {
-  _IO_size_t more = n;
+  size_t more = n;
   wchar_t *s = (wchar_t*) data;
   for (;;)
     {
       /* Data available. */
-      _IO_ssize_t count = (fp->_wide_data->_IO_read_end
-			   - fp->_wide_data->_IO_read_ptr);
+      ssize_t count = (fp->_wide_data->_IO_read_end
+                       - fp->_wide_data->_IO_read_ptr);
       if (count > 0)
 	{
-	  if ((_IO_size_t) count > more)
+	  if ((size_t) count > more)
 	    count = more;
 	  if (count > 20)
 	    {
-#ifdef _LIBC
 	      s = __wmempcpy (s, fp->_wide_data->_IO_read_ptr, count);
-#else
-	      memcpy (s, fp->_wide_data->_IO_read_ptr, count);
-	      s += count;
-#endif
 	      fp->_wide_data->_IO_read_ptr += count;
 	    }
 	  else if (count <= 0)
@@ -406,8 +363,7 @@ libc_hidden_def (_IO_wdefault_xsgetn)
 
 
 void
-_IO_wdoallocbuf (fp)
-     _IO_FILE *fp;
+_IO_wdoallocbuf (FILE *fp)
 {
   if (fp->_wide_data->_IO_buf_base)
     return;
@@ -421,21 +377,21 @@ libc_hidden_def (_IO_wdoallocbuf)
 
 
 int
-_IO_wdefault_doallocate (fp)
-     _IO_FILE *fp;
+_IO_wdefault_doallocate (FILE *fp)
 {
   wchar_t *buf;
 
-  ALLOC_WBUF (buf, _IO_BUFSIZ, EOF);
-  _IO_wsetb (fp, buf, buf + _IO_BUFSIZ, 1);
+  buf = malloc (BUFSIZ);
+  if (__glibc_unlikely (buf == NULL))
+    return EOF;
+  _IO_wsetb (fp, buf, buf + BUFSIZ, 1);
   return 1;
 }
 libc_hidden_def (_IO_wdefault_doallocate)
 
 
 int
-_IO_switch_to_wget_mode (fp)
-     _IO_FILE *fp;
+_IO_switch_to_wget_mode (FILE *fp)
 {
   if (fp->_wide_data->_IO_write_ptr > fp->_wide_data->_IO_write_base)
     if ((wint_t)_IO_WOVERFLOW (fp, WEOF) == WEOF)
@@ -459,8 +415,7 @@ _IO_switch_to_wget_mode (fp)
 libc_hidden_def (_IO_switch_to_wget_mode)
 
 void
-_IO_free_wbackup_area (fp)
-     _IO_FILE *fp;
+_IO_free_wbackup_area (FILE *fp)
 {
   if (_IO_in_backup (fp))
     _IO_switch_to_main_wget_area (fp);  /* Just in case. */
@@ -471,45 +426,19 @@ _IO_free_wbackup_area (fp)
 }
 libc_hidden_def (_IO_free_wbackup_area)
 
-#if 0
-int
-_IO_switch_to_wput_mode (fp)
-     _IO_FILE *fp;
-{
-  fp->_wide_data->_IO_write_base = fp->_wide_data->_IO_read_ptr;
-  fp->_wide_data->_IO_write_ptr = fp->_wide_data->_IO_read_ptr;
-  /* Following is wrong if line- or un-buffered? */
-  fp->_wide_data->_IO_write_end = (fp->_flags & _IO_IN_BACKUP
-				   ? fp->_wide_data->_IO_read_end
-				   : fp->_wide_data->_IO_buf_end);
-
-  fp->_wide_data->_IO_read_ptr = fp->_wide_data->_IO_read_end;
-  fp->_wide_data->_IO_read_base = fp->_wide_data->_IO_read_end;
-
-  fp->_flags |= _IO_CURRENTLY_PUTTING;
-  return 0;
-}
-#endif
-
-
 static int
-#ifdef _LIBC
-internal_function
-#endif
-save_for_wbackup (fp, end_p)
-     _IO_FILE *fp;
-     wchar_t *end_p;
+save_for_wbackup (FILE *fp, wchar_t *end_p)
 {
   /* Append [_IO_read_base..end_p] to backup area. */
-  _IO_ssize_t least_mark = _IO_least_wmarker (fp, end_p);
+  ssize_t least_mark = _IO_least_wmarker (fp, end_p);
   /* needed_size is how much space we need in the backup area. */
-  _IO_size_t needed_size = ((end_p - fp->_wide_data->_IO_read_base)
-			    - least_mark);
+  size_t needed_size = ((end_p - fp->_wide_data->_IO_read_base)
+                        - least_mark);
   /* FIXME: Dubious arithmetic if pointers are NULL */
-  _IO_size_t current_Bsize = (fp->_wide_data->_IO_save_end
-			      - fp->_wide_data->_IO_save_base);
-  _IO_size_t avail; /* Extra space available for future expansion. */
-  _IO_ssize_t delta;
+  size_t current_Bsize = (fp->_wide_data->_IO_save_end
+                          - fp->_wide_data->_IO_save_base);
+  size_t avail; /* Extra space available for future expansion. */
+  ssize_t delta;
   struct _IO_marker *mark;
   if (needed_size > current_Bsize)
     {
@@ -521,32 +450,17 @@ save_for_wbackup (fp, end_p)
 	return EOF;		/* FIXME */
       if (least_mark < 0)
 	{
-#ifdef _LIBC
 	  __wmempcpy (__wmempcpy (new_buffer + avail,
 				  fp->_wide_data->_IO_save_end + least_mark,
 				  -least_mark),
 		      fp->_wide_data->_IO_read_base,
 		      end_p - fp->_wide_data->_IO_read_base);
-#else
-	  memcpy (new_buffer + avail,
-		  fp->_wide_data->_IO_save_end + least_mark,
-		  -least_mark * sizeof (wchar_t));
-	  memcpy (new_buffer + avail - least_mark,
-		  fp->_wide_data->_IO_read_base,
-		  (end_p - fp->_wide_data->_IO_read_base) * sizeof (wchar_t));
-#endif
 	}
       else
 	{
-#ifdef _LIBC
 	  __wmemcpy (new_buffer + avail,
 		     fp->_wide_data->_IO_read_base + least_mark,
 		     needed_size);
-#else
-	  memcpy (new_buffer + avail,
-		  fp->_wide_data->_IO_read_base + least_mark,
-		  needed_size * sizeof (wchar_t));
-#endif
 	}
       free (fp->_wide_data->_IO_save_base);
       fp->_wide_data->_IO_save_base = new_buffer;
@@ -557,32 +471,17 @@ save_for_wbackup (fp, end_p)
       avail = current_Bsize - needed_size;
       if (least_mark < 0)
 	{
-#ifdef _LIBC
 	  __wmemmove (fp->_wide_data->_IO_save_base + avail,
 		      fp->_wide_data->_IO_save_end + least_mark,
 		      -least_mark);
 	  __wmemcpy (fp->_wide_data->_IO_save_base + avail - least_mark,
 		     fp->_wide_data->_IO_read_base,
 		     end_p - fp->_wide_data->_IO_read_base);
-#else
-	  memmove (fp->_wide_data->_IO_save_base + avail,
-		   fp->_wide_data->_IO_save_end + least_mark,
-		   -least_mark * sizeof (wchar_t));
-	  memcpy (fp->_wide_data->_IO_save_base + avail - least_mark,
-		  fp->_wide_data->_IO_read_base,
-		  (end_p - fp->_wide_data->_IO_read_base) * sizeof (wchar_t));
-#endif
 	}
       else if (needed_size > 0)
-#ifdef _LIBC
 	__wmemcpy (fp->_wide_data->_IO_save_base + avail,
 		   fp->_wide_data->_IO_read_base + least_mark,
 		   needed_size);
-#else
-	memcpy (fp->_wide_data->_IO_save_base + avail,
-		fp->_wide_data->_IO_read_base + least_mark,
-		needed_size * sizeof (wchar_t));
-#endif
     }
   fp->_wide_data->_IO_backup_base = fp->_wide_data->_IO_save_base + avail;
   /* Adjust all the streammarkers. */
@@ -593,9 +492,7 @@ save_for_wbackup (fp, end_p)
 }
 
 wint_t
-_IO_sputbackwc (fp, c)
-     _IO_FILE *fp;
-     wint_t c;
+_IO_sputbackwc (FILE *fp, wint_t c)
 {
   wint_t result;
 
@@ -616,8 +513,7 @@ _IO_sputbackwc (fp, c)
 libc_hidden_def (_IO_sputbackwc)
 
 wint_t
-_IO_sungetwc (fp)
-     _IO_FILE *fp;
+_IO_sungetwc (FILE *fp)
 {
   wint_t result;
 
@@ -637,10 +533,7 @@ _IO_sungetwc (fp)
 
 
 unsigned
-_IO_adjust_wcolumn (start, line, count)
-     unsigned start;
-     const wchar_t *line;
-     int count;
+_IO_adjust_wcolumn (unsigned start, const wchar_t *line, int count)
 {
   const wchar_t *ptr = line + count;
   while (ptr > line)
@@ -650,9 +543,7 @@ _IO_adjust_wcolumn (start, line, count)
 }
 
 void
-_IO_init_wmarker (marker, fp)
-     struct _IO_marker *marker;
-     _IO_FILE *fp;
+_IO_init_wmarker (struct _IO_marker *marker, FILE *fp)
 {
   marker->_sbuf = fp;
   if (_IO_in_put_mode (fp))
@@ -672,8 +563,7 @@ _IO_init_wmarker (marker, fp)
 
 /* Return difference between MARK and current position of MARK's stream. */
 int
-_IO_wmarker_delta (mark)
-     struct _IO_marker *mark;
+_IO_wmarker_delta (struct _IO_marker *mark)
 {
   int cur_pos;
   if (mark->_sbuf == NULL)
@@ -688,10 +578,7 @@ _IO_wmarker_delta (mark)
 }
 
 int
-_IO_seekwmark (fp, mark, delta)
-     _IO_FILE *fp;
-     struct _IO_marker *mark;
-     int delta;
+_IO_seekwmark (FILE *fp, struct _IO_marker *mark, int delta)
 {
   if (mark->_sbuf != fp)
     return EOF;
@@ -712,26 +599,11 @@ _IO_seekwmark (fp, mark, delta)
 }
 
 void
-_IO_unsave_wmarkers (fp)
-     _IO_FILE *fp;
+_IO_unsave_wmarkers (FILE *fp)
 {
   struct _IO_marker *mark = fp->_markers;
   if (mark)
     {
-#ifdef TODO
-      streampos offset = seekoff (0, ios::cur, ios::in);
-      if (offset != EOF)
-	{
-	  offset += eGptr () - Gbase ();
-	  for ( ; mark != NULL; mark = mark->_next)
-	    mark->set_streampos (mark->_pos + offset);
-	}
-    else
-      {
-	for ( ; mark != NULL; mark = mark->_next)
-	  mark->set_streampos (EOF);
-      }
-#endif
       fp->_markers = 0;
     }
 

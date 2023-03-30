@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -25,14 +25,12 @@
    Operates just like `read' (see <unistd.h>) except that data are
    put in VECTOR instead of a contiguous buffer.  */
 ssize_t
-__readv (fd, vector, count)
-     int fd;
-     const struct iovec *vector;
-     int count;
+__readv (int fd, const struct iovec *vector, int count)
 {
   __set_errno (ENOSYS);
   return -1;
 }
+libc_hidden_def (__readv)
 weak_alias (__readv, readv)
 
 stub_warning (readv)

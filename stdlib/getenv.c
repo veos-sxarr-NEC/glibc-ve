@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <endian.h>
 #include <errno.h>
@@ -30,8 +30,7 @@
    two characters which we can access.  By doing this we can avoid using the
    `strncmp' most of the time.  */
 char *
-getenv (name)
-     const char *name;
+getenv (const char *name)
 {
   size_t len = strlen (name);
   char **ep;

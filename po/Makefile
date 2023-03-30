@@ -1,4 +1,4 @@
-# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Makefile for installing libc message catalogs.
 
@@ -39,10 +39,12 @@ endif
 domainname = libc
 
 # Pattern for where message catalog object for language % gets installed.
-mo-installed = $(inst_msgcatdir)/%/LC_MESSAGES/$(domainname).mo
+mo-installed = $(inst_localedir)/%/LC_MESSAGES/$(domainname).mo
 
 # Files to install: a $(domainname).mo file for each language.
 install-others = $(LINGUAS:%=$(mo-installed))
+
+generated += $(ALL_LINGUAS:%=%.mo)
 
 
 include ../Rules
@@ -80,32 +82,24 @@ libc.pot.files: FORCE
 
 # Compile the binary message object files from the portable object source
 # files of translations for each language.
-%.mo: %.po
+$(objpfx)%.mo: %.po
+	$(make-target-directory)
 	$(MSGFMT) -o $@ $<
 
 # Install the message object files as libc.po in the language directory.
-$(mo-installed): %.mo $(+force); $(do-install) || exit 0
-
-.PHONY: linguas linguas.mo
-linguas: $(ALL_LINGUAS:=.po)
-linguas.mo: $(ALL_LINGUAS:=.mo)
-
-realclean:
-	rm -f $(ALL_LINGUAS:=.mo)
+$(mo-installed): $(objpfx)%.mo $(+force); $(do-install) || exit 0
 
-# Copy the PO files from the translation coordinator's repository.
+# Update translations from the translation project.
+TRANSLATIONS_URL = https://translationproject.org/latest/libc
+WGET = wget
 
-podir = /com/share/ftp/gnu/po/maint/glibc
-
-pofiles := $(wildcard $(podir)/*.po)
-
-ifneq (,$(pofiles))
-
-%.po: $(podir)/%.po
-	cp -f $< $@
-	chmod 444 $@
-
-linguas: $(pofiles:$(podir)/%=%)
-linguas.mo: $(pofiles:$(podir)/%.po=%.mo)
-
-endif
+update-translations:
+	$(WGET) -qO- $(TRANSLATIONS_URL) | sed -n 's|.*href="\([^"]\+po\)".*|\1|p' | \
+	  while read f; do \
+	    $(WGET) -O $(objdir)/$$f-tmp2 $(TRANSLATIONS_URL)/$$f && \
+	    msgmerge --previous --no-wrap $(objdir)/$$f-tmp2 libc.pot > \
+	      $(objdir)/$$f-tmp && \
+	    msgattrib --translated --no-fuzzy --no-obsolete --no-wrap \
+	      $(objdir)/$$f-tmp > $(objdir)/$$f-tmp0 && \
+	    mv -f $(objdir)/$$f-tmp0 $$f; \
+	  done

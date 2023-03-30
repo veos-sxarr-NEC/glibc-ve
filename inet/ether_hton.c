@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <netinet/ether.h>
@@ -26,11 +26,6 @@
 /* Type of the lookup function we need here.  */
 typedef int (*lookup_function) (const char *, struct etherent *, char *, int,
 				int *);
-
-/* The lookup function for the first entry of this service.  */
-extern int __nss_ethers_lookup (service_user **nip, const char *name,
-				void **fctp) internal_function;
-
 
 int
 ether_hostton (const char *hostname, struct ether_addr *addr)
@@ -49,7 +44,7 @@ ether_hostton (const char *hostname, struct ether_addr *addr)
 
   if (startp == NULL)
     {
-      no_more = __nss_ethers_lookup (&nip, "gethostton_r", &fct.ptr);
+      no_more = __nss_ethers_lookup2 (&nip, "gethostton_r", NULL, &fct.ptr);
       if (no_more)
 	startp = (service_user *) -1;
       else

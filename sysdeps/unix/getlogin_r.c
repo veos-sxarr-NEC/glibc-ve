@@ -1,5 +1,5 @@
 /* Reentrant function to return the current login name.  Unix version.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -34,9 +34,7 @@
 STATIC
 #endif
 int
-getlogin_r (name, name_len)
-     char *name;
-     size_t name_len;
+__getlogin_r (char *name, size_t name_len)
 {
   char tty_pathname[2 + 2 * NAME_MAX];
   char *real_tty_path = tty_pathname;
@@ -66,8 +64,8 @@ getlogin_r (name, name_len)
      held so that our search is thread-safe.  */
 
   __libc_lock_lock (__libc_utmp_lock);
-  (*__libc_utmp_jump_table->setutent) ();
-  result = (*__libc_utmp_jump_table->getutline_r) (&line, &buffer, &ut);
+  __libc_setutent ();
+  result = __libc_getutline_r (&line, &buffer, &ut);
   if (result < 0)
     {
       if (errno == ESRCH)
@@ -76,13 +74,12 @@ getlogin_r (name, name_len)
       else
 	result = errno;
     }
-  (*__libc_utmp_jump_table->endutent) ();
-  __libc_utmp_jump_table = &__libc_utmp_unknown_functions;
+  __libc_endutent ();
   __libc_lock_unlock (__libc_utmp_lock);
 
   if (result == 0)
     {
-      size_t needed = strlen (ut->ut_user) + 1;
+      size_t needed = __strnlen (ut->ut_user, UT_NAMESIZE) + 1;
 
       if (needed > name_len)
 	{
@@ -91,7 +88,8 @@ getlogin_r (name, name_len)
 	}
       else
 	{
-	  memcpy (name, ut->ut_user, needed);
+	  memcpy (name, ut->ut_user, needed - 1);
+	  name[needed - 1] = 0;
 	  result = 0;
 	}
     }
@@ -99,5 +97,7 @@ getlogin_r (name, name_len)
   return result;
 }
 #ifndef STATIC
-libc_hidden_def (getlogin_r)
+libc_hidden_def (__getlogin_r)
+weak_alias (__getlogin_r, getlogin_r)
+libc_hidden_weak (getlogin_r)
 #endif

@@ -5,7 +5,11 @@
 #include <dirent.h>
 #include <stdbool.h>
 #include <string.h>
+#include <sys/stat.h>
 
+#ifndef O_NOATIME
+# define O_NOATIME	0
+#endif
 
 static int
 do_test (void)
@@ -119,6 +123,5 @@ do_test (void)
   return 0;
 }
 
-#define TIMEOUT 6
 #define TEST_FUNCTION do_test ()
 #include "../test-skeleton.c"

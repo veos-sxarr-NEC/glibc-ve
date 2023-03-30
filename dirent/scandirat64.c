@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,18 +13,20 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#define scandirat __no_scandirat_decl
 #include <dirent.h>
+#undef scandirat
 
-/* scandirat.c defines scandirat64 as an alias if _DIRENT_MATCHES_DIRENT64.  */
-#ifndef _DIRENT_MATCHES_DIRENT64
+int
+scandirat64 (int dfd, const char *dir, struct dirent64 ***namelist,
+	     int (*select) (const struct dirent64 *),
+	     int (*cmp) (const struct dirent64 **, const struct dirent64 **))
+{
+  return __scandir64_tail (__opendirat (dfd, dir), namelist, select, cmp);
+}
 
-#define SCANDIRAT scandirat64
-#define READDIR __readdir64
-#define DIRENT_TYPE struct dirent64
-#define SKIP_SCANDIR_CANCEL 1
-
-#include "scandirat.c"
-
+#if _DIRENT_MATCHES_DIRENT64
+weak_alias (scandirat64, scandirat)
 #endif

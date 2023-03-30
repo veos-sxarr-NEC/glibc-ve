@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2005.
 
@@ -14,16 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthreadP.h>
 
 
 int
-pthread_mutexattr_setrobust (attr, robustness)
-     pthread_mutexattr_t *attr;
-     int robustness;
+pthread_mutexattr_setrobust (pthread_mutexattr_t *attr, int robustness)
 {
   if (robustness != PTHREAD_MUTEX_STALLED_NP
       && __builtin_expect (robustness != PTHREAD_MUTEX_ROBUST_NP, 0))

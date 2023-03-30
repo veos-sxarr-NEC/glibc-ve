@@ -1,5 +1,5 @@
 /* File tree walker functions.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -109,8 +109,6 @@ extern char *xgetcwd (void);
 # define __tfind tfind
 # undef __tsearch
 # define __tsearch tsearch
-# undef internal_function
-# define internal_function /* empty */
 # undef dirent64
 # define dirent64 dirent
 # undef MAX
@@ -222,7 +220,7 @@ static const int ftw_arr[] =
 
 /* Forward declarations of local functions.  */
 static int ftw_dir (struct ftw_data *data, struct STAT *st,
-		    struct dir_data *old_dir) internal_function;
+		    struct dir_data *old_dir);
 
 
 static int
@@ -337,11 +335,11 @@ open_dir_stream (int *dfdp, struct ftw_data *data, struct dir_data *dirp)
 
       if (dfdp != NULL && *dfdp != -1)
 	{
-	  int fd = openat64_not_cancel_3 (*dfdp, data->dirbuf + data->ftw.base,
-					  O_RDONLY | O_DIRECTORY | O_NDELAY);
+	  int fd = __openat64_nocancel (*dfdp, data->dirbuf + data->ftw.base,
+					O_RDONLY | O_DIRECTORY | O_NDELAY);
 	  dirp->stream = NULL;
 	  if (fd != -1 && (dirp->stream = __fdopendir (fd)) == NULL)
-	    close_not_cancel_no_status (fd);
+	    __close_nocancel_nostatus (fd);
 	}
       else
 	{
@@ -363,7 +361,7 @@ open_dir_stream (int *dfdp, struct ftw_data *data, struct dir_data *dirp)
 	result = -1;
       else
 	{
-	  dirp->streamfd = dirfd (dirp->stream);
+	  dirp->streamfd = __dirfd (dirp->stream);
 	  dirp->content = NULL;
 	  data->dirstreams[data->actdir] = dirp;
 
@@ -377,7 +375,6 @@ open_dir_stream (int *dfdp, struct ftw_data *data, struct dir_data *dirp)
 
 
 static int
-internal_function
 process_entry (struct ftw_data *data, struct dir_data *dir, const char *name,
 	       size_t namlen, int d_type)
 {
@@ -426,10 +423,12 @@ process_entry (struct ftw_data *data, struct dir_data *dir, const char *name,
 	result = -1;
       else if (data->flags & FTW_PHYS)
 	flag = FTW_NS;
-      else if (d_type == DT_LNK)
-	flag = FTW_SLN;
       else
 	{
+	  /* Old code left ST undefined for dangling DT_LNK without
+	     FTW_PHYS set; a clarification at the POSIX level suggests
+	     it should contain information about the link (ala lstat).
+	     We do our best to fill in what data we can.  */
 	  if (dir->streamfd != -1)
 	    statres = FXSTATAT (_STAT_VER, dir->streamfd, name, &st,
 				AT_SYMLINK_NOFOLLOW);
@@ -477,7 +476,6 @@ process_entry (struct ftw_data *data, struct dir_data *dir, const char *name,
 
 static int
 __attribute ((noinline))
-internal_function
 ftw_dir (struct ftw_data *data, struct STAT *st, struct dir_data *old_dir)
 {
   struct dir_data dir;
@@ -522,7 +520,7 @@ fail:
   /* If necessary, change to this directory.  */
   if (data->flags & FTW_CHDIR)
     {
-      if (__fchdir (dirfd (dir.stream)) < 0)
+      if (__fchdir (__dirfd (dir.stream)) < 0)
 	{
 	  result = -1;
 	  goto fail;
@@ -606,7 +604,7 @@ fail:
       /* Change back to the parent directory.  */
       int done = 0;
       if (old_dir->stream != NULL)
-	if (__fchdir (dirfd (old_dir->stream)) == 0)
+	if (__fchdir (__dirfd (old_dir->stream)) == 0)
 	  done = 1;
 
       if (!done)
@@ -628,7 +626,6 @@ fail:
 
 static int
 __attribute ((noinline))
-internal_function
 ftw_startup (const char *dir, int is_nftw, void *func, int descriptors,
 	     int flags)
 {
@@ -791,7 +788,7 @@ ftw_startup (const char *dir, int is_nftw, void *func, int descriptors,
     {
       int save_err = errno;
       __fchdir (cwdfd);
-      close_not_cancel_no_status (cwdfd);
+      __close_nocancel_nostatus (cwdfd);
       __set_errno (save_err);
     }
   else if (cwd != NULL)
@@ -817,21 +814,14 @@ ftw_startup (const char *dir, int is_nftw, void *func, int descriptors,
 /* Entry points.  */
 
 int
-FTW_NAME (path, func, descriptors)
-     const char *path;
-     FTW_FUNC_T func;
-     int descriptors;
+FTW_NAME (const char *path, FTW_FUNC_T func, int descriptors)
 {
   return ftw_startup (path, 0, func, descriptors, 0);
 }
 
 #ifndef _LIBC
 int
-NFTW_NAME (path, func, descriptors, flags)
-     const char *path;
-     NFTW_FUNC_T func;
-     int descriptors;
-     int flags;
+NFTW_NAME (const char *path, NFTW_FUNC_T func, int descriptors, int flags)
 {
   return ftw_startup (path, 1, func, descriptors, flags);
 }
@@ -842,11 +832,7 @@ NFTW_NAME (path, func, descriptors, flags)
 int NFTW_NEW_NAME (const char *, NFTW_FUNC_T, int, int);
 
 int
-NFTW_NEW_NAME (path, func, descriptors, flags)
-     const char *path;
-     NFTW_FUNC_T func;
-     int descriptors;
-     int flags;
+NFTW_NEW_NAME (const char *path, NFTW_FUNC_T func, int descriptors, int flags)
 {
   if (flags
       & ~(FTW_PHYS | FTW_MOUNT | FTW_CHDIR | FTW_DEPTH | FTW_ACTIONRETVAL))
@@ -867,11 +853,7 @@ int NFTW_OLD_NAME (const char *, NFTW_FUNC_T, int, int);
 
 int
 attribute_compat_text_section
-NFTW_OLD_NAME (path, func, descriptors, flags)
-     const char *path;
-     NFTW_FUNC_T func;
-     int descriptors;
-     int flags;
+NFTW_OLD_NAME (const char *path, NFTW_FUNC_T func, int descriptors, int flags)
 {
   flags &= (FTW_PHYS | FTW_MOUNT | FTW_CHDIR | FTW_DEPTH);
   return ftw_startup (path, 1, func, descriptors, flags);

@@ -1,5 +1,5 @@
 /* ELF startup code for HPPA.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 	.import main, code
 	.import $global$, data
@@ -42,7 +42,11 @@
 	/* Have the linker create plabel words so we get PLABEL32
 	   relocs and not 21/14.  The use of 21/14 relocs is only
 	   supported in the latest dynamic linker.  */
-	.section	.rodata
+#ifdef PIC
+	.section	.data.rel.ro,"aw",@progbits
+#else
+	.section	.rodata,"a",@progbits
+#endif
 	.align 4
 .Lpmain:
 	.word P%main
@@ -91,9 +95,15 @@ _start:
 	/* argc and argv should be in 25 and 24 (2nd and 3rd argument) */
 	/* void (*rtld_fini) (void) (6th argument) */
 	stw	%r23, -56(%sp)
+
 	/* Need to setup 1, 4, 5, and 7th arguments */
 
-#ifdef SHARED
+#ifdef PIC
+	/* Load $global$ address into %dp */
+	bl	.+8, %dp
+	addil	L'$global$-$PIC_pcrel$0+1, %dp
+	ldo	R'$global$-$PIC_pcrel$0+5(%r1), %dp
+
 	/* load main (1st argument) */
 	addil	LT'.Lpmain, %r19
 	ldw	RT'.Lpmain(%r1), %r26
@@ -107,6 +117,10 @@ _start:
 	ldw	RT'.Lp__libc_csu_fini(%r1), %r22
 	ldw	0(%r22), %r22
 #else
+	/* Load $global$ address into %dp */
+	ldil	L%$global$, %dp
+	ldo	R%$global$(%dp), %dp
+
 	/* load main (1st argument) */
 	ldil	LR'.Lpmain, %r26
 	ldw	RR'.Lpmain(%r26), %r26
@@ -121,11 +135,6 @@ _start:
 	stw	%r22, -52(%sp)
 	/* void *stack_end (7th argument) */
 	stw	%sp, -60(%sp)
-
-	/* load global */
-	ldil	L%$global$, %dp
-	ldo	R%$global$(%dp), %dp
-
 	bl	__libc_start_main,%r2
 	nop
 	/* die horribly if it returned (it shouldn't) */

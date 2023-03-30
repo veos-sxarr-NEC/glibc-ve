@@ -45,7 +45,7 @@ static char rcsid[] = "$NetBSD: k_rem_pio2.c,v 1.7 1995/05/10 20:46:25 jtc Exp $
  *			z    = (z-x[i])*2**24
  *
  *
- *	y[]	ouput result in an array of double precision numbers.
+ *	y[]	output result in an array of double precision numbers.
  *		The dimension of y[] is:
  *			24-bit  precision	1
  *			53-bit  precision	2
@@ -131,7 +131,9 @@ static char rcsid[] = "$NetBSD: k_rem_pio2.c,v 1.7 1995/05/10 20:46:25 jtc Exp $
  */
 
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <libc-diag.h>
 
 static const int init_jk[] = {2,3,4,6}; /* initial value for jk */
 
@@ -194,7 +196,7 @@ recompute:
 
   /* compute n */
   z = __scalbn (z, q0);                 /* actual value of z */
-  z -= 8.0 * __floor (z * 0.125);               /* trim off integer >= 8 */
+  z -= 8.0 * floor (z * 0.125);               /* trim off integer >= 8 */
   n = (int32_t) z;
   z -= (double) n;
   ih = 0;
@@ -251,8 +253,17 @@ recompute:
 	j |= iq[i];
       if (j == 0)      /* need recomputation */
 	{
+	  /* On s390x gcc 6.1 -O3 produces the warning "array subscript is below
+	     array bounds [-Werror=array-bounds]".  Only __ieee754_rem_pio2l
+	     calls __kernel_rem_pio2 for normal numbers and |x| > pi/4 in case
+	     of ldbl-96 and |x| > 3pi/4 in case of ldbl-128[ibm].
+	     Thus x can't be zero and ipio2 is not zero, too.  Thus not all iq[]
+	     values can't be zero.  */
+	  DIAG_PUSH_NEEDS_COMMENT;
+	  DIAG_IGNORE_NEEDS_COMMENT (6.1, "-Warray-bounds");
 	  for (k = 1; iq[jk - k] == 0; k++)
 	    ;                               /* k = no. of terms needed */
+	  DIAG_POP_NEEDS_COMMENT;
 
 	  for (i = jz + 1; i <= jz + k; i++) /* add q[jz+1] to q[jz+k] */
 	    {
@@ -315,34 +326,34 @@ recompute:
       break;
     case 1:
     case 2:;
-#if __FLT_EVAL_METHOD__ != 0
-      volatile
-#endif
       double fv = 0.0;
       for (i = jz; i >= 0; i--)
-	fv += fq[i];
+	fv = math_narrow_eval (fv + fq[i]);
       y[0] = (ih == 0) ? fv : -fv;
-      fv = fq[0] - fv;
+      /* GCC mainline (to be GCC 9), as of 2018-05-22 on i686, warns
+	 that fq[0] may be used uninitialized.  This is not possible
+	 because jz is always nonnegative when the above loop
+	 initializing fq is executed, because the result is never zero
+	 to full precision (this function is not called for zero
+	 arguments).  */
+      DIAG_PUSH_NEEDS_COMMENT;
+      DIAG_IGNORE_NEEDS_COMMENT (9, "-Wmaybe-uninitialized");
+      fv = math_narrow_eval (fq[0] - fv);
+      DIAG_POP_NEEDS_COMMENT;
       for (i = 1; i <= jz; i++)
-	fv += fq[i];
+	fv = math_narrow_eval (fv + fq[i]);
       y[1] = (ih == 0) ? fv : -fv;
       break;
     case 3:             /* painful */
       for (i = jz; i > 0; i--)
 	{
-#if __FLT_EVAL_METHOD__ != 0
-	  volatile
-#endif
-	  double fv = (double) (fq[i - 1] + fq[i]);
+	  double fv = math_narrow_eval (fq[i - 1] + fq[i]);
 	  fq[i] += fq[i - 1] - fv;
 	  fq[i - 1] = fv;
 	}
       for (i = jz; i > 1; i--)
 	{
-#if __FLT_EVAL_METHOD__ != 0
-	  volatile
-#endif
-	  double fv = (double) (fq[i - 1] + fq[i]);
+	  double fv = math_narrow_eval (fq[i - 1] + fq[i]);
 	  fq[i] += fq[i - 1] - fv;
 	  fq[i - 1] = fv;
 	}

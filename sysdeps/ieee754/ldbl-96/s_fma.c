@@ -1,5 +1,5 @@
 /* Compute x * y + z as ternary operation.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2010.
 
@@ -15,13 +15,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <float.h>
 #include <math.h>
 #include <fenv.h>
 #include <ieee754.h>
-#include <math_private.h>
+#include <math-barriers.h>
+#include <libm-alias-double.h>
 
 /* This implementation uses rounding to odd to avoid problems with
    double rounding.  See a paper by Boldo and Melquiond:
@@ -30,18 +31,19 @@
 double
 __fma (double x, double y, double z)
 {
-  if (__glibc_unlikely (isinf (z)))
-    {
-      /* If z is Inf, but x and y are finite, the result should be
-	 z rather than NaN.  */
-      if (finite (x) && finite (y))
-	return (z + x) + y;
-      return (x * y) + z;
-    }
+  if (__glibc_unlikely (!isfinite (x) || !isfinite (y)))
+    return x * y + z;
+  else if (__glibc_unlikely (!isfinite (z)))
+    /* If z is Inf, but x and y are finite, the result should be z
+       rather than NaN.  */
+    return (z + x) + y;
 
   /* Ensure correct sign of exact 0 + 0.  */
   if (__glibc_unlikely ((x == 0 || y == 0) && z == 0))
-    return x * y + z;
+    {
+      x = math_opt_barrier (x);
+      return x * y + z;
+    }
 
   fenv_t env;
   feholdexcept (&env);
@@ -94,5 +96,5 @@ __fma (double x, double y, double z)
   return u.d;
 }
 #ifndef __fma
-weak_alias (__fma, fma)
+libm_alias_double (__fma, fma)
 #endif

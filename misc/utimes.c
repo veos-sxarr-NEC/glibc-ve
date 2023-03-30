@@ -1,4 +1,5 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* utimes -- Change access and modification times of file.  Stub version.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/time.h>
 #include <errno.h>
@@ -22,9 +23,7 @@
 /* Change the access time of FILE to TVP[0] and
    the modification time of FILE to TVP[1].  */
 int
-__utimes (file, tvp)
-     const char *file;
-     const struct timeval tvp[2];
+__utimes (const char *file, const struct timeval tvp[2])
 {
   if (file == NULL)
     {

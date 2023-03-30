@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_BITS_TIMEX_H
 #define	_BITS_TIMEX_H	1
 
 #include <bits/types.h>
+#include <bits/types/struct_timeval.h>
 
-/* These definitions from linux/timex.h as of 2.6.30.  */
+/* These definitions from linux/timex.h as of 3.18.  */
 
 struct timex
 {
@@ -33,7 +34,7 @@ struct timex
   __syscall_slong_t constant;	/* pll time constant */
   __syscall_slong_t precision;	/* clock precision (usec) (ro) */
   __syscall_slong_t tolerance;	/* clock frequency tolerance (ppm) (ro) */
-  struct timeval time;		/* (read only) */
+  struct timeval time;		/* (read only, except for ADJ_SETOFFSET) */
   __syscall_slong_t tick;	/* (modified) usecs between clock ticks */
   __syscall_slong_t ppsfreq;	/* pps frequency (scaled ppm) (ro) */
   __syscall_slong_t jitter;	/* pps jitter (us) (ro) */
@@ -60,6 +61,7 @@ struct timex
 #define ADJ_STATUS		0x0010	/* clock status */
 #define ADJ_TIMECONST		0x0020	/* pll time constant */
 #define ADJ_TAI			0x0080	/* set TAI offset */
+#define ADJ_SETOFFSET		0x0100	/* add 'time' to current time */
 #define ADJ_MICRO		0x1000	/* select microsecond resolution */
 #define ADJ_NANO		0x2000	/* select nanosecond resolution */
 #define ADJ_TICK		0x4000	/* tick value */
@@ -102,7 +104,7 @@ struct timex
 #define STA_CLK		0x8000	/* clock source (0 = A, 1 = B) (ro) */
 
 /* Read-only bits */
-#define STA_RONLY (STA_PPSSIGNAL | STA_PPSJITTER | STA_PPSWANDER | \
-    STA_PPSERROR | STA_CLOCKERR | STA_NANO | STA_MODE | STA_CLK)
+#define STA_RONLY (STA_PPSSIGNAL | STA_PPSJITTER | STA_PPSWANDER \
+    | STA_PPSERROR | STA_CLOCKERR | STA_NANO | STA_MODE | STA_CLK)
 
 #endif /* bits/timex.h */

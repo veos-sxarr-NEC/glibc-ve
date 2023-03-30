@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Richard Henderson (rth@tamu.edu)
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -39,27 +39,16 @@
 #define __NR_clone 120
 #define SYS_clone 120
 
-#define CLONE_VM	0x00000100
-#define CLONE_THREAD	0x00010000
-
         .text
 ENTRY (__clone)
 	/* Sanity check arguments.  */
 	movl	$-EINVAL,%eax
 	movl	FUNC(%esp),%ecx		/* no NULL function pointers */
-#ifdef PIC
-	jecxz	SYSCALL_ERROR_LABEL
-#else
 	testl	%ecx,%ecx
 	jz	SYSCALL_ERROR_LABEL
-#endif
 	movl	STACK(%esp),%ecx	/* no NULL stack pointers */
-#ifdef PIC
-	jecxz	SYSCALL_ERROR_LABEL
-#else
 	testl	%ecx,%ecx
 	jz	SYSCALL_ERROR_LABEL
-#endif
 
 	/* Insert the argument onto the new stack.  Make sure the new
 	   thread is started with an alignment of (mod 16).  */
@@ -116,9 +105,6 @@ L(thread_start):
 	cfi_undefined (eip);
 	/* Note: %esi is zero.  */
 	movl	%esi,%ebp	/* terminate the stack frame */
-	testl	$CLONE_THREAD, %edi
-	je	L(newpid)
-L(haspid):
 	call	*%ebx
 #ifdef PIC
 	call	L(here)
@@ -130,21 +116,7 @@ L(here):
 	movl	$SYS_ify(exit), %eax
 	ENTER_KERNEL
 
-	.subsection 2
-L(newpid):
-	testl	$CLONE_VM, %edi
-	movl	$-1, %eax
-	jne	L(nomoregetpid)
-	movl	$SYS_ify(getpid), %eax
-	ENTER_KERNEL
-L(nomoregetpid):
-	movl	%eax, %gs:PID
-	movl	%eax, %gs:TID
-	jmp	L(haspid)
-	.previous
-	cfi_endproc;
-
-	cfi_startproc
 PSEUDO_END (__clone)
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

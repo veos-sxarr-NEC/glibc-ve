@@ -2,6 +2,8 @@
    function parameter passing/return.  */
 
 #include <dlfcn.h>
+#include <link.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,6 +85,16 @@ la_objclose  (uintptr_t *cookie)
 {
   printf ("objclose\n");
   return 0;
+}
+
+uintptr_t
+la_symbind32 (Elf32_Sym *sym, unsigned int ndx, uintptr_t *refcook,
+	      uintptr_t *defcook, unsigned int *flags, const char *symname)
+{
+  printf ("symbind32: symname=%s, st_value=%#lx, ndx=%u, flags=%u\n",
+	  symname, (long int) sym->st_value, ndx, *flags);
+
+  return sym->st_value;
 }
 
 uintptr_t

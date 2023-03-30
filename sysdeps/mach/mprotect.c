@@ -1,4 +1,4 @@
-/* Copyright (C) 1994-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -25,7 +25,7 @@
    (and sets errno).  */
 
 int
-__mprotect (__ptr_t addr, size_t len, int prot)
+__mprotect (void *addr, size_t len, int prot)
 {
   kern_return_t err;
   vm_prot_t vmprot;
@@ -47,4 +47,5 @@ __mprotect (__ptr_t addr, size_t len, int prot)
     }
   return 0;
 }
+libc_hidden_def (__mprotect)
 weak_alias (__mprotect, mprotect)

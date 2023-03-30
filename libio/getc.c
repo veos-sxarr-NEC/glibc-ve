@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -30,11 +30,12 @@
 #undef _IO_getc
 
 int
-_IO_getc (fp)
-     FILE *fp;
+_IO_getc (FILE *fp)
 {
   int result;
   CHECK_FILE (fp, EOF);
+  if (!_IO_need_lock (fp))
+    return _IO_getc_unlocked (fp);
   _IO_acquire_lock (fp);
   result = _IO_getc_unlocked (fp);
   _IO_release_lock (fp);
@@ -43,7 +44,6 @@ _IO_getc (fp)
 
 #undef getc
 
-#ifdef weak_alias
 weak_alias (_IO_getc, getc)
 weak_alias (_IO_getc, fgetc)
 
@@ -51,5 +51,4 @@ weak_alias (_IO_getc, fgetc)
 #undef getc_unlocked
 weak_alias (_IO_getc, getc_unlocked)
 weak_alias (_IO_getc, fgetc_unlocked)
-#endif
 #endif

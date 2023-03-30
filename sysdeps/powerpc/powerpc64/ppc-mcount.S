@@ -1,5 +1,5 @@
 /* PowerPC64-specific implementation of profiling support.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 /* We don't need to save the parameter-passing registers as gcc takes
@@ -24,16 +24,17 @@
 ENTRY(_mcount)
 	mflr		 r4
 	ld		 r11, 0(r1)
+	std		 r4, FRAME_LR_SAVE(r1)
 	stdu		 r1,-FRAME_MIN_SIZE(r1)
 	cfi_adjust_cfa_offset (FRAME_MIN_SIZE)
-	std		 r4, FRAME_MIN_SIZE+FRAME_LR_SAVE(r1)
 	cfi_offset (lr, FRAME_LR_SAVE)
 	ld		 r3, FRAME_LR_SAVE(r11)
 	bl		 JUMPTARGET(__mcount_internal)
+#ifndef SHARED
 	nop
+#endif
 	ld		 r0, FRAME_MIN_SIZE+FRAME_LR_SAVE(r1)
 	mtlr		 r0
 	addi		 r1,r1,FRAME_MIN_SIZE
 	blr
 END(_mcount)
-

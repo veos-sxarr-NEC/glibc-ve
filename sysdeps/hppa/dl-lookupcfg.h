@@ -1,5 +1,5 @@
 /* Configuration of lookup functions.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define ELF_FUNCTION_PTR_IS_SPECIAL
 #define DL_UNMAP_IS_SPECIAL
@@ -25,16 +25,15 @@
 struct link_map;
 
 void *_dl_symbol_address (struct link_map *map, const ElfW(Sym) *ref);
+rtld_hidden_proto (_dl_symbol_address)
 
 #define DL_SYMBOL_ADDRESS(map, ref) _dl_symbol_address(map, ref)
 
 Elf32_Addr _dl_lookup_address (const void *address);
 
-/* Clear the bottom two bits so generic code can find the fdesc entry */
-#define DL_LOOKUP_ADDRESS(addr) \
-  (_dl_lookup_address ((void *)((unsigned long)addr & ~3)))
+#define DL_LOOKUP_ADDRESS(addr) _dl_lookup_address ((const void *) addr)
 
-void _dl_unmap (struct link_map *map);
+void attribute_hidden _dl_unmap (struct link_map *map);
 
 #define DL_UNMAP(map) _dl_unmap (map)
 
@@ -74,7 +73,8 @@ void _dl_unmap (struct link_map *map);
 
 /* Construct a fixup value from the address and linkmap */
 #define DL_FIXUP_MAKE_VALUE(map, addr) \
-   ((struct fdesc) { (addr), (map)->l_info[DT_PLTGOT]->d_un.d_ptr })
+  (map) ? ((struct fdesc) { (addr), (map)->l_info[DT_PLTGOT]->d_un.d_ptr }) \
+	: ((struct fdesc) { 0, 0 })
 
 /* Extract the code address from a fixup value */
 #define DL_FIXUP_VALUE_CODE_ADDR(value) ((value).ip)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
@@ -26,9 +26,7 @@
 
 /* Get file-specific information about descriptor FD.  */
 long int
-__fpathconf (fd, name)
-     int fd;
-     int name;
+__fpathconf (int fd, int name)
 {
   if (fd < 0)
     {
@@ -66,10 +64,10 @@ __fpathconf (fd, name)
     case _PC_NAME_MAX:
 #ifdef	NAME_MAX
       {
-	struct statfs buf;
+	struct statvfs64 sv;
 	int save_errno = errno;
 
-	if (__fstatfs (fd, &buf) < 0)
+	if (__fstatvfs64 (fd, &sv) < 0)
 	  {
 	    if (errno == ENOSYS)
 	      {
@@ -83,15 +81,7 @@ __fpathconf (fd, name)
 	  }
 	else
 	  {
-#ifdef _STATFS_F_NAMELEN
-	    return buf.f_namelen;
-#else
-# ifdef _STATFS_F_NAME_MAX
-	    return buf.f_name_max;
-# else
-	    return NAME_MAX;
-# endif
-#endif
+	    return sv.f_namemax;
 	  }
       }
 #else
@@ -113,25 +103,22 @@ __fpathconf (fd, name)
 #endif
 
     case _PC_CHOWN_RESTRICTED:
-#ifdef	_POSIX_CHOWN_RESTRICTED
-      return _POSIX_CHOWN_RESTRICTED;
-#else
-      return -1;
+#if _POSIX_CHOWN_RESTRICTED == -1
+# error "Invalid value for _POSIX_CHOWN_RESTRICTED"
 #endif
+      return _POSIX_CHOWN_RESTRICTED;
 
     case _PC_NO_TRUNC:
-#ifdef	_POSIX_NO_TRUNC
-      return _POSIX_NO_TRUNC;
-#else
-      return -1;
+#if _POSIX_NO_TRUNC == -1
+# error "Invalid value for _POSIX_NO_TRUNC"
 #endif
+      return _POSIX_NO_TRUNC;
 
     case _PC_VDISABLE:
-#ifdef	_POSIX_VDISABLE
-      return _POSIX_VDISABLE;
-#else
-      return -1;
+#if _POSIX_VDISABLE == -1
+# error "Invalid value for _POSIX_VDISABLE"
 #endif
+      return _POSIX_VDISABLE;
 
     case _PC_SYNC_IO:
 #ifdef	_POSIX_SYNC_IO

@@ -1,364 +1,169 @@
-/*
- * IBM Accurate Mathematical Library
- * written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2.1 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
- */
-/***************************************************************************/
-/*  MODULE_NAME:uexp.c                                                     */
-/*                                                                         */
-/*  FUNCTION:uexp                                                          */
-/*           exp1                                                          */
-/*                                                                         */
-/* FILES NEEDED:dla.h endian.h mpa.h mydefs.h uexp.h                       */
-/*              mpa.c mpexp.x slowexp.c                                    */
-/*                                                                         */
-/* An ultimate exp routine. Given an IEEE double machine number x          */
-/* it computes the correctly rounded (to nearest) value of e^x             */
-/* Assumption: Machine arithmetic operations are performed in              */
-/* round to nearest mode of IEEE 754 standard.                             */
-/*                                                                         */
-/***************************************************************************/
+/* Double-precision e^x function.
+   Copyright (C) 2018-2020 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
+
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
-#include "endian.h"
-#include "uexp.h"
-#include "mydefs.h"
-#include "MathLib.h"
-#include "uexp.tbl"
-#include <math_private.h>
-#include <fenv.h>
-#include <float.h>
+#include <stdint.h>
+#include <math-barriers.h>
+#include <math-narrow-eval.h>
+#include <math-svid-compat.h>
+#include <libm-alias-finite.h>
+#include <libm-alias-double.h>
+#include "math_config.h"
+
+#define N (1 << EXP_TABLE_BITS)
+#define InvLn2N __exp_data.invln2N
+#define NegLn2hiN __exp_data.negln2hiN
+#define NegLn2loN __exp_data.negln2loN
+#define Shift __exp_data.shift
+#define T __exp_data.tab
+#define C2 __exp_data.poly[5 - EXP_POLY_ORDER]
+#define C3 __exp_data.poly[6 - EXP_POLY_ORDER]
+#define C4 __exp_data.poly[7 - EXP_POLY_ORDER]
+#define C5 __exp_data.poly[8 - EXP_POLY_ORDER]
+
+/* Handle cases that may overflow or underflow when computing the result that
+   is scale*(1+TMP) without intermediate rounding.  The bit representation of
+   scale is in SBITS, however it has a computed exponent that may have
+   overflown into the sign bit so that needs to be adjusted before using it as
+   a double.  (int32_t)KI is the k used in the argument reduction and exponent
+   adjustment of scale, positive k here means the result may overflow and
+   negative k means the result may underflow.  */
+static inline double
+specialcase (double_t tmp, uint64_t sbits, uint64_t ki)
+{
+  double_t scale, y;
+
+  if ((ki & 0x80000000) == 0)
+    {
+      /* k > 0, the exponent of scale might have overflowed by <= 460.  */
+      sbits -= 1009ull << 52;
+      scale = asdouble (sbits);
+      y = 0x1p1009 * (scale + scale * tmp);
+      return check_oflow (y);
+    }
+  /* k < 0, need special care in the subnormal range.  */
+  sbits += 1022ull << 52;
+  scale = asdouble (sbits);
+  y = scale + scale * tmp;
+  if (y < 1.0)
+    {
+      /* Round y to the right precision before scaling it into the subnormal
+	 range to avoid double rounding that can cause 0.5+E/2 ulp error where
+	 E is the worst-case ulp error outside the subnormal range.  So this
+	 is only useful if the goal is better than 1 ulp worst-case error.  */
+      double_t hi, lo;
+      lo = scale - y + scale * tmp;
+      hi = 1.0 + y;
+      lo = 1.0 - hi + y + lo;
+      y = math_narrow_eval (hi + lo) - 1.0;
+      /* Avoid -0.0 with downward rounding.  */
+      if (WANT_ROUNDING && y == 0.0)
+	y = 0.0;
+      /* The underflow exception needs to be signaled explicitly.  */
+      math_force_eval (math_opt_barrier (0x1p-1022) * 0x1p-1022);
+    }
+  y = 0x1p-1022 * y;
+  return check_uflow (y);
+}
+
+/* Top 12 bits of a double (sign and exponent bits).  */
+static inline uint32_t
+top12 (double x)
+{
+  return asuint64 (x) >> 52;
+}
 
 #ifndef SECTION
 # define SECTION
 #endif
 
-double __slowexp (double);
-
-/* An ultimate exp routine. Given an IEEE double machine number x it computes
-   the correctly rounded (to nearest) value of e^x.  */
 double
 SECTION
-__ieee754_exp (double x)
+__exp (double x)
 {
-  double bexp, t, eps, del, base, y, al, bet, res, rem, cor;
-  mynumber junk1, junk2, binexp = {{0, 0}};
-  int4 i, j, m, n, ex;
-  double retval;
+  uint32_t abstop;
+  uint64_t ki, idx, top, sbits;
+  /* double_t for better performance on targets with FLT_EVAL_METHOD==2.  */
+  double_t kd, z, r, r2, scale, tail, tmp;
 
-  {
-    SET_RESTORE_ROUND (FE_TONEAREST);
-
-    junk1.x = x;
-    m = junk1.i[HIGH_HALF];
-    n = m & hugeint;
-
-    if (n > smallint && n < bigint)
-      {
-	y = x * log2e.x + three51.x;
-	bexp = y - three51.x;	/*  multiply the result by 2**bexp        */
-
-	junk1.x = y;
-
-	eps = bexp * ln_two2.x;	/* x = bexp*ln(2) + t - eps               */
-	t = x - bexp * ln_two1.x;
-
-	y = t + three33.x;
-	base = y - three33.x;	/* t rounded to a multiple of 2**-18      */
-	junk2.x = y;
-	del = (t - base) - eps;	/*  x = bexp*ln(2) + base + del           */
-	eps = del + del * del * (p3.x * del + p2.x);
-
-	binexp.i[HIGH_HALF] = (junk1.i[LOW_HALF] + 1023) << 20;
-
-	i = ((junk2.i[LOW_HALF] >> 8) & 0xfffffffe) + 356;
-	j = (junk2.i[LOW_HALF] & 511) << 1;
-
-	al = coar.x[i] * fine.x[j];
-	bet = ((coar.x[i] * fine.x[j + 1] + coar.x[i + 1] * fine.x[j])
-	       + coar.x[i + 1] * fine.x[j + 1]);
-
-	rem = (bet + bet * eps) + al * eps;
-	res = al + rem;
-	cor = (al - res) + rem;
-	if (res == (res + cor * err_0))
-	  {
-	    retval = res * binexp.x;
-	    goto ret;
-	  }
-	else
-	  {
-	    retval = __slowexp (x);
-	    goto ret;
-	  }			/*if error is over bound */
-      }
-
-    if (n <= smallint)
-      {
-	retval = 1.0;
-	goto ret;
-      }
-
-    if (n >= badint)
-      {
-	if (n > infint)
-	  {
-	    retval = x + x;
-	    goto ret;
-	  }			/* x is NaN */
-	if (n < infint)
-	  {
-	    if (x > 0)
-	      goto ret_huge;
-	    else
-	      goto ret_tiny;
-	  }
-	/* x is finite,  cause either overflow or underflow  */
-	if (junk1.i[LOW_HALF] != 0)
-	  {
-	    retval = x + x;
-	    goto ret;
-	  }			/*  x is NaN  */
-	retval = (x > 0) ? inf.x : zero;	/* |x| = inf;  return either inf or 0 */
-	goto ret;
-      }
-
-    y = x * log2e.x + three51.x;
-    bexp = y - three51.x;
-    junk1.x = y;
-    eps = bexp * ln_two2.x;
-    t = x - bexp * ln_two1.x;
-    y = t + three33.x;
-    base = y - three33.x;
-    junk2.x = y;
-    del = (t - base) - eps;
-    eps = del + del * del * (p3.x * del + p2.x);
-    i = ((junk2.i[LOW_HALF] >> 8) & 0xfffffffe) + 356;
-    j = (junk2.i[LOW_HALF] & 511) << 1;
-    al = coar.x[i] * fine.x[j];
-    bet = ((coar.x[i] * fine.x[j + 1] + coar.x[i + 1] * fine.x[j])
-	   + coar.x[i + 1] * fine.x[j + 1]);
-    rem = (bet + bet * eps) + al * eps;
-    res = al + rem;
-    cor = (al - res) + rem;
-    if (m >> 31)
-      {
-	ex = junk1.i[LOW_HALF];
-	if (res < 1.0)
-	  {
-	    res += res;
-	    cor += cor;
-	    ex -= 1;
-	  }
-	if (ex >= -1022)
-	  {
-	    binexp.i[HIGH_HALF] = (1023 + ex) << 20;
-	    if (res == (res + cor * err_0))
-	      {
-		retval = res * binexp.x;
-		goto ret;
-	      }
-	    else
-	      {
-		retval = __slowexp (x);
-		goto check_uflow_ret;
-	      }			/*if error is over bound */
-	  }
-	ex = -(1022 + ex);
-	binexp.i[HIGH_HALF] = (1023 - ex) << 20;
-	res *= binexp.x;
-	cor *= binexp.x;
-	eps = 1.0000000001 + err_0 * binexp.x;
-	t = 1.0 + res;
-	y = ((1.0 - t) + res) + cor;
-	res = t + y;
-	cor = (t - res) + y;
-	if (res == (res + eps * cor))
-	  {
-	    binexp.i[HIGH_HALF] = 0x00100000;
-	    retval = (res - 1.0) * binexp.x;
-	    goto check_uflow_ret;
-	  }
-	else
-	  {
-	    retval = __slowexp (x);
-	    goto check_uflow_ret;
-	  }			/*   if error is over bound    */
-      check_uflow_ret:
-	if (retval < DBL_MIN)
-	  {
-#if FLT_EVAL_METHOD != 0
-	    volatile
-#endif
-	      double force_underflow = tiny * tiny;
-	    math_force_eval (force_underflow);
-	  }
-	if (retval == 0)
-	  goto ret_tiny;
-	goto ret;
-      }
-    else
-      {
-	binexp.i[HIGH_HALF] = (junk1.i[LOW_HALF] + 767) << 20;
-	if (res == (res + cor * err_0))
-	  retval = res * binexp.x * t256.x;
-	else
-	  retval = __slowexp (x);
-	if (__isinf (retval))
-	  goto ret_huge;
-	else
-	  goto ret;
-      }
-  }
-ret:
-  return retval;
-
- ret_huge:
-  return hhuge * hhuge;
-
- ret_tiny:
-  return tiny * tiny;
-}
-#ifndef __ieee754_exp
-strong_alias (__ieee754_exp, __exp_finite)
-#endif
-
-/* Compute e^(x+xx).  The routine also receives bound of error of previous
-   calculation.  If after computing exp the error exceeds the allowed bounds,
-   the routine returns a non-positive number.  Otherwise it returns the
-   computed result, which is always positive.  */
-double
-SECTION
-__exp1 (double x, double xx, double error)
-{
-  double bexp, t, eps, del, base, y, al, bet, res, rem, cor;
-  mynumber junk1, junk2, binexp = {{0, 0}};
-  int4 i, j, m, n, ex;
-
-  junk1.x = x;
-  m = junk1.i[HIGH_HALF];
-  n = m & hugeint;		/* no sign */
-
-  if (n > smallint && n < bigint)
+  abstop = top12 (x) & 0x7ff;
+  if (__glibc_unlikely (abstop - top12 (0x1p-54)
+			>= top12 (512.0) - top12 (0x1p-54)))
     {
-      y = x * log2e.x + three51.x;
-      bexp = y - three51.x;	/*  multiply the result by 2**bexp        */
-
-      junk1.x = y;
-
-      eps = bexp * ln_two2.x;	/* x = bexp*ln(2) + t - eps               */
-      t = x - bexp * ln_two1.x;
-
-      y = t + three33.x;
-      base = y - three33.x;	/* t rounded to a multiple of 2**-18      */
-      junk2.x = y;
-      del = (t - base) + (xx - eps);	/*  x = bexp*ln(2) + base + del      */
-      eps = del + del * del * (p3.x * del + p2.x);
-
-      binexp.i[HIGH_HALF] = (junk1.i[LOW_HALF] + 1023) << 20;
-
-      i = ((junk2.i[LOW_HALF] >> 8) & 0xfffffffe) + 356;
-      j = (junk2.i[LOW_HALF] & 511) << 1;
-
-      al = coar.x[i] * fine.x[j];
-      bet = ((coar.x[i] * fine.x[j + 1] + coar.x[i + 1] * fine.x[j])
-	     + coar.x[i + 1] * fine.x[j + 1]);
-
-      rem = (bet + bet * eps) + al * eps;
-      res = al + rem;
-      cor = (al - res) + rem;
-      if (res == (res + cor * (1.0 + error + err_1)))
-	return res * binexp.x;
-      else
-	return -10.0;
-    }
-
-  if (n <= smallint)
-    return 1.0;			/*  if x->0 e^x=1 */
-
-  if (n >= badint)
-    {
-      if (n > infint)
-	return (zero / zero);	/* x is NaN,  return invalid */
-      if (n < infint)
-	return ((x > 0) ? (hhuge * hhuge) : (tiny * tiny));
-      /* x is finite,  cause either overflow or underflow  */
-      if (junk1.i[LOW_HALF] != 0)
-	return (zero / zero);	/*  x is NaN  */
-      return ((x > 0) ? inf.x : zero);	/* |x| = inf;  return either inf or 0 */
-    }
-
-  y = x * log2e.x + three51.x;
-  bexp = y - three51.x;
-  junk1.x = y;
-  eps = bexp * ln_two2.x;
-  t = x - bexp * ln_two1.x;
-  y = t + three33.x;
-  base = y - three33.x;
-  junk2.x = y;
-  del = (t - base) + (xx - eps);
-  eps = del + del * del * (p3.x * del + p2.x);
-  i = ((junk2.i[LOW_HALF] >> 8) & 0xfffffffe) + 356;
-  j = (junk2.i[LOW_HALF] & 511) << 1;
-  al = coar.x[i] * fine.x[j];
-  bet = ((coar.x[i] * fine.x[j + 1] + coar.x[i + 1] * fine.x[j])
-	 + coar.x[i + 1] * fine.x[j + 1]);
-  rem = (bet + bet * eps) + al * eps;
-  res = al + rem;
-  cor = (al - res) + rem;
-  if (m >> 31)
-    {
-      ex = junk1.i[LOW_HALF];
-      if (res < 1.0)
+      if (abstop - top12 (0x1p-54) >= 0x80000000)
+	/* Avoid spurious underflow for tiny x.  */
+	/* Note: 0 is common input.  */
+	return WANT_ROUNDING ? 1.0 + x : 1.0;
+      if (abstop >= top12 (1024.0))
 	{
-	  res += res;
-	  cor += cor;
-	  ex -= 1;
-	}
-      if (ex >= -1022)
-	{
-	  binexp.i[HIGH_HALF] = (1023 + ex) << 20;
-	  if (res == (res + cor * (1.0 + error + err_1)))
-	    return res * binexp.x;
+	  if (asuint64 (x) == asuint64 (-INFINITY))
+	    return 0.0;
+	  if (abstop >= top12 (INFINITY))
+	    return 1.0 + x;
+	  if (asuint64 (x) >> 63)
+	    return __math_uflow (0);
 	  else
-	    return -10.0;
+	    return __math_oflow (0);
 	}
-      ex = -(1022 + ex);
-      binexp.i[HIGH_HALF] = (1023 - ex) << 20;
-      res *= binexp.x;
-      cor *= binexp.x;
-      eps = 1.00000000001 + (error + err_1) * binexp.x;
-      t = 1.0 + res;
-      y = ((1.0 - t) + res) + cor;
-      res = t + y;
-      cor = (t - res) + y;
-      if (res == (res + eps * cor))
-	{
-	  binexp.i[HIGH_HALF] = 0x00100000;
-	  return (res - 1.0) * binexp.x;
-	}
-      else
-	return -10.0;
+      /* Large x is special cased below.  */
+      abstop = 0;
     }
-  else
-    {
-      binexp.i[HIGH_HALF] = (junk1.i[LOW_HALF] + 767) << 20;
-      if (res == (res + cor * (1.0 + error + err_1)))
-	return res * binexp.x * t256.x;
-      else
-	return -10.0;
-    }
+
+  /* exp(x) = 2^(k/N) * exp(r), with exp(r) in [2^(-1/2N),2^(1/2N)].  */
+  /* x = ln2/N*k + r, with int k and r in [-ln2/2N, ln2/2N].  */
+  z = InvLn2N * x;
+#if TOINT_INTRINSICS
+  kd = roundtoint (z);
+  ki = converttoint (z);
+#else
+  /* z - kd is in [-1, 1] in non-nearest rounding modes.  */
+  kd = math_narrow_eval (z + Shift);
+  ki = asuint64 (kd);
+  kd -= Shift;
+#endif
+  r = x + kd * NegLn2hiN + kd * NegLn2loN;
+  /* 2^(k/N) ~= scale * (1 + tail).  */
+  idx = 2 * (ki % N);
+  top = ki << (52 - EXP_TABLE_BITS);
+  tail = asdouble (T[idx]);
+  /* This is only a valid scale when -1023*N < k < 1024*N.  */
+  sbits = T[idx + 1] + top;
+  /* exp(x) = 2^(k/N) * exp(r) ~= scale + scale * (tail + exp(r) - 1).  */
+  /* Evaluation is optimized assuming superscalar pipelined execution.  */
+  r2 = r * r;
+  /* Without fma the worst case error is 0.25/N ulp larger.  */
+  /* Worst case error is less than 0.5+1.11/N+(abs poly error * 2^53) ulp.  */
+  tmp = tail + r + r2 * (C2 + r * C3) + r2 * r2 * (C4 + r * C5);
+  if (__glibc_unlikely (abstop == 0))
+    return specialcase (tmp, sbits, ki);
+  scale = asdouble (sbits);
+  /* Note: tmp == 0 or |tmp| > 2^-65 and scale > 2^-739, so there
+     is no spurious underflow here even without fma.  */
+  return scale + scale * tmp;
 }
+#ifndef __exp
+hidden_def (__exp)
+strong_alias (__exp, __ieee754_exp)
+libm_alias_finite (__ieee754_exp, __exp)
+# if LIBM_SVID_COMPAT
+versioned_symbol (libm, __exp, exp, GLIBC_2_29);
+libm_alias_double_other (__exp, exp)
+# else
+libm_alias_double (__exp, exp)
+# endif
+#endif

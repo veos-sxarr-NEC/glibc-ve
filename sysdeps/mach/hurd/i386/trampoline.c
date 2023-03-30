@@ -1,5 +1,5 @@
 /* Set thread_state for sighandler, and sigcontext to recover.  i386 version.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <hurd/signal.h>
 #include <hurd/userlink.h>
@@ -35,9 +35,9 @@ _hurd_setup_sighandler (struct hurd_sigstate *ss, __sighandler_t handler,
   void trampoline (void);
   void rpc_wait_trampoline (void);
   void firewall (void);
-  extern const void _hurd_intr_rpc_msg_in_trap;
   extern const void _hurd_intr_rpc_msg_cx_sp;
   extern const void _hurd_intr_rpc_msg_sp_restored;
+  const struct sigaction *action;
   void *volatile sigsp;
   struct sigcontext *scp;
   struct
@@ -63,7 +63,7 @@ _hurd_setup_sighandler (struct hurd_sigstate *ss, __sighandler_t handler,
 		  sizeof (state->basic));
 	  memcpy (&state->fpu, &ss->context->sc_i386_float_state,
 		  sizeof (state->fpu));
-	  state->set |= (1 << i386_THREAD_STATE) | (1 << i386_FLOAT_STATE);
+	  state->set |= (1 << i386_REGS_SEGS_STATE) | (1 << i386_FLOAT_STATE);
 	}
     }
 
@@ -75,14 +75,6 @@ _hurd_setup_sighandler (struct hurd_sigstate *ss, __sighandler_t handler,
      interrupted RPC frame.  */
   state->basic.esp = state->basic.uesp;
 
-  if ((ss->actions[signo].sa_flags & SA_ONSTACK) &&
-      !(ss->sigaltstack.ss_flags & (SS_DISABLE|SS_ONSTACK)))
-    {
-      sigsp = ss->sigaltstack.ss_sp + ss->sigaltstack.ss_size;
-      ss->sigaltstack.ss_flags |= SS_ONSTACK;
-      /* XXX need to set up base of new stack for
-	 per-thread variables, cthreads.  */
-    }
   /* This code has intimate knowledge of the special mach_msg system call
      done in intr-msg.c; that code does (see intr-msg.h):
 					movl %esp, %ecx
@@ -94,13 +86,24 @@ _hurd_setup_sighandler (struct hurd_sigstate *ss, __sighandler_t handler,
      We must check for the window during which %esp points at the
      mach_msg arguments.  The space below until %ecx is used by
      the _hurd_intr_rpc_mach_msg frame, and must not be clobbered.  */
-  else if (state->basic.eip >= (int) &_hurd_intr_rpc_msg_cx_sp &&
-	   state->basic.eip < (int) &_hurd_intr_rpc_msg_sp_restored)
-    /* The SP now points at the mach_msg args, but there is more stack
-       space used below it.  The real SP is saved in %ecx; we must push the
-       new frame below there, and restore that value as the SP on
-       sigreturn.  */
-    sigsp = (char *) (state->basic.uesp = state->basic.ecx);
+  if (state->basic.eip >= (int) &_hurd_intr_rpc_msg_cx_sp
+      && state->basic.eip < (int) &_hurd_intr_rpc_msg_sp_restored)
+  /* The SP now points at the mach_msg args, but there is more stack
+     space used below it.  The real SP is saved in %ecx; we must push the
+     new frame below there (if not on the altstack), and restore that value as
+     the SP on sigreturn.  */
+    state->basic.uesp = state->basic.ecx;
+
+  /* XXX what if handler != action->handler (for instance, if a signal
+   * preemptor took over) ? */
+  action = & _hurd_sigstate_actions (ss) [signo];
+
+  if ((action->sa_flags & SA_ONSTACK)
+      && !(ss->sigaltstack.ss_flags & (SS_DISABLE|SS_ONSTACK)))
+    {
+      sigsp = ss->sigaltstack.ss_sp + ss->sigaltstack.ss_size;
+      ss->sigaltstack.ss_flags |= SS_ONSTACK;
+    }
   else
     sigsp = (char *) state->basic.uesp;
 

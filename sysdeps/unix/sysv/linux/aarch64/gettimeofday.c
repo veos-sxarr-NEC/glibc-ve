@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2018-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,25 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
-#include <sys/time.h>
-
-#undef __gettimeofday
-
-#include <bits/libc-vdso.h>
-
-/* Get the current time of day and timezone information,
-   putting it into *tv and *tz.  If tz is null, *tz is not filled.
-   Returns 0 on success, -1 on errors.  */
-int
-__gettimeofday (tv, tz)
-     struct timeval *tv;
-     struct timezone *tz;
-{
-  return INLINE_VSYSCALL (gettimeofday, 2, tv, tz);
-}
-libc_hidden_def (__gettimeofday)
-weak_alias (__gettimeofday, gettimeofday)
-libc_hidden_weak (gettimeofday)
+#define USE_IFUNC_GETTIMEOFDAY
+#include <sysdeps/unix/sysv/linux/gettimeofday.c>

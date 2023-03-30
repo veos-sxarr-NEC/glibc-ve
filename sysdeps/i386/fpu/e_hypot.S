@@ -1,5 +1,5 @@
 /* Compute the hypothenuse of X and Y.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,12 +15,25 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <i386-math-asm.h>
+#include <libm-alias-finite.h>
+
+DEFINE_DBL_MIN
+
+#ifdef PIC
+# define MO(op) op##@GOTOFF(%edx)
+#else
+# define MO(op) op
+#endif
 
 	.text
 ENTRY(__ieee754_hypot)
+#ifdef  PIC
+	LOAD_PIC_REG (dx)
+#endif
 	fldl	4(%esp)		// x
 	fxam
 	fnstsw
@@ -37,6 +50,7 @@ ENTRY(__ieee754_hypot)
 	fmul	%st(0)		// x * x : y * y
 	faddp			// x * x + y * y
 	fsqrt
+	DBL_NARROW_EVAL_UFLOW_NONNEG
 2:	ret
 
 	// We have to test whether any of the parameters is Inf.
@@ -59,4 +73,4 @@ ENTRY(__ieee754_hypot)
 	jmp	2b
 
 END(__ieee754_hypot)
-strong_alias (__ieee754_hypot, __hypot_finite)
+libm_alias_finite (__ieee754_hypot, __hypot)

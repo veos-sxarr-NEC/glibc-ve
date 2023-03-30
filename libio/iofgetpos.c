@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -29,22 +29,22 @@
    complain about the mismatch when we do the alias below.  */
 #define _IO_new_fgetpos64 __renamed__IO_new_fgetpos64
 #define _IO_fgetpos64 __renamed__IO_fgetpos64
+#define fgetpos64 __renamed_fgetpos64
 
 #include "libioP.h"
 
 #undef _IO_new_fgetpos64
 #undef _IO_fgetpos64
+#undef fgetpos64
 
 #include <errno.h>
 #include <stdlib.h>
 #include <shlib-compat.h>
 
 int
-_IO_new_fgetpos (fp, posp)
-     _IO_FILE *fp;
-     _IO_fpos_t *posp;
+_IO_new_fgetpos (FILE *fp, __fpos_t *posp)
 {
-  _IO_off64_t pos;
+  off64_t pos;
   int result = 0;
   CHECK_FILE (fp, EOF);
   _IO_acquire_lock (fp);
@@ -58,24 +58,19 @@ _IO_new_fgetpos (fp, posp)
     {
       /* ANSI explicitly requires setting errno to a positive value on
 	 failure.  */
-#ifdef EIO
       if (errno == 0)
 	__set_errno (EIO);
-#endif
       result = EOF;
     }
-  else if ((_IO_off64_t) (__typeof (posp->__pos)) pos != pos)
+  else if ((off64_t) (__typeof (posp->__pos)) pos != pos)
     {
-#ifdef EOVERFLOW
       __set_errno (EOVERFLOW);
-#endif
       result = EOF;
     }
   else
     {
       posp->__pos = pos;
-      if (fp->_mode > 0
-	  && (*fp->_codecvt->__codecvt_do_encoding) (fp->_codecvt) < 0)
+      if (fp->_mode > 0 && __libio_codecvt_encoding (fp->_codecvt) < 0)
 	/* This is a stateful encoding, safe the state.  */
 	posp->__state = fp->_wide_data->_IO_state;
     }

@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@uni-paderborn.de>, 1997.
 
@@ -14,13 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <rpcsvc/nis.h>
 #include "nis_xdr.h"
 #include "nis_intern.h"
 #include <libnsl.h>
+#include <shlib-compat.h>
 
 
 nis_result *
@@ -215,4 +216,4 @@ nis_lookup (const_nis_name name, const unsigned int flags)
 
   return res;
 }
-libnsl_hidden_def (nis_lookup)
+libnsl_hidden_nolink_def (nis_lookup, GLIBC_2_1)

@@ -1,10 +1,18 @@
 #ifndef _IFADDRS_H
 #include <inet/ifaddrs.h>
+
+# ifndef _ISOMAC
+
 #include <stdbool.h>
 #include <stdint.h>
 
 libc_hidden_proto (getifaddrs)
 libc_hidden_proto (freeifaddrs)
+
+extern int __getifaddrs (struct ifaddrs **__ifap);
+libc_hidden_proto (__getifaddrs)
+extern void __freeifaddrs (struct ifaddrs *__ifa);
+libc_hidden_proto (__freeifaddrs)
 
 struct in6addrinfo
 {
@@ -30,4 +38,5 @@ extern void __check_native (uint32_t a1_index, int *a1_native,
 extern uint32_t __bump_nl_timestamp (void) attribute_hidden;
 #endif
 
+# endif /* !_ISOMAC */
 #endif	/* ifaddrs.h */

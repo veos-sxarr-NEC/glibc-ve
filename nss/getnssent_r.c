@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,11 +13,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <netdb.h>
 #include "nsswitch.h"
+#include <resolv/resolv_context.h>
 
 /* Set up NIP to run through the services.  If ALL is zero, use NIP's
    current location if it's not nil.  Return nonzero if there are no
@@ -59,10 +60,15 @@ __nss_setent (const char *func_name, db_lookup_function lookup_fct,
   } fct;
   int no_more;
 
-  if (res && __res_maybe_init (&_res, 0) == -1)
+  struct resolv_context *res_ctx = NULL;
+  if (res)
     {
-      __set_h_errno (NETDB_INTERNAL);
-      return;
+      res_ctx = __resolv_context_get ();
+      if (res_ctx == NULL)
+	{
+	  __set_h_errno (NETDB_INTERNAL);
+	  return;
+	}
     }
 
   /* Cycle through the services and run their `setXXent' functions until
@@ -79,10 +85,23 @@ __nss_setent (const char *func_name, db_lookup_function lookup_fct,
       else
 	status = DL_CALL_FCT (fct.f, (0));
 
-      no_more = __nss_next2 (nip, func_name, NULL, &fct.ptr, status, 0);
+
+      /* This is a special-case.  When [SUCCESS=merge] is in play,
+         _nss_next2() will skip to the next database.  Due to the
+         implementation of that function, we can't know whether we're
+         in an enumeration or an individual lookup, which behaves
+         differently with regards to merging.  We'll treat SUCCESS as
+         an indication to start the enumeration at this database. */
+      if (nss_next_action (*nip, status) == NSS_ACTION_MERGE)
+	no_more = 1;
+      else
+	no_more = __nss_next2 (nip, func_name, NULL, &fct.ptr, status, 0);
+
       if (is_last_nip)
 	*last_nip = *nip;
     }
+
+  __resolv_context_put (res_ctx);
 
   if (stayopen_tmp)
     *stayopen_tmp = stayopen;
@@ -101,10 +120,15 @@ __nss_endent (const char *func_name, db_lookup_function lookup_fct,
   } fct;
   int no_more;
 
-  if (res && __res_maybe_init (&_res, 0) == -1)
+  struct resolv_context *res_ctx = NULL;
+  if (res)
     {
-      __set_h_errno (NETDB_INTERNAL);
-      return;
+      res_ctx = __resolv_context_get ();
+      if (res_ctx == NULL)
+	{
+	  __set_h_errno (NETDB_INTERNAL);
+	  return;
+	}
     }
 
   /* Cycle through all the services and run their endXXent functions.  */
@@ -121,6 +145,8 @@ __nss_endent (const char *func_name, db_lookup_function lookup_fct,
       no_more = __nss_next2 (nip, func_name, NULL, &fct.ptr, 0, 1);
     }
   *last_nip = *nip = NULL;
+
+  __resolv_context_put (res_ctx);
 }
 
 
@@ -141,11 +167,16 @@ __nss_getent_r (const char *getent_func_name,
   int no_more;
   enum nss_status status;
 
-  if (res && __res_maybe_init (&_res, 0) == -1)
+  struct resolv_context *res_ctx = NULL;
+  if (res)
     {
-      *h_errnop = NETDB_INTERNAL;
-      *result = NULL;
-      return errno;
+      res_ctx = __resolv_context_get ();
+      if (res_ctx == NULL)
+	{
+	  *h_errnop = NETDB_INTERNAL;
+	  *result = NULL;
+	  return errno;
+	}
     }
 
   /* Initialize status to return if no more functions are found.  */
@@ -175,8 +206,18 @@ __nss_getent_r (const char *getent_func_name,
 
       do
 	{
-	  no_more = __nss_next2 (nip, getent_func_name, NULL, &fct.ptr,
-				 status, 0);
+        /* This is a special-case.  When [SUCCESS=merge] is in play,
+           _nss_next2() will skip to the next database.  Due to the
+           implementation of that function, we can't know whether we're
+           in an enumeration or an individual lookup, which behaves
+           differently with regards to merging.  We'll treat SUCCESS as
+           an indication to return the results here. */
+	  if (status == NSS_STATUS_SUCCESS
+	      && nss_next_action (*nip, status) == NSS_ACTION_MERGE)
+	    no_more = 1;
+	  else
+	    no_more = __nss_next2 (nip, getent_func_name, NULL, &fct.ptr,
+				   status, 0);
 
 	  if (is_last_nip)
 	    *last_nip = *nip;
@@ -205,6 +246,8 @@ __nss_getent_r (const char *getent_func_name,
 	}
       while (! no_more && status != NSS_STATUS_SUCCESS);
     }
+
+  __resolv_context_put (res_ctx);
 
   *result = status == NSS_STATUS_SUCCESS ? resbuf : NULL;
   return (status == NSS_STATUS_SUCCESS ? 0

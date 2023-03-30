@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,16 +13,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 
-/* Clear memory.  Can't alias to bzero because it's not defined in the
-   same translation unit.  */
+/* Set memory like memset, but different argument order and no return
+   value required.  Also only integer caller-saves may be used.  */
 void
 __aeabi_memclr (void *dest, size_t n)
 {
-  __bzero (dest, n);
+  memset (dest, 0, n);
 }
 
 /* Versions of the above which may assume memory alignment.  */

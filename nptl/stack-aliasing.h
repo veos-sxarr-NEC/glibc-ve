@@ -1,5 +1,5 @@
 /* Define macros for stack address aliasing issues for NPTL.  Stub version.
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-
-/* This is a number of bytes (less than a page) by which to "color" the
-   starting stack address of new threads.  This number is multiplied by the
-   number of threads created so far and then truncated modulo page size,
-   to get a roughly even distribution of values for different threads.  */
-#define COLORING_INCREMENT      0
+   <https://www.gnu.org/licenses/>.  */
 
 /* This is a number of bytes that is an alignment that should be avoided
    when choosing the exact size of a new thread's stack.  If the size

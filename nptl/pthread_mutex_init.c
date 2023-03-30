@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -23,6 +23,8 @@
 #include <kernel-features.h>
 #include "pthreadP.h"
 #include <atomic.h>
+#include <pthread-offsets.h>
+#include <futex-internal.h>
 
 #include <stap-probe.h>
 
@@ -36,32 +38,28 @@ static const struct pthread_mutexattr default_mutexattr =
 static bool
 prio_inherit_missing (void)
 {
-#ifdef __NR_futex
-# ifndef __ASSUME_FUTEX_LOCK_PI
   static int tpi_supported;
-  if (__glibc_unlikely (tpi_supported == 0))
+  if (__glibc_unlikely (atomic_load_relaxed (&tpi_supported) == 0))
     {
-      int lock = 0;
-      INTERNAL_SYSCALL_DECL (err);
-      int ret = INTERNAL_SYSCALL (futex, err, 4, &lock, FUTEX_UNLOCK_PI, 0, 0);
-      assert (INTERNAL_SYSCALL_ERROR_P (ret, err));
-      tpi_supported = INTERNAL_SYSCALL_ERRNO (ret, err) == ENOSYS ? -1 : 1;
+      int e = futex_unlock_pi (&(unsigned int){0}, 0);
+      atomic_store_relaxed (&tpi_supported, e == ENOSYS ? -1 : 1);
     }
   return __glibc_unlikely (tpi_supported < 0);
-# endif
-  return false;
-#endif
-  return true;
 }
 
 int
-__pthread_mutex_init (mutex, mutexattr)
-     pthread_mutex_t *mutex;
-     const pthread_mutexattr_t *mutexattr;
+__pthread_mutex_init (pthread_mutex_t *mutex,
+		      const pthread_mutexattr_t *mutexattr)
 {
   const struct pthread_mutexattr *imutexattr;
 
-  assert (sizeof (pthread_mutex_t) <= __SIZEOF_PTHREAD_MUTEX_T);
+  ASSERT_TYPE_SIZE (pthread_mutex_t, __SIZEOF_PTHREAD_MUTEX_T);
+
+  /* __kind is the only field where its offset should be checked to
+     avoid ABI breakage with static initializers.  */
+  ASSERT_PTHREAD_INTERNAL_OFFSET (pthread_mutex_t, __data.__kind,
+				  __PTHREAD_MUTEX_KIND_OFFSET);
+  ASSERT_PTHREAD_INTERNAL_MEMBER_SIZE (pthread_mutex_t, __data.__kind, int);
 
   imutexattr = ((const struct pthread_mutexattr *) mutexattr
 		?: &default_mutexattr);
@@ -91,7 +89,7 @@ __pthread_mutex_init (mutex, mutexattr)
   memset (mutex, '\0', __SIZEOF_PTHREAD_MUTEX_T);
 
   /* Copy the values from the attribute.  */
-  mutex->__data.__kind = imutexattr->mutexkind & ~PTHREAD_MUTEXATTR_FLAG_BITS;
+  int mutex_kind = imutexattr->mutexkind & ~PTHREAD_MUTEXATTR_FLAG_BITS;
 
   if ((imutexattr->mutexkind & PTHREAD_MUTEXATTR_FLAG_ROBUST) != 0)
     {
@@ -101,17 +99,17 @@ __pthread_mutex_init (mutex, mutexattr)
 	return ENOTSUP;
 #endif
 
-      mutex->__data.__kind |= PTHREAD_MUTEX_ROBUST_NORMAL_NP;
+      mutex_kind |= PTHREAD_MUTEX_ROBUST_NORMAL_NP;
     }
 
   switch (imutexattr->mutexkind & PTHREAD_MUTEXATTR_PROTOCOL_MASK)
     {
     case PTHREAD_PRIO_INHERIT << PTHREAD_MUTEXATTR_PROTOCOL_SHIFT:
-      mutex->__data.__kind |= PTHREAD_MUTEX_PRIO_INHERIT_NP;
+      mutex_kind |= PTHREAD_MUTEX_PRIO_INHERIT_NP;
       break;
 
     case PTHREAD_PRIO_PROTECT << PTHREAD_MUTEXATTR_PROTOCOL_SHIFT:
-      mutex->__data.__kind |= PTHREAD_MUTEX_PRIO_PROTECT_NP;
+      mutex_kind |= PTHREAD_MUTEX_PRIO_PROTECT_NP;
 
       int ceiling = (imutexattr->mutexkind
 		     & PTHREAD_MUTEXATTR_PRIO_CEILING_MASK)
@@ -135,7 +133,11 @@ __pthread_mutex_init (mutex, mutexattr)
      FUTEX_PRIVATE_FLAG FUTEX_WAKE.  */
   if ((imutexattr->mutexkind & (PTHREAD_MUTEXATTR_FLAG_PSHARED
 				| PTHREAD_MUTEXATTR_FLAG_ROBUST)) != 0)
-    mutex->__data.__kind |= PTHREAD_MUTEX_PSHARED_BIT;
+    mutex_kind |= PTHREAD_MUTEX_PSHARED_BIT;
+
+  /* See concurrency notes regarding __kind in struct __pthread_mutex_s
+     in sysdeps/nptl/bits/thread-shared-types.h.  */
+  atomic_store_relaxed (&(mutex->__data.__kind), mutex_kind);
 
   /* Default values: mutex not used yet.  */
   // mutex->__count = 0;	already done by memset
@@ -148,5 +150,5 @@ __pthread_mutex_init (mutex, mutexattr)
 
   return 0;
 }
-strong_alias (__pthread_mutex_init, pthread_mutex_init)
+weak_alias (__pthread_mutex_init, pthread_mutex_init)
 hidden_def (__pthread_mutex_init)

@@ -1,5 +1,5 @@
 /* Support code for dealing with priorities in the Hurd.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <hurd.h>
 #include <hurd/resource.h>
@@ -50,7 +50,7 @@ _hurd_priority_which_map (enum __priority_which which, int who,
 
     case PRIO_USER:
       if (who == 0)
-	who = geteuid ();
+	who = __geteuid ();
       err = __USEPORT (PROC, __proc_getallpids (port, &pids, &npids));
       for (i = 0; !err && i < npids; ++i)
 	{

@@ -1,4 +1,4 @@
-# Copyright (C) 1993-2015 Free Software Foundation, Inc.
+# Copyright (C) 1993-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 ifdef in-Makerules
 
@@ -46,15 +46,16 @@ hurd-objpfx = $(common-objpfx)hurd/
 
 # These are all the generated headers that <hurd.h> includes.
 before-compile += $(patsubst %,$(hurd-objpfx)hurd/%.h,auth io fs process)
-$(patsubst %,$(hurd-objpfx)hurd/%.%,auth io fs process): \
-  $(common-objpfx)mach/mach-shortcuts.h
-	$(MAKE) -C $(..)hurd before-compile no_deps=t
+$(patsubst %,$(hurd-objpfx)hurd/%.h,auth io fs process): hurd-before-compile
+.PHONY: hurd-before-compile
+hurd-before-compile: $(common-objpfx)mach/mach-shortcuts.h
+	$(MAKE) -C $(..)hurd subdir=hurd before-compile no_deps=t
 endif
 
 # Hurd profil.c includes this file, so give a rule to make it.
 ifeq ($(subdir),gmon)
 $(common-objpfx)hurd/../mach/RPC_task_get_sampled_pcs.c:
-	$(MAKE) -C $(..)mach before-compile no_deps=t
+	$(MAKE) -C $(..)mach subdir=mach before-compile no_deps=t
 endif
 
 
@@ -80,7 +81,9 @@ endef
 -include $(common-objpfx)errnos.d
 $(common-objpfx)errnos.d: $(mach-errnos-deps)
 	$(mach-errno-h) | \
-	$(CC) $(CFLAGS) $(CPPFLAGS) -M -x c - | \
+	$(CC) $(CFLAGS) \
+	    $(subst -include $(common-objpfx)libc-modules.h,,$(CPPFLAGS)) \
+	    -M -x c - | \
 	sed $(sed-remove-objpfx) -e 's,- *:,mach-errnos-deps :=,' \
 	    -e 's, \.\./, $(..),g' > $@t
 	mv -f $@t $@
@@ -88,10 +91,11 @@ $(common-objpfx)errnos.d: $(mach-errnos-deps)
 $(hurd)/bits/errno.h: $(common-objpfx)stamp-errnos ;
 $(common-objpfx)stamp-errnos: $(hurd)/errnos.awk $(errno.texinfo) \
 			      $(mach-errnos-deps) $(common-objpfx)errnos.d
-	$(AWK) -f $^ > $(hurd)/bits/errno.h-tmp
+	mkdir -p $(hurd-objpfx)bits
+	$(AWK) -f $^ > $(hurd-objpfx)bits/errno.h-tmp
 # Make it unwritable so noone will edit it by mistake.
-	-chmod a-w $(hurd)/bits/errno.h-tmp
-	$(move-if-change) $(hurd)/bits/errno.h-tmp $(hurd)/bits/errno.h
+	-chmod a-w $(hurd-objpfx)bits/errno.h-tmp
+	$(move-if-change) $(hurd-objpfx)bits/errno.h-tmp $(hurd)/bits/errno.h
 	touch $@
 
 common-generated += errnos.d stamp-errnos
@@ -191,13 +195,22 @@ ifeq (hurd, $(subdir))
 sysdep_routines += cthreads
 endif
 
+ifeq (io, $(subdir))
+sysdep_routines += f_setlk close_nocancel_nostatus
+endif
+
 ifeq ($(subdir),sunrpc)
 sysdep_headers += nfs/nfs.h
 endif
 
 ifeq ($(subdir),socket)
-sysdep_headers += net/ethernet.h net/if_arp.h net/if_ether.h net/if_ppp.h \
-		  net/route.h
+sysdep_headers += net/ethernet.h net/if_arp.h net/if_ether.h net/route.h
 endif
+
+ifeq ($(subdir),nis)
+CFLAGS-ypclnt.c += -DUSE_BINDINGDIR=1
+endif
+
+LDLIBS-pthread.so += $(objdir)/hurd/libhurduser.so
 
 endif	# in-Makerules

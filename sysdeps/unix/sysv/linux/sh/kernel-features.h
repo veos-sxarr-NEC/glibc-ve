@@ -1,6 +1,6 @@
 /* Set flags signalling availability of kernel features based on given
    kernel version number.  SH version.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,28 +15,53 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-/* SH uses socketcall.  */
-#define __ASSUME_SOCKETCALL		1
+#ifndef __KERNEL_FEATURES_SH__
+# define __KERNEL_FEATURES_SH__
 
-/* The accept4 syscall was added for SH in 2.6.37.  */
-#if __LINUX_KERNEL_VERSION >= 0x020625
-# define __ASSUME_ACCEPT4_SYSCALL	1
-#endif
+#include <endian.h>
 
-/* The recvmmsg syscall was added for SH in 2.6.37.  */
-#if __LINUX_KERNEL_VERSION >= 0x020625
-# define __ASSUME_RECVMMSG_SYSCALL	1
-#endif
-
-/* The sendmmsg syscall was added for SH in 3.0.  */
-#if __LINUX_KERNEL_VERSION >= 0x030000
-# define __ASSUME_SENDMMSG_SYSCALL	1
-#endif
-#define __ASSUME_SENDMMSG_SYSCALL_WITH_SOCKETCALL	1
+/* These syscalls were added for SH in 2.6.37.  */
+#define __ASSUME_SOCKET_SYSCALL		1
+#define __ASSUME_BIND_SYSCALL		1
+#define __ASSUME_CONNECT_SYSCALL	1
+#define __ASSUME_LISTEN_SYSCALL		1
+#define __ASSUME_GETSOCKNAME_SYSCALL	1
+#define __ASSUME_GETPEERNAME_SYSCALL	1
+#define __ASSUME_SOCKETPAIR_SYSCALL	1
+#define __ASSUME_SEND_SYSCALL		1
+#define __ASSUME_RECV_SYSCALL		1
+#define __ASSUME_SHUTDOWN_SYSCALL	1
+#define __ASSUME_GETSOCKOPT_SYSCALL	1
+#define __ASSUME_SETSOCKOPT_SYSCALL	1
 
 #include_next <kernel-features.h>
 
-/* SH does not have a 64-bit inode field.  */
-#undef __ASSUME_ST_INO_64_BIT
+/* SH4 ABI does not really require argument alignment for 64-bits, but
+   the kernel interface for p{read,write}64 adds a dummy long argument
+   before the offset.  */
+#define __ASSUME_PRW_DUMMY_ARG	1
+
+/* sh only supports ipc syscall before 5.1.  */
+#if __LINUX_KERNEL_VERSION < 0x050100
+# undef __ASSUME_DIRECT_SYSVIPC_SYSCALLS
+# undef __ASSUME_SYSVIPC_DEFAULT_IPC_64
+#endif
+#if __BYTE_ORDER == __BIG_ENDIAN
+# define __ASSUME_SYSVIPC_BROKEN_MODE_T
+#endif
+
+/* Support for several syscalls was added in 4.8.  */
+#if __LINUX_KERNEL_VERSION < 0x040800
+# undef __ASSUME_RENAMEAT2
+# undef __ASSUME_EXECVEAT
+# undef __ASSUME_MLOCK2
+#endif
+
+/* sh does not support the statx system call before 5.1.  */
+#if __LINUX_KERNEL_VERSION < 0x050100
+# undef __ASSUME_STATX
+#endif
+
+#endif

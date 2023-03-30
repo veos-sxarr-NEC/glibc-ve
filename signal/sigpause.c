@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define sigpause __rename_sigpause
 #include <errno.h>
@@ -21,9 +21,7 @@
 #undef sigpause
 
 int
-__sigpause (sig_or_mask, is_sig)
-     int sig_or_mask;
-     int is_sig;
+__sigpause (int sig_or_mask, int is_sig)
 {
   __set_errno (ENOSYS);
   return -1;

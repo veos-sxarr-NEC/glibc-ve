@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  SPARC version.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h
@@ -27,6 +27,7 @@
 #include <sysdep.h>
 #include <tls.h>
 #include <dl-plt.h>
+#include <elf/dl-hwcaps.h>
 
 /* Return nonzero iff ELF header is compatible with the running host.  */
 static inline int
@@ -36,10 +37,9 @@ elf_machine_matches_host (const Elf32_Ehdr *ehdr)
     return 1;
   else if (ehdr->e_machine == EM_SPARC32PLUS)
     {
-      /* XXX The following is wrong!  Dave Miller rejected to implement it
-	 correctly.  If this causes problems shoot *him*!  */
-#ifdef SHARED
-      return GLRO(dl_hwcap) & GLRO(dl_hwcap_mask) & HWCAP_SPARC_V9;
+#if HAVE_TUNABLES || defined SHARED
+      uint64_t hwcap_mask = GET_HWCAP_MASK();
+      return GLRO(dl_hwcap) & hwcap_mask & HWCAP_SPARC_V9;
 #else
       return GLRO(dl_hwcap) & HWCAP_SPARC_V9;
 #endif
@@ -184,7 +184,7 @@ elf_machine_runtime_setup (struct link_map *l, int lazy, int profile)
 
 /* ELF_RTYPE_CLASS_PLT iff TYPE describes relocation of a PLT entry, so
    PLT entries should not be allowed to define the value.
-   ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to one
+   ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve to one
    of the main executable's symbols, as for a COPY reloc.  */
 #define elf_machine_type_class(type) \
   ((((type) == R_SPARC_JMP_SLOT						      \
@@ -294,6 +294,7 @@ _dl_start_user:\n\
 
 static inline Elf32_Addr
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf32_Rela *reloc,
 		       Elf32_Addr *reloc_addr, Elf32_Addr value)
 {
@@ -375,12 +376,13 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
   if (__builtin_expect (ELF32_ST_BIND (sym->st_info) == STB_LOCAL, 0)
       && sym->st_shndx != SHN_UNDEF)
     {
+      sym_map = map;
       value = map->l_addr;
     }
   else
     {
       sym_map = RESOLVE_MAP (&sym, version, r_type);
-      value = sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value;
+      value = SYMBOL_ADDRESS (sym_map, sym, true);
     }
 #else
   value = 0;
@@ -423,11 +425,13 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
       *reloc_addr = value;
       break;
     case R_SPARC_IRELATIVE:
-      value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
+      if (__glibc_likely (!skip_ifunc))
+	value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
       *reloc_addr = value;
       break;
     case R_SPARC_JMP_IREL:
-      value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
+      if (__glibc_likely (!skip_ifunc))
+	value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
       /* Fall thru */
     case R_SPARC_JMP_SLOT:
       {

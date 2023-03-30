@@ -1,5 +1,5 @@
 /* Suspend until termination of a requests.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 
 /* We use an UGLY hack to prevent gcc from finding us cheating.  The
@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <aio_misc.h>
 
 
@@ -94,21 +94,19 @@ cleanup (void *arg)
 #ifdef DONT_NEED_AIO_MISC_COND
 static int
 __attribute__ ((noinline))
-do_aio_misc_wait(int *cntr, const struct timespec *timeout)
+do_aio_misc_wait (unsigned int *cntr, const struct timespec *timeout)
 {
-	int result = 0;
+  int result = 0;
 
-	AIO_MISC_WAIT(result, *cntr, timeout, 1);
+  AIO_MISC_WAIT (result, *cntr, timeout, 1);
 
-	return result;
+  return result;
 }
 #endif
 
 int
-aio_suspend (list, nent, timeout)
-     const struct aiocb *const list[];
-     int nent;
-     const struct timespec *timeout;
+aio_suspend (const struct aiocb *const list[], int nent,
+	     const struct timespec *timeout)
 {
   if (__glibc_unlikely (nent < 0))
     {
@@ -124,7 +122,7 @@ aio_suspend (list, nent, timeout)
   int cnt;
   bool any = false;
   int result = 0;
-  int cntr = 1;
+  unsigned int cntr = 1;
 
   /* Request the mutex.  */
   pthread_mutex_lock (&__aio_requests_mutex);
@@ -147,9 +145,6 @@ aio_suspend (list, nent, timeout)
 		waitlist[cnt].next = requestlist[cnt]->waiting;
 		waitlist[cnt].counterp = &cntr;
 		waitlist[cnt].sigevp = NULL;
-#ifdef BROKEN_THREAD_SIGNALS
-		waitlist[cnt].caller_pid = 0;	/* Not needed.  */
-#endif
 		requestlist[cnt]->waiting = &waitlist[cnt];
 		any = true;
 	      }
@@ -180,7 +175,7 @@ aio_suspend (list, nent, timeout)
       pthread_cleanup_push (cleanup, &clparam);
 
 #ifdef DONT_NEED_AIO_MISC_COND
-      result = do_aio_misc_wait(&cntr, timeout);
+      result = do_aio_misc_wait (&cntr, timeout);
 #else
       if (timeout == NULL)
 	result = pthread_cond_wait (&cond, &__aio_requests_mutex);
@@ -188,11 +183,11 @@ aio_suspend (list, nent, timeout)
 	{
 	  /* We have to convert the relative timeout value into an
 	     absolute time value with pthread_cond_timedwait expects.  */
-	  struct timeval now;
+	  struct timespec now;
 	  struct timespec abstime;
 
-	  __gettimeofday (&now, NULL);
-	  abstime.tv_nsec = timeout->tv_nsec + now.tv_usec * 1000;
+	  __clock_gettime (CLOCK_REALTIME, &now);
+	  abstime.tv_nsec = timeout->tv_nsec + now.tv_nsec;
 	  abstime.tv_sec = timeout->tv_sec + now.tv_sec;
 	  if (abstime.tv_nsec >= 1000000000)
 	    {

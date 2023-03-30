@@ -1,5 +1,5 @@
 /* Special startup support.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#if defined __GNUC__ && __GNUC__ >= 2
-
-#include <_G_config.h>
-
-/* This records which stdio is linked against in the application. */
-const int _IO_stdin_used = _G_IO_IO_FILE_VERSION;
-
-#endif
+/* Vestigial libio version number.  Some code in libio checks whether
+   this symbol exists in the executable, but nothing looks at its
+   value anymore; the value it was historically set to has been
+   preserved out of an abundance of caution.  */
+const int _IO_stdin_used = 0x20001;

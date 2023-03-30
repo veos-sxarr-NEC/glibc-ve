@@ -1,5 +1,5 @@
 /* Convert between the kernel's `struct stat' format, and libc's.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef STAT_IS_KERNEL_STAT
-extern int __xstat_conv (int vers, struct kernel_stat *kbuf, void *ubuf);
-extern int __xstat64_conv (int vers, struct kernel_stat *kbuf, void *ubuf);
+extern int __xstat_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
+  attribute_hidden;
+extern int __xstat64_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
+  attribute_hidden;
 #endif
-extern int __xstat32_conv (int vers, struct stat64 *kbuf, struct stat *buf);
+extern int __xstat32_conv (int vers, struct stat64 *kbuf, struct stat *buf)
+  attribute_hidden;

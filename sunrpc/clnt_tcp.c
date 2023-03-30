@@ -54,6 +54,7 @@
 #include <sys/socket.h>
 #include <rpc/pmap_clnt.h>
 #include <wchar.h>
+#include <shlib-compat.h>
 
 extern u_long _create_xid (void);
 
@@ -224,20 +225,15 @@ libc_hidden_nolink_sunrpc (clnttcp_create, GLIBC_2_0)
 #endif
 
 static enum clnt_stat
-clnttcp_call (h, proc, xdr_args, args_ptr, xdr_results, results_ptr, timeout)
-     CLIENT *h;
-     u_long proc;
-     xdrproc_t xdr_args;
-     caddr_t args_ptr;
-     xdrproc_t xdr_results;
-     caddr_t results_ptr;
-     struct timeval timeout;
+clnttcp_call (CLIENT *h, u_long proc, xdrproc_t xdr_args, caddr_t args_ptr,
+	      xdrproc_t xdr_results, caddr_t results_ptr,
+	      struct timeval timeout)
 {
   struct ct_data *ct = (struct ct_data *) h->cl_private;
   XDR *xdrs = &(ct->ct_xdrs);
   struct rpc_msg reply_msg;
   u_long x_id;
-  u_int32_t *msg_x_id = (u_int32_t *) (ct->ct_mcall);	/* yuk */
+  uint32_t *msg_x_id = (uint32_t *) (ct->ct_mcall);	/* yuk */
   bool_t shipnow;
   int refreshes = 2;
 
@@ -295,7 +291,7 @@ call_again:
 	    continue;
 	  return ct->ct_error.re_status;
 	}
-      if ((u_int32_t) reply_msg.rm_xid == (u_int32_t) x_id)
+      if ((uint32_t) reply_msg.rm_xid == (uint32_t) x_id)
 	break;
     }
 
@@ -332,9 +328,7 @@ call_again:
 }
 
 static void
-clnttcp_geterr (h, errp)
-     CLIENT *h;
-     struct rpc_err *errp;
+clnttcp_geterr (CLIENT *h, struct rpc_err *errp)
 {
   struct ct_data *ct =
   (struct ct_data *) h->cl_private;
@@ -343,10 +337,7 @@ clnttcp_geterr (h, errp)
 }
 
 static bool_t
-clnttcp_freeres (cl, xdr_res, res_ptr)
-     CLIENT *cl;
-     xdrproc_t xdr_res;
-     caddr_t res_ptr;
+clnttcp_freeres (CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
   struct ct_data *ct = (struct ct_data *) cl->cl_private;
   XDR *xdrs = &(ct->ct_xdrs);
@@ -365,7 +356,7 @@ clnttcp_control (CLIENT *cl, int request, char *info)
 {
   struct ct_data *ct = (struct ct_data *) cl->cl_private;
   u_long ul;
-  u_int32_t ui32;
+  uint32_t ui32;
 
 
   switch (request)

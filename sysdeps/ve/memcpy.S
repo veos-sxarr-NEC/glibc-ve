@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 NEC Corporation.
+# Copyright (C) 2020 NEC Corporation.
 #
 
 # void *memcpy(void *dest, void *src, size_t n)

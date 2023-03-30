@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2017-2019 NEC Corporation
+   Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 #include <sysdeps/unix/sysv/linux/x86_64/timer_getoverr.c>

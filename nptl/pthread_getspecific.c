@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,15 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 #include "pthreadP.h"
 
 
 void *
-__pthread_getspecific (key)
-     pthread_key_t key;
+__pthread_getspecific (pthread_key_t key)
 {
   struct pthread_key_data *data;
 
@@ -64,5 +63,5 @@ __pthread_getspecific (key)
 
   return result;
 }
-strong_alias (__pthread_getspecific, pthread_getspecific)
+weak_alias (__pthread_getspecific, pthread_getspecific)
 hidden_def (__pthread_getspecific)

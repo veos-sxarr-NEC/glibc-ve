@@ -1,5 +1,5 @@
 /* Conversion module for UTF-32.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <byteswap.h>
 #include <dlfcn.h>
@@ -239,7 +239,7 @@ gconv_end (struct __gconv_step *data)
     if (swap)								      \
       u1 = bswap_32 (u1);						      \
 									      \
-    if (__glibc_unlikely (u1 >= 0x110000))				      \
+    if (__glibc_unlikely (u1 >= 0x110000 || (u1 >= 0xd800 && u1 < 0xe000)))   \
       {									      \
 	/* This is illegal.  */						      \
 	STANDARD_FROM_LOOP_ERR_HANDLER (4);				      \

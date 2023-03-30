@@ -1,5 +1,5 @@
 /* Low-level statistical profiling support function.  Mach/Hurd version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -40,7 +40,7 @@ static mach_msg_timeout_t collector_timeout; /* ms between collections.  */
 static int profile_tick;
 
 /* Reply port used by profiler thread */
-static mach_port_t profil_reply_port;
+static mach_port_t profil_reply_port = MACH_PORT_NULL;
 
 /* Forwards */
 static kern_return_t profil_task_get_sampled_pcs (mach_port_t,
@@ -63,11 +63,15 @@ update_waiter (u_short *sample_buffer, size_t size, size_t offset, u_int scale)
 
   if (profile_thread == MACH_PORT_NULL)
     {
+      if (profil_reply_port == MACH_PORT_NULL)
+	profil_reply_port = __mach_reply_port ();
       /* Set up the profiling collector thread.  */
       err = __thread_create (__mach_task_self (), &profile_thread);
       if (! err)
 	err = __mach_setup_thread (__mach_task_self (), profile_thread,
 				   &profile_waiter, NULL, NULL);
+      if (! err)
+	err = __mach_setup_tls(profile_thread);
     }
   else
     err = 0;
@@ -100,7 +104,7 @@ update_waiter (u_short *sample_buffer, size_t size, size_t offset, u_int scale)
 int
 __profile_frequency (void)
 {
-  return profile_tick;
+  return 1000000 / profile_tick;
 }
 libc_hidden_def (__profile_frequency)
 
@@ -136,8 +140,10 @@ __profil (u_short *sample_buffer, size_t size, size_t offset, u_int scale)
 }
 weak_alias (__profil, profil)
 
+static volatile error_t special_profil_failure;
+
 /* Fetch PC samples.  This function must be very careful not to depend
-   on Hurd threadvar variables.  We arrange that by using a special
+   on Hurd TLS variables.  We arrange that by using a special
    stub arranged for at the end of this file. */
 static void
 fetch_samples (void)
@@ -152,14 +158,13 @@ fetch_samples (void)
 				     pc_samples, &nsamples);
   if (err)
     {
-      static error_t special_profil_failure;
-      static volatile int a, b, c;
+      static volatile int a, b;
 
       special_profil_failure = err;
       a = 1;
       b = 0;
       while (1)
-	c = a / b;
+	a = a / b;
     }
 
   for (i = 0; i < nsamples; ++i)
@@ -173,7 +178,7 @@ fetch_samples (void)
 }
 
 
-/* This function must be very careful not to depend on Hurd threadvar
+/* This function must be very careful not to depend on Hurd TLS
    variables.  We arrange that by using special stubs arranged for at the
    end of this file. */
 static void
@@ -182,7 +187,6 @@ profile_waiter (void)
   mach_msg_header_t msg;
   mach_port_t timeout_reply_port;
 
-  profil_reply_port = __mach_reply_port ();
   timeout_reply_port = __mach_reply_port ();
 
   while (1)
@@ -265,7 +269,7 @@ text_set_element (_hurd_fork_child_hook, fork_profil_child);
    are fatal in profile_waiter anyhow. */
 #define __mig_put_reply_port(foo)
 
-/* Use our static variable instead of the usual threadvar mechanism for
+/* Use our static variable instead of the usual TLS mechanism for
    this. */
 #define __mig_get_reply_port() profil_reply_port
 

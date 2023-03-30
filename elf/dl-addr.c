@@ -1,5 +1,5 @@
 /* Locate the shared object symbol nearest a given address.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <dlfcn.h>
 #include <stddef.h>
@@ -42,8 +42,7 @@ determine_info (const ElfW(Addr) addr, struct link_map *match, Dl_info *info,
   ElfW(Word) strtabsize = match->l_info[DT_STRSZ]->d_un.d_val;
 
   const ElfW(Sym) *matchsym = NULL;
-  if (match->l_info[DT_ADDRTAGIDX (DT_GNU_HASH) + DT_NUM + DT_THISPROCNUM
-		    + DT_VERSIONTAGNUM + DT_EXTRANUM + DT_VALNUM] != NULL)
+  if (match->l_info[ELF_MACHINE_GNU_HASH_ADDRIDX] != NULL)
     {
       /* We look at all symbol table entries referenced by the hash
 	 table.  */
@@ -58,15 +57,15 @@ determine_info (const ElfW(Addr) addr, struct link_map *match, Dl_info *info,
 		{
 		  /* The hash table never references local symbols so
 		     we can omit that test here.  */
+		  symndx = ELF_MACHINE_HASH_SYMIDX (match, hasharr);
 		  if ((symtab[symndx].st_shndx != SHN_UNDEF
 		       || symtab[symndx].st_value != 0)
+		      && symtab[symndx].st_shndx != SHN_ABS
 		      && ELFW(ST_TYPE) (symtab[symndx].st_info) != STT_TLS
 		      && DL_ADDR_SYM_MATCH (match, &symtab[symndx],
 					    matchsym, addr)
 		      && symtab[symndx].st_name < strtabsize)
 		    matchsym = (ElfW(Sym) *) &symtab[symndx];
-
-		  ++symndx;
 		}
 	      while ((*hasharr++ & 1u) == 0);
 	    }
@@ -88,9 +87,11 @@ determine_info (const ElfW(Addr) addr, struct link_map *match, Dl_info *info,
       for (; (void *) symtab < (void *) symtabend; ++symtab)
 	if ((ELFW(ST_BIND) (symtab->st_info) == STB_GLOBAL
 	     || ELFW(ST_BIND) (symtab->st_info) == STB_WEAK)
+	    && __glibc_likely (!dl_symbol_visibility_binds_local_p (symtab))
 	    && ELFW(ST_TYPE) (symtab->st_info) != STT_TLS
 	    && (symtab->st_shndx != SHN_UNDEF
 		|| symtab->st_value != 0)
+	    && symtab->st_shndx != SHN_ABS
 	    && DL_ADDR_SYM_MATCH (match, symtab, matchsym, addr)
 	    && symtab->st_name < strtabsize)
 	  matchsym = (ElfW(Sym) *) symtab;
@@ -120,7 +121,6 @@ determine_info (const ElfW(Addr) addr, struct link_map *match, Dl_info *info,
 
 
 int
-internal_function
 _dl_addr (const void *address, Dl_info *info,
 	  struct link_map **mapp, const ElfW(Sym) **symbolp)
 {
@@ -143,19 +143,3 @@ _dl_addr (const void *address, Dl_info *info,
   return result;
 }
 libc_hidden_def (_dl_addr)
-
-/* Return non-zero if ADDR lies within one of L's segments.  */
-int
-internal_function
-_dl_addr_inside_object (struct link_map *l, const ElfW(Addr) addr)
-{
-  int n = l->l_phnum;
-  const ElfW(Addr) reladdr = addr - l->l_addr;
-
-  while (--n >= 0)
-    if (l->l_phdr[n].p_type == PT_LOAD
-	&& reladdr - l->l_phdr[n].p_vaddr >= 0
-	&& reladdr - l->l_phdr[n].p_vaddr < l->l_phdr[n].p_memsz)
-      return 1;
-  return 0;
-}

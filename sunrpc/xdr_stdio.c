@@ -40,6 +40,8 @@
 #include <rpc/xdr.h>
 
 #include <libio/iolibio.h>
+#include <shlib-compat.h>
+
 #define fflush(s) _IO_fflush (s)
 #define fread(p, m, n, s) _IO_fread (p, m, n, s)
 #define ftell(s) _IO_ftell (s)
@@ -104,7 +106,7 @@ xdrstdio_destroy (XDR *xdrs)
 static bool_t
 xdrstdio_getlong (XDR *xdrs, long *lp)
 {
-  u_int32_t mycopy;
+  uint32_t mycopy;
 
   if (fread ((caddr_t) &mycopy, 4, 1, (FILE *) xdrs->x_private) != 1)
     return FALSE;
@@ -115,7 +117,7 @@ xdrstdio_getlong (XDR *xdrs, long *lp)
 static bool_t
 xdrstdio_putlong (XDR *xdrs, const long *lp)
 {
-  int32_t mycopy = htonl ((u_int32_t) *lp);
+  int32_t mycopy = htonl ((uint32_t) *lp);
 
   if (fwrite ((caddr_t) &mycopy, 4, 1, (FILE *) xdrs->x_private) != 1)
     return FALSE;

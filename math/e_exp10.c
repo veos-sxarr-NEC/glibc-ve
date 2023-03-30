@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -14,20 +14,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
 #include <float.h>
+#include <libm-alias-finite.h>
 
 double
 __ieee754_exp10 (double arg)
 {
-  if (__finite (arg) && arg < DBL_MIN_10_EXP - DBL_DIG - 10)
+  if (isfinite (arg) && arg < DBL_MIN_10_EXP - DBL_DIG - 10)
     return DBL_MIN * DBL_MIN;
   else
     /* This is a very stupid and inprecise implementation.  It'll get
        replaced sometime (soon?).  */
     return __ieee754_exp (M_LN10 * arg);
 }
-strong_alias (__ieee754_exp10, __exp10_finite)
+libm_alias_finite (__ieee754_exp10, __exp10)

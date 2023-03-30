@@ -14,8 +14,12 @@
  */
 
 #include <errno.h>
+#include <float.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-float.h>
 
 static const float huge = 1.0e+30;
 static const float tiny = 1.0e-30;
@@ -38,7 +42,7 @@ __expm1f(float x)
 {
 	float y,hi,lo,c,t,e,hxs,hfx,r1;
 	int32_t k,xsb;
-	u_int32_t hx;
+	uint32_t hx;
 
 	GET_FLOAT_WORD(hx,x);
 	xsb = hx&0x80000000;		/* sign bit of x */
@@ -80,6 +84,7 @@ __expm1f(float x)
 	    c  = (hi-x)-lo;
 	}
 	else if(hx < 0x33000000) {	/* when |x|<2**-25, return x */
+	    math_check_force_underflow (x);
 	    t = huge+x;	/* return x with inexact flags when x!=0 */
 	    return x - (t-(huge+x));
 	}
@@ -125,4 +130,4 @@ __expm1f(float x)
 	}
 	return y;
 }
-weak_alias (__expm1f, expm1f)
+libm_alias_float (__expm1, expm1)

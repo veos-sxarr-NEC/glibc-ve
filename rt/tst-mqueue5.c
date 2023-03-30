@@ -1,5 +1,5 @@
 /* Test mq_notify.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2004.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -33,9 +33,7 @@
 #include <unistd.h>
 #include "tst-mqueue.h"
 
-#define TIMEOUT 3
-
-#if _POSIX_THREADS
+#if _POSIX_THREADS && defined SIGRTMIN && defined SA_SIGINFO
 # include <pthread.h>
 
 volatile int rtmin_cnt;
@@ -116,7 +114,7 @@ thr (void *arg)
 
   if (rtmin_cnt != 2)
     {
-      puts ("SIGRTMIN signal in child did not arrive");
+      puts ("SIGRTMIN signal in thread did not arrive");
       result = 1;
     }
   else if (rtmin_pid != getppid ()
@@ -403,6 +401,16 @@ do_child (const char *name, pthread_barrier_t *b2, pthread_barrier_t *b3,
       result = 1;
     }
 
+  /* Ensure the thr thread gets the signal, not us.  */
+  sigset_t set;
+  sigemptyset (&set);
+  sigaddset (&set, SIGRTMIN);
+  if (pthread_sigmask (SIG_BLOCK, &set, NULL))
+    {
+      printf ("Failed to block SIGRTMIN in child: %m\n");
+      result = 1;
+    }
+
   (void) pthread_barrier_wait (b2);
 
   /* Parent calls mqsend (q), which should wake up mqrecv (q)
@@ -514,7 +522,14 @@ do_child (const char *name, pthread_barrier_t *b2, pthread_barrier_t *b3,
       result = 1;
     }
 
- void *thr_ret;
+  /* Reenable test signals before cleaning up the thread.  */
+  if (pthread_sigmask (SIG_UNBLOCK, &set, NULL))
+    {
+      printf ("Failed to unblock SIGRTMIN in child: %m\n");
+      result = 1;
+    }
+
+  void *thr_ret;
   ret = pthread_join (th, &thr_ret);
   if (ret)
     {

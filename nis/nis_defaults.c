@@ -1,4 +1,4 @@
-/* Copyright (c) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@vt.uni-paderborn.de>, 1997.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <stdio.h>
@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <rpc/rpc.h>
 #include <rpcsvc/nis.h>
+#include <shlib-compat.h>
 
 #define DEFAULT_TTL 43200
 
@@ -277,18 +278,18 @@ searchaccess (char *str, unsigned int access)
 	  cptr++;		/* Remove "=" from beginning */
 	  /* Clear */
 	  if (n)
-	    result = result & ~((NIS_READ_ACC + NIS_MODIFY_ACC +
-				 NIS_CREATE_ACC + NIS_DESTROY_ACC) << 24);
+	    result = result & ~((NIS_READ_ACC + NIS_MODIFY_ACC
+				 + NIS_CREATE_ACC + NIS_DESTROY_ACC) << 24);
 
 	  if (o)
-	    result = result & ~((NIS_READ_ACC + NIS_MODIFY_ACC +
-				 NIS_CREATE_ACC + NIS_DESTROY_ACC) << 16);
+	    result = result & ~((NIS_READ_ACC + NIS_MODIFY_ACC
+				 + NIS_CREATE_ACC + NIS_DESTROY_ACC) << 16);
 	  if (g)
-	    result = result & ~((NIS_READ_ACC + NIS_MODIFY_ACC +
-				 NIS_CREATE_ACC + NIS_DESTROY_ACC) << 8);
+	    result = result & ~((NIS_READ_ACC + NIS_MODIFY_ACC
+				 + NIS_CREATE_ACC + NIS_DESTROY_ACC) << 8);
 	  if (w)
-	    result = result & ~(NIS_READ_ACC + NIS_MODIFY_ACC +
-				NIS_CREATE_ACC + NIS_DESTROY_ACC);
+	    result = result & ~(NIS_READ_ACC + NIS_MODIFY_ACC
+				+ NIS_CREATE_ACC + NIS_DESTROY_ACC);
 	  while (*cptr != '\0' && *cptr != ',')
 	    {
 	      switch (*cptr)
@@ -375,7 +376,7 @@ __nis_default_owner (char *defaults)
 
   return strdup (default_owner ?: nis_local_principal ());
 }
-libnsl_hidden_def (__nis_default_owner)
+libnsl_hidden_nolink_def (__nis_default_owner, GLIBC_2_1)
 
 
 nis_name
@@ -402,7 +403,7 @@ __nis_default_group (char *defaults)
 
   return strdup (default_group ?: nis_local_group ());
 }
-libnsl_hidden_def (__nis_default_group)
+libnsl_hidden_nolink_def (__nis_default_group, GLIBC_2_1)
 
 
 uint32_t
@@ -427,6 +428,7 @@ __nis_default_ttl (char *defaults)
 
   return searchttl (cptr);
 }
+libnsl_hidden_nolink_def (__nis_default_ttl, GLIBC_2_1)
 
 /* Default access rights are ----rmcdr---r---, but we could change
    this with the NIS_DEFAULTS variable. */
@@ -452,4 +454,4 @@ __nis_default_access (char *param, unsigned int defaults)
 
   return result;
 }
-libnsl_hidden_def (__nis_default_access)
+libnsl_hidden_nolink_def (__nis_default_access, GLIBC_2_1)

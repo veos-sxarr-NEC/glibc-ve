@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation functions.  PowerPC64 version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Library General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <unistd.h>
@@ -24,14 +24,17 @@
 
 void
 _dl_reloc_overflow (struct link_map *map,
-		   const char *name,
-		   Elf64_Addr *const reloc_addr,
-		   const Elf64_Sym *refsym)
+		    const char *name,
+		    Elf64_Addr *const reloc_addr,
+		    const Elf64_Sym *refsym)
 {
-  char buffer[128];
+  char buffer[1024];
   char *t;
   t = stpcpy (buffer, name);
-  t = stpcpy (t, " reloc at 0x");
+  /* Notice that _itoa_word() writes characters from the higher address to the
+     lower address, requiring the destination string to reserve all the
+     required size before the call.  */
+  t = stpcpy (t, " reloc at 0x0000000000000000");
   _itoa_word ((unsigned long) reloc_addr, t, 16, 0);
   if (refsym)
     {
@@ -45,3 +48,19 @@ _dl_reloc_overflow (struct link_map *map,
   t = stpcpy (t, " out of range");
   _dl_signal_error (0, map->l_name, NULL, buffer);
 }
+
+#if _CALL_ELF == 2
+void
+_dl_error_localentry (struct link_map *map, const Elf64_Sym *refsym)
+{
+  char buffer[1024];
+  char *t;
+  const char *strtab;
+
+  strtab = (const void *) D_PTR (map, l_info[DT_STRTAB]);
+  t = stpcpy (buffer, "expected localentry:0 `");
+  t = stpcpy (t, strtab + refsym->st_name);
+  t = stpcpy (t, "'");
+  _dl_signal_error (0, map->l_name, NULL, buffer);
+}
+#endif

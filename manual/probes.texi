@@ -1,5 +1,5 @@
 @node Internal Probes
-@c @node Internal Probes, , POSIX Threads, Top
+@c @node Internal Probes, Tunables, Threads, Top
 @c %MENU% Probes to monitor libc internal behavior
 @chapter Internal probes
 
@@ -121,7 +121,7 @@ This occurs within
 point to the same arena.  In this configuration, this will usually only
 occur once per thread.  The exception is when a thread first selected
 the main arena, but a subsequent allocation from it fails: then, and
-only then, may we switch to another arena to retry that allocations, and
+only then, may we switch to another arena to retry that allocation, and
 for further allocations within that thread.
 @end deftp
 
@@ -163,7 +163,7 @@ parameter.
 @end deftp
 
 @deftp Probe memory_mallopt_trim_threshold (int @var{$arg1}, int @var{$arg2}, int @var{$arg3})
-This probe is triggere shortly after the @code{memory_mallopt} probe,
+This probe is triggered shortly after the @code{memory_mallopt} probe,
 when the parameter to be changed is @code{M_TRIM_THRESHOLD}.  Argument
 @var{$arg1} is the requested value, @var{$arg2} is the previous value of
 this @code{malloc} parameter, and @var{$arg3} is nonzero if dynamic
@@ -195,13 +195,6 @@ this @code{malloc} parameter, and @var{$arg3} is nonzero if dynamic
 threshold adjustment was already disabled.
 @end deftp
 
-@deftp Probe memory_mallopt_check_action (int @var{$arg1}, int @var{$arg2})
-This probe is triggered shortly after the @code{memory_mallopt} probe,
-when the parameter to be changed is @code{M_CHECK_ACTION}.  Argument
-@var{$arg1} is the requested value, and @var{$arg2} is the previous
-value of this @code{malloc} parameter.
-@end deftp
-
 @deftp Probe memory_mallopt_perturb (int @var{$arg1}, int @var{$arg2})
 This probe is triggered shortly after the @code{memory_mallopt} probe,
 when the parameter to be changed is @code{M_PERTURB}.  Argument
@@ -231,6 +224,37 @@ dynamic brk/mmap thresholds.  Argument @var{$arg1} and @var{$arg2} are
 the adjusted mmap and trim thresholds, respectively.
 @end deftp
 
+@deftp Probe memory_tunable_tcache_max_bytes (int @var{$arg1}, int @var{$arg2})
+This probe is triggered when the @code{glibc.malloc.tcache_max}
+tunable is set.  Argument @var{$arg1} is the requested value, and
+@var{$arg2} is the previous value of this tunable.
+@end deftp
+
+@deftp Probe memory_tunable_tcache_count (int @var{$arg1}, int @var{$arg2})
+This probe is triggered when the @code{glibc.malloc.tcache_count}
+tunable is set.  Argument @var{$arg1} is the requested value, and
+@var{$arg2} is the previous value of this tunable.
+@end deftp
+
+@deftp Probe memory_tunable_tcache_unsorted_limit (int @var{$arg1}, int @var{$arg2})
+This probe is triggered when the
+@code{glibc.malloc.tcache_unsorted_limit} tunable is set.  Argument
+@var{$arg1} is the requested value, and @var{$arg2} is the previous
+value of this tunable.
+@end deftp
+
+@deftp Probe memory_tcache_double_free (void *@var{$arg1}, int @var{$arg2})
+This probe is triggered when @code{free} determines that the memory
+being freed has probably already been freed, and resides in the
+per-thread cache.  Note that there is an extremely unlikely chance
+that this probe will trigger due to random payload data remaining in
+the allocated memory matching the key used to detect double frees.
+This probe actually indicates that an expensive linear search of the
+tcache, looking for a double free, has happened.  Argument @var{$arg1}
+is the memory location as passed to @code{free}, Argument @var{$arg2}
+is the tcache bin it resides in.
+@end deftp
+
 @node Mathematical Function Probes
 @section Mathematical Function Probes
 
@@ -245,53 +269,6 @@ arithmetic.
 Unless explicitly mentioned otherwise, a precision of 1 implies 24 bits of
 precision in the mantissa of the multiple precision number.  Hence, a precision
 level of 32 implies 768 bits of precision in the mantissa.
-
-@deftp Probe slowexp_p6 (double @var{$arg1}, double @var{$arg2})
-This probe is triggered when the @code{exp} function is called with an
-input that results in multiple precision computation with precision
-6.  Argument @var{$arg1} is the input value and @var{$arg2} is the
-computed output.
-@end deftp
-
-@deftp Probe slowexp_p32 (double @var{$arg1}, double @var{$arg2})
-This probe is triggered when the @code{exp} function is called with an
-input that results in multiple precision computation with precision
-32.  Argument @var{$arg1} is the input value and @var{$arg2} is the
-computed output.
-@end deftp
-
-@deftp Probe slowpow_p10 (double @var{$arg1}, double @var{$arg2}, double @var{$arg3}, double @var{$arg4})
-This probe is triggered when the @code{pow} function is called with
-inputs that result in multiple precision computation with precision
-10.  Arguments @var{$arg1} and @var{$arg2} are the input values,
-@code{$arg3} is the value computed in the fast phase of the algorithm
-and @code{$arg4} is the final accurate value.
-@end deftp
-
-@deftp Probe slowpow_p32 (double @var{$arg1}, double @var{$arg2}, double @var{$arg3}, double @var{$arg4})
-This probe is triggered when the @code{pow} function is called with an
-input that results in multiple precision computation with precision
-32.  Arguments @var{$arg1} and @var{$arg2} are the input values,
-@code{$arg3} is the value computed in the fast phase of the algorithm
-and @code{$arg4} is the final accurate value.
-@end deftp
-
-@deftp Probe slowlog (int @var{$arg1}, double @var{$arg2}, double @var{$arg3})
-This probe is triggered when the @code{log} function is called with an
-input that results in multiple precision computation.  Argument
-@var{$arg1} is the precision with which the computation succeeded.
-Argument @var{$arg2} is the input and @var{$arg3} is the computed
-output.
-@end deftp
-
-@deftp Probe slowlog_inexact (int @var{$arg1}, double @var{$arg2}, double @var{$arg3})
-This probe is triggered when the @code{log} function is called with an
-input that results in multiple precision computation and none of the
-multiple precision computations result in an accurate result.
-Argument @var{$arg1} is the maximum precision with which computations
-were performed.  Argument @var{$arg2} is the input and @var{$arg3} is
-the computed output.
-@end deftp
 
 @deftp Probe slowatan2 (int @var{$arg1}, double @var{$arg2}, double @var{$arg3}, double @var{$arg4})
 This probe is triggered when the @code{atan2} function is called with

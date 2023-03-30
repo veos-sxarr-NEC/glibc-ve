@@ -1,6 +1,6 @@
 /* Make sure dlopen/dlclose are not marked as leaf functions.
 
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Mike Frysinger <vapier@gentoo.org>
 
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* The bug-dl-leaf.c file will call our lib_main directly.  We do this to
    keep things simple -- no need to use --export-dynamic with the linker
@@ -50,7 +50,7 @@ void check_val_fini (void)
 
 int lib_main (void)
 {
-  int ret;
+  int ret __attribute__ ((unused));
   void *hdl;
 
   /* Make sure the constructor sees the updated val.  */

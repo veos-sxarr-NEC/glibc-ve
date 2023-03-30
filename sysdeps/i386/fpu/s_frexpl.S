@@ -1,5 +1,5 @@
 /* ix87 specific frexp implementation for long double.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,8 +15,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <libm-alias-ldouble.h>
 #include <machine/asm.h>
 
 	.section .rodata
@@ -50,7 +51,7 @@ ENTRY (__frexpl)
 	jz	1f
 	xorl	%ecx, %ecx
 	cmpl	$0x7fff, %eax
-	je	1f
+	je	3f
 
 	cmpl	$0, %eax
 	jne	2f
@@ -81,5 +82,12 @@ ENTRY (__frexpl)
 	movl	%ecx, (%eax)
 
 	ret
+
+	/* Infinity or NaN; ensure signaling NaNs are quieted.  */
+3:	movl	EXPP(%esp), %eax
+	fldt	VAL0(%esp)
+	fadd	%st
+	movl	%ecx, (%eax)
+	ret
 END (__frexpl)
-weak_alias (__frexpl, frexpl)
+libm_alias_ldouble (__frexp, frexp)

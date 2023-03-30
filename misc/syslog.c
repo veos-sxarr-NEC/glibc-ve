@@ -47,13 +47,13 @@ static char sccsid[] = "@(#)syslog.c	8.4 (Berkeley) 3/18/94";
 #include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <signal.h>
 #include <locale.h>
 
 #include <stdarg.h>
 
-#include <libio/iolibio.h>
+#include <libio/libioP.h>
 #include <math_ldbl_opt.h>
 
 #include <kernel-features.h>
@@ -72,7 +72,7 @@ extern char	*__progname;		/* Program name, from crt0. */
 /* Define the lock.  */
 __libc_lock_define_initialized (static, syslog_lock)
 
-static void openlog_internal(const char *, int, int) internal_function;
+static void openlog_internal(const char *, int, int);
 static void closelog_internal(void);
 #ifndef NO_SIGPIPE
 static void sigpipe_handler (int);
@@ -114,11 +114,18 @@ __syslog(int pri, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	__vsyslog_chk(pri, -1, fmt, ap);
+	__vsyslog_internal(pri, fmt, ap, 0);
 	va_end(ap);
 }
 ldbl_hidden_def (__syslog, syslog)
 ldbl_strong_alias (__syslog, syslog)
+
+void
+__vsyslog(int pri, const char *fmt, va_list ap)
+{
+	__vsyslog_internal(pri, fmt, ap, 0);
+}
+ldbl_weak_alias (__vsyslog, vsyslog)
 
 void
 __syslog_chk(int pri, int flag, const char *fmt, ...)
@@ -126,12 +133,19 @@ __syslog_chk(int pri, int flag, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	__vsyslog_chk(pri, flag, fmt, ap);
+	__vsyslog_internal(pri, fmt, ap, (flag > 0) ? PRINTF_FORTIFY : 0);
 	va_end(ap);
 }
 
 void
 __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
+{
+	__vsyslog_internal(pri, fmt, ap, (flag > 0) ? PRINTF_FORTIFY : 0);
+}
+
+void
+__vsyslog_internal(int pri, const char *fmt, va_list ap,
+		   unsigned int mode_flags)
 {
 	struct tm now_tm;
 	time_t now;
@@ -164,7 +178,7 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
 		pri |= LogFacility;
 
 	/* Build the message in a memory-buffer stream.  */
-	f = open_memstream (&buf, &bufsize);
+	f = __open_memstream (&buf, &bufsize);
 	if (f == NULL)
 	  {
 	    /* We cannot get a stream.  There is not much we can do but
@@ -191,7 +205,7 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
 	  {
 	    __fsetlocking (f, FSETLOCKING_BYCALLER);
 	    fprintf (f, "<%d>", pri);
-	    (void) time (&now);
+	    now = time_now ();
 	    f->_IO_write_ptr += __strftime_l (f->_IO_write_ptr,
 					      f->_IO_write_end
 					      - f->_IO_write_ptr,
@@ -202,24 +216,21 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
 	    if (LogTag == NULL)
 	      LogTag = __progname;
 	    if (LogTag != NULL)
-	      fputs_unlocked (LogTag, f);
+	      __fputs_unlocked (LogTag, f);
 	    if (LogStat & LOG_PID)
 	      fprintf (f, "[%d]", (int) __getpid ());
 	    if (LogTag != NULL)
 	      {
-		putc_unlocked (':', f);
-		putc_unlocked (' ', f);
+		__putc_unlocked (':', f);
+		__putc_unlocked (' ', f);
 	      }
 
 	    /* Restore errno for %m format.  */
 	    __set_errno (saved_errno);
 
 	    /* We have the header.  Print the user's format into the
-               buffer.  */
-	    if (flag == -1)
-	      vfprintf (f, fmt, ap);
-	    else
-	      __vfprintf_chk (f, flag, fmt, ap);
+	       buffer.  */
+	    __vfprintf_internal (f, fmt, ap, mode_flags);
 
 	    /* Close the memory stream; this will finalize the data
 	       into a malloc'd buffer in BUF.  */
@@ -298,7 +309,7 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
 		if (LogStat & LOG_CONS &&
 		    (fd = __open(_PATH_CONSOLE, O_WRONLY|O_NOCTTY, 0)) >= 0)
 		  {
-		    dprintf (fd, "%s\r\n", buf + msgoff);
+		    __dprintf (fd, "%s\r\n", buf + msgoff);
 		    (void)__close(fd);
 		  }
 	      }
@@ -316,21 +327,11 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
 	if (buf != failbuf)
 		free (buf);
 }
-libc_hidden_def (__vsyslog_chk)
-
-void
-__vsyslog(int pri, const char *fmt, va_list ap)
-{
-  __vsyslog_chk (pri, -1, fmt, ap);
-}
-ldbl_hidden_def (__vsyslog, vsyslog)
-ldbl_strong_alias (__vsyslog, vsyslog)
 
 static struct sockaddr_un SyslogAddr;	/* AF_UNIX address of local logger */
 
 
 static void
-internal_function
 openlog_internal(const char *ident, int logstat, int logfac)
 {
 	if (ident != NULL)
@@ -346,36 +347,9 @@ openlog_internal(const char *ident, int logstat, int logfac)
 			(void)strncpy(SyslogAddr.sun_path, _PATH_LOG,
 				      sizeof(SyslogAddr.sun_path));
 			if (LogStat & LOG_NDELAY) {
-#ifdef SOCK_CLOEXEC
-# ifndef __ASSUME_SOCK_CLOEXEC
-				if (__have_sock_cloexec >= 0) {
-# endif
-					LogFile = __socket(AF_UNIX,
-							   LogType
-							   | SOCK_CLOEXEC, 0);
-# ifndef __ASSUME_SOCK_CLOEXEC
-					if (__have_sock_cloexec == 0)
-						__have_sock_cloexec
-						  = ((LogFile != -1
-						      || errno != EINVAL)
-						     ? 1 : -1);
-				}
-# endif
-#endif
-#ifndef __ASSUME_SOCK_CLOEXEC
-# ifdef SOCK_CLOEXEC
-				if (__have_sock_cloexec < 0)
-# endif
-				  LogFile = __socket(AF_UNIX, LogType, 0);
-#endif
-				if (LogFile == -1)
-					return;
-#ifndef __ASSUME_SOCK_CLOEXEC
-# ifdef SOCK_CLOEXEC
-				if (__have_sock_cloexec < 0)
-# endif
-					__fcntl(LogFile, F_SETFD, FD_CLOEXEC);
-#endif
+			  LogFile = __socket(AF_UNIX, LogType | SOCK_CLOEXEC, 0);
+			  if (LogFile == -1)
+			    return;
 			}
 		}
 		if (LogFile != -1 && !connected)
@@ -452,8 +426,7 @@ closelog (void)
 
 /* setlogmask -- set the log mask level */
 int
-setlogmask(pmask)
-	int pmask;
+setlogmask (int pmask)
 {
 	int omask;
 

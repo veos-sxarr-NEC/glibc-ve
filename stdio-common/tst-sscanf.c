@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2000.
 
@@ -14,8 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <array_length.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <locale.h>
@@ -124,8 +125,8 @@ struct test2
   { L("0x.e+0"), L("%g%c"), 2, '+' },
 };
 
-int
-main (void)
+static int
+do_test (void)
 {
   double d[6];
   long l[6];
@@ -184,7 +185,7 @@ main (void)
 	break;
     }
 
-  for (i = 0; i < sizeof (int_tests) / sizeof (int_tests[0]); ++i)
+  for (i = 0; i < array_length (int_tests); ++i)
     {
       long dummy;
       int ret;
@@ -198,7 +199,7 @@ main (void)
 	}
     }
 
-  for (i = 0; i < sizeof (double_tests) / sizeof (double_tests[0]); ++i)
+  for (i = 0; i < array_length (double_tests); ++i)
     {
       double dummy;
       int ret;
@@ -212,7 +213,7 @@ main (void)
 	}
     }
 
-  for (i = 0; i < sizeof (double_tests2) / sizeof (double_tests2[0]); ++i)
+  for (i = 0; i < array_length (double_tests2); ++i)
     {
       double dummy;
       int ret;
@@ -268,3 +269,6 @@ main (void)
 
   return result;
 }
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"

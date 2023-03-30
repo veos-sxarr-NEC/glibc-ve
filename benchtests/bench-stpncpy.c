@@ -1,5 +1,5 @@
 /* Measure stpncpy functions.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,46 +14,30 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define STRNCPY_RESULT(dst, len, n) ((dst) + ((len) > (n) ? (n) : (len)))
 #define TEST_MAIN
-#define TEST_NAME "stpncpy"
+#ifndef WIDE
+# define TEST_NAME "stpncpy"
+#else
+# define TEST_NAME "wcpncpy"
+# define generic_stpncpy generic_wcpncpy
+#endif /* WIDE */
 #include "bench-string.h"
 
-char *simple_stpncpy (char *, const char *, size_t);
-char *stupid_stpncpy (char *, const char *, size_t);
-
-IMPL (stupid_stpncpy, 0)
-IMPL (simple_stpncpy, 0)
-IMPL (stpncpy, 1)
-
-char *
-simple_stpncpy (char *dst, const char *src, size_t n)
+CHAR *
+generic_stpncpy (CHAR *dst, const CHAR *src, size_t n)
 {
-  while (n--)
-    if ((*dst++ = *src++) == '\0')
-      {
-	size_t i;
-
-	for (i = 0; i < n; ++i)
-	  dst[i] = '\0';
-	return dst - 1;
-      }
-  return dst;
+  size_t nc = STRNLEN (src, n);
+  MEMCPY (dst, src, nc);
+  dst += nc;
+  if (nc == n)
+    return dst;
+  return MEMSET (dst, 0, n - nc);
 }
 
-char *
-stupid_stpncpy (char *dst, const char *src, size_t n)
-{
-  size_t nc = strnlen (src, n);
-  size_t i;
-
-  for (i = 0; i < nc; ++i)
-    dst[i] = src[i];
-  for (; i < n; ++i)
-    dst[i] = '\0';
-  return dst + nc;
-}
+IMPL (STPNCPY, 1)
+IMPL (generic_stpncpy, 0)
 
 #include "bench-strncpy.c"

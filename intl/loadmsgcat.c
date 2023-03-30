@@ -1,5 +1,5 @@
 /* Load needed message catalogs.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as published by
@@ -12,7 +12,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Tell glibc's <string.h> to provide a prototype for mempcpy().
    This must come before <config.h> because <config.h> may include
@@ -31,29 +31,6 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#ifdef __GNUC__
-# undef  alloca
-# define alloca __builtin_alloca
-# define HAVE_ALLOCA 1
-#else
-# ifdef _MSC_VER
-#  include <malloc.h>
-#  define alloca _alloca
-# else
-#  if defined HAVE_ALLOCA_H || defined _LIBC
-#   include <alloca.h>
-#  else
-#   ifdef _AIX
- #pragma alloca
-#   else
-#    ifndef alloca
-char *alloca ();
-#    endif
-#   endif
-#  endif
-# endif
-#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -95,7 +72,7 @@ char *alloca ();
 
 /* Handle multi-threaded applications.  */
 #ifdef _LIBC
-# include <bits/libc-lock.h>
+# include <libc-lock.h>
 #else
 # include "lock.h"
 #endif
@@ -468,21 +445,12 @@ char *alloca ();
 /* Rename the non ISO C functions.  This is required by the standard
    because some ISO C functions will require linking with this object
    file and the name space must not be polluted.  */
-# define open(name, flags)	open_not_cancel_2 (name, flags)
-# define close(fd)		close_not_cancel_no_status (fd)
-# define read(fd, buf, n)	read_not_cancel (fd, buf, n)
+# define open(name, flags)	__open_nocancel (name, flags)
+# define close(fd)		__close_nocancel_nostatus (fd)
+# define read(fd, buf, n)	__read_nocancel (fd, buf, n)
 # define mmap(addr, len, prot, flags, fd, offset) \
   __mmap (addr, len, prot, flags, fd, offset)
 # define munmap(addr, len)	__munmap (addr, len)
-#endif
-
-/* For those losing systems which don't have `alloca' we have to add
-   some additional code emulating it.  */
-#ifdef HAVE_ALLOCA
-# define freea(p) /* nothing */
-#else
-# define alloca(n) malloc (n)
-# define freea(p) free (p)
 #endif
 
 /* For systems that distinguish between text and binary I/O.
@@ -781,7 +749,6 @@ get_sysdep_segment_value (const char *name)
 /* Load the message catalogs specified by FILENAME.  If it is no valid
    message catalog do nothing.  */
 void
-internal_function
 _nl_load_domain (struct loaded_l10nfile *domain_file,
 		 struct binding *domainbinding)
 {
@@ -982,9 +949,10 @@ _nl_load_domain (struct loaded_l10nfile *domain_file,
 		sysdep_segments = (const struct sysdep_segment *)
 		  ((char *) data
 		   + W (domain->must_swap, data->sysdep_segments_offset));
-		sysdep_segment_values =
-		  (const char **)
-		  alloca (n_sysdep_segments * sizeof (const char *));
+		sysdep_segment_values = calloc
+		  (n_sysdep_segments, sizeof (const char *));
+		if (sysdep_segment_values == NULL)
+		  goto invalid;
 		for (i = 0; i < n_sysdep_segments; i++)
 		  {
 		    const char *name =
@@ -995,7 +963,7 @@ _nl_load_domain (struct loaded_l10nfile *domain_file,
 
 		    if (!(namelen > 0 && name[namelen - 1] == '\0'))
 		      {
-			freea (sysdep_segment_values);
+			free (sysdep_segment_values);
 			goto invalid;
 		      }
 
@@ -1046,7 +1014,7 @@ _nl_load_domain (struct loaded_l10nfile *domain_file,
 			      if (sysdepref >= n_sysdep_segments)
 				{
 				  /* Invalid.  */
-				  freea (sysdep_segment_values);
+				  free (sysdep_segment_values);
 				  goto invalid;
 				}
 
@@ -1250,7 +1218,7 @@ _nl_load_domain (struct loaded_l10nfile *domain_file,
 		    domain->trans_sysdep_tab = NULL;
 		  }
 
-		freea (sysdep_segment_values);
+		free (sysdep_segment_values);
 	      }
 	    else
 	      {
@@ -1316,7 +1284,7 @@ _nl_load_domain (struct loaded_l10nfile *domain_file,
 
 #ifdef _LIBC
 void
-internal_function __libc_freeres_fn_section
+__libc_freeres_fn_section
 _nl_unload_domain (struct loaded_domain *domain)
 {
   size_t i;

@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 
@@ -25,22 +25,43 @@
 #ifdef USE_WIDE_CHAR
 # define STRTOF		wcstold_l
 # define __STRTOF	__wcstold_l
+# define STRTOF_NAN	__wcstold_nan
 #else
 # define STRTOF		strtold_l
 # define __STRTOF	__strtold_l
+# define STRTOF_NAN	__strtold_nan
 #endif
 #define MPN2FLOAT	__mpn_construct_long_double
 #define FLOAT_HUGE_VAL	HUGE_VALL
-#define SET_MANTISSA(flt, mant) \
-  do { union ieee854_long_double u;					      \
-       u.d = (flt);							      \
-       u.ieee_nan.mantissa0 = 0;					      \
-       u.ieee_nan.mantissa1 = 0;					      \
-       u.ieee_nan.mantissa2 = (mant) >> 32;				      \
-       u.ieee_nan.mantissa3 = (mant);					      \
-       if ((u.ieee.mantissa0 | u.ieee.mantissa1				      \
-	    | u.ieee.mantissa2 | u.ieee.mantissa3) != 0)		      \
-	 (flt) = u.d;							      \
-  } while (0)
+
+#if __HAVE_FLOAT128 && !__HAVE_DISTINCT_FLOAT128
+# define strtof128_l __hide_strtof128_l
+# define wcstof128_l __hide_wcstof128_l
+#endif
+
+#if __HAVE_FLOAT64X_LONG_DOUBLE
+# define strtof64x_l __hide_strtof64x_l
+# define wcstof64x_l __hide_wcstof64x_l
+#endif
 
 #include <strtod_l.c>
+
+#if __HAVE_FLOAT128 && !__HAVE_DISTINCT_FLOAT128
+# undef strtof128_l
+# undef wcstof128_l
+# ifdef USE_WIDE_CHAR
+weak_alias (wcstold_l, wcstof128_l)
+# else
+weak_alias (strtold_l, strtof128_l)
+# endif
+#endif
+
+#if __HAVE_FLOAT64X_LONG_DOUBLE
+# undef strtof64x_l
+# undef wcstof64x_l
+# ifdef USE_WIDE_CHAR
+weak_alias (wcstold_l, wcstof64x_l)
+# else
+weak_alias (strtold_l, strtof64x_l)
+# endif
+#endif

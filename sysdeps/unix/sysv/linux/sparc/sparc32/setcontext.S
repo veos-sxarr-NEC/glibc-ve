@@ -1,5 +1,5 @@
 /* Install given context.
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David S. Miller <davem@davemloft.net>, 2008.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <sys/trap.h>
@@ -94,6 +94,19 @@ ENTRY(__setcontext)
 END(__setcontext)
 
 weak_alias (__setcontext, setcontext)
+
+/* We add an NOP here to separate between __setcontext/__startcontext. The
+   wanted behavior that happens is: when unwinding from a function called
+   inside a makecontext() context, FDE lookup will use '&__startcontext - 1',
+   then returns NULL for no FDE found, and immediately ends the unwind, in
+   a normal fashion.
+
+   If this NOP word does not exist, FDE lookup just repeatedly finds
+   __setcontext's FDE in an infinite loop, due to the convention of using
+   'address - 1' for FDE lookup. Modifiying/deleting the below
+   __startcontext's FDE has no help on this.  */
+
+	nop
 
 /* This is the helper code which gets called if a function which is
    registered with 'makecontext' returns.  In this case we have to

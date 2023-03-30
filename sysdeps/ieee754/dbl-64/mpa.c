@@ -1,7 +1,7 @@
 /*
  * IBM Accurate Mathematical Library
  * written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2001-2020 Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,7 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 /************************************************************************/
 /*  MODULE_NAME: mpa.c                                                  */
@@ -119,7 +119,8 @@ __cpy (const mp_no *x, mp_no *y, int p)
 
 #ifndef NO___MP_DBL
 /* Convert a multiple precision number *X into a double precision
-   number *Y, normalized case  (|x| >= 2**(-1022))).  */
+   number *Y, normalized case (|x| >= 2**(-1022))).  X has precision
+   P, which is positive.  */
 static void
 norm (const mp_no *x, double *y, int p)
 {
@@ -135,7 +136,7 @@ norm (const mp_no *x, double *y, int p)
 	c = X[1] + R * X[2];
       else if (p == 3)
 	c = X[1] + R * (X[2] + R * X[3]);
-      else if (p == 4)
+      else /* p == 4.  */
 	c = (X[1] + R * X[2]) + R * R * (X[3] + R * X[4]);
     }
   else
@@ -870,6 +871,13 @@ __inv (const mp_no *x, mp_no *y, int p)
   z.e = 0;
   __mp_dbl (&z, &t, p);
   t = 1 / t;
+
+  /* t == 0 will never happen at this point, since 1/t can only be 0 if t is
+     infinity, but before the division t == mantissa of x (exponent is 0).  We
+     can instruct the compiler to ignore this case.  */
+  if (t == 0)
+    __builtin_unreachable ();
+
   __dbl_mp (t, y, p);
   EY -= EX;
 

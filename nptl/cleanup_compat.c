@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,17 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 #include "pthreadP.h"
 
 
 void
-_pthread_cleanup_push (buffer, routine, arg)
-     struct _pthread_cleanup_buffer *buffer;
-     void (*routine) (void *);
-     void *arg;
+_pthread_cleanup_push (struct _pthread_cleanup_buffer *buffer,
+		       void (*routine) (void *), void *arg)
 {
   struct pthread *self = THREAD_SELF;
 
@@ -38,9 +36,7 @@ strong_alias (_pthread_cleanup_push, __pthread_cleanup_push)
 
 
 void
-_pthread_cleanup_pop (buffer, execute)
-     struct _pthread_cleanup_buffer *buffer;
-     int execute;
+_pthread_cleanup_pop (struct _pthread_cleanup_buffer *buffer, int execute)
 {
   struct pthread *self __attribute ((unused)) = THREAD_SELF;
 

@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Makefile for malloc routines
@@ -25,12 +25,55 @@ include ../Makeconfig
 dist-headers := malloc.h
 headers := $(dist-headers) obstack.h mcheck.h
 tests := mallocbug tst-malloc tst-valloc tst-calloc tst-obstack \
-	 tst-mallocstate tst-mcheck tst-mallocfork tst-trim1 \
-	 tst-malloc-usable tst-realloc tst-posix_memalign \
-	 tst-pvalloc tst-memalign tst-mallopt
+	 tst-mcheck tst-mallocfork tst-trim1 \
+	 tst-malloc-usable tst-realloc tst-reallocarray tst-posix_memalign \
+	 tst-pvalloc tst-pvalloc-fortify tst-memalign tst-mallopt \
+	 tst-malloc-backtrace tst-malloc-thread-exit \
+	 tst-malloc-thread-fail tst-malloc-fork-deadlock \
+	 tst-mallocfork2 \
+	 tst-interpose-nothread \
+	 tst-interpose-thread \
+	 tst-alloc_buffer \
+	 tst-malloc-tcache-leak \
+	 tst-malloc_info \
+	 tst-malloc-too-large \
+	 tst-malloc-stats-cancellation \
+	 tst-tcfree1 tst-tcfree2 tst-tcfree3 \
+
+tests-static := \
+	 tst-interpose-static-nothread \
+	 tst-interpose-static-thread \
+	 tst-malloc-usable-static \
+
+tests-internal := tst-mallocstate tst-scratch_buffer
+
+# The dynarray framework is only available inside glibc.
+tests-internal += \
+	 tst-dynarray \
+	 tst-dynarray-fail \
+	 tst-dynarray-at-fail \
+
+ifneq (no,$(have-tunables))
+tests += tst-malloc-usable-tunables tst-mxfast
+tests-static += tst-malloc-usable-static-tunables
+endif
+
+tests += $(tests-static)
 test-srcs = tst-mtrace
 
-routines = malloc morecore mcheck mtrace obstack
+routines = malloc morecore mcheck mtrace obstack reallocarray \
+  scratch_buffer_grow scratch_buffer_grow_preserve \
+  scratch_buffer_set_array_size \
+  dynarray_at_failure \
+  dynarray_emplace_enlarge \
+  dynarray_finalize \
+  dynarray_resize \
+  dynarray_resize_clear \
+  alloc_buffer_alloc_array \
+  alloc_buffer_allocate \
+  alloc_buffer_copy_bytes  \
+  alloc_buffer_copy_string \
+  alloc_buffer_create_failure \
 
 install-lib := libmcheck.a
 non-lib.a := libmcheck.a
@@ -39,11 +82,30 @@ non-lib.a := libmcheck.a
 extra-libs = libmemusage
 extra-libs-others = $(extra-libs)
 
+# Helper objects for some tests.
+extra-tests-objs += \
+  tst-interpose-aux-nothread.o \
+  tst-interpose-aux-thread.o \
+
+test-extras = \
+  tst-interpose-aux-nothread \
+  tst-interpose-aux-thread \
+
 libmemusage-routines = memusage
 libmemusage-inhibit-o = $(filter-out .os,$(object-suffixes))
 
+$(objpfx)tst-malloc-backtrace: $(shared-thread-library)
+$(objpfx)tst-malloc-thread-exit: $(shared-thread-library)
+$(objpfx)tst-malloc-thread-fail: $(shared-thread-library)
+$(objpfx)tst-malloc-fork-deadlock: $(shared-thread-library)
+$(objpfx)tst-malloc-stats-cancellation: $(shared-thread-library)
+
+# Export the __malloc_initialize_hook variable to libc.so.
+LDFLAGS-tst-mallocstate = -rdynamic
+
 # These should be removed by `make clean'.
 extra-objs = mcheck-init.o libmcheck.a
+others-extras = mcheck-init.o
 
 # Include the cleanup handler.
 aux := set-freeres thread-freeres
@@ -69,6 +131,7 @@ ifneq ($(cross-compiling),yes)
 # If the gd library is available we build the `memusagestat' program.
 ifneq ($(LIBGD),no)
 others: $(objpfx)memusage
+others += memusagestat
 install-bin = memusagestat
 install-bin-script += memusage
 generated += memusagestat memusage
@@ -90,23 +153,24 @@ memusagestat-modules = memusagestat
 
 cpp-srcs-left := $(memusagestat-modules)
 lib := memusagestat
-include $(patsubst %,$(..)cppflags-iterator.mk,$(cpp-srcs-left))
+include $(patsubst %,$(..)libof-iterator.mk,$(cpp-srcs-left))
 
-$(objpfx)memusagestat: $(memusagestat-modules:%=$(objpfx)%.o)
-	$(LINK.o) -o $@ $^ $(libgd-LDFLAGS) -lgd -lpng -lz -lm
+LDLIBS-memusagestat = $(libgd-LDFLAGS) -lgd -lpng -lz -lm
 
 ifeq ($(run-built-tests),yes)
 ifeq (yes,$(build-shared))
 ifneq ($(PERL),no)
 tests-special += $(objpfx)tst-mtrace.out
+tests-special += $(objpfx)tst-dynarray-mem.out
+tests-special += $(objpfx)tst-dynarray-fail-mem.out
 endif
 endif
 endif
 
 include ../Rules
 
-CFLAGS-mcheck-init.c = $(PIC-ccflag)
-CFLAGS-obstack.c = $(uses-callbacks)
+CFLAGS-mcheck-init.c += $(PIC-ccflag)
+CFLAGS-obstack.c += $(uses-callbacks)
 
 $(objpfx)libmcheck.a: $(objpfx)mcheck-init.o
 	-rm -f $@
@@ -120,7 +184,7 @@ ifeq (yes,$(build-shared))
 ifneq ($(PERL),no)
 $(objpfx)tst-mtrace.out: tst-mtrace.sh $(objpfx)tst-mtrace
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
-		 '$(run-program-env)' '$(test-program-prefix-after-env)' ; \
+		 '$(run-program-env)' '$(test-program-prefix-after-env)' > $@; \
 	$(evaluate-test)
 endif
 endif
@@ -128,7 +192,17 @@ endif
 
 tst-mcheck-ENV = VE_MALLOC_CHECK_=3
 tst-malloc-usable-ENV = VE_MALLOC_CHECK_=3
+tst-malloc-usable-static-ENV = $(tst-malloc-usable-ENV)
+tst-malloc-usable-tunables-ENV = GLIBC_TUNABLES=glibc.malloc.check=3
+tst-malloc-usable-static-tunables-ENV = $(tst-malloc-usable-tunables-ENV)
 
+tst-mxfast-ENV = GLIBC_TUNABLES=glibc.malloc.tcache_count=0:glibc.malloc.mxfast=0
+
+ifeq ($(experimental-malloc),yes)
+CPPFLAGS-malloc.c += -DUSE_TCACHE=1
+else
+CPPFLAGS-malloc.c += -DUSE_TCACHE=0
+endif
 # Uncomment this for test releases.  For public releases it is too expensive.
 #CPPFLAGS-malloc.o += -DMALLOC_DEBUG=1
 
@@ -156,3 +230,28 @@ $(objpfx)libmemusage.so: $(libdl)
 
 # Extra dependencies
 $(foreach o,$(all-object-suffixes),$(objpfx)malloc$(o)): arena.c hooks.c
+
+# Compile the tests with a flag which suppresses the mallopt call in
+# the test skeleton.
+$(tests:%=$(objpfx)%.o): CPPFLAGS += -DTEST_NO_MALLOPT
+
+$(objpfx)tst-interpose-nothread: $(objpfx)tst-interpose-aux-nothread.o
+$(objpfx)tst-interpose-thread: \
+  $(objpfx)tst-interpose-aux-thread.o $(shared-thread-library)
+$(objpfx)tst-interpose-static-nothread: $(objpfx)tst-interpose-aux-nothread.o
+$(objpfx)tst-interpose-static-thread: \
+  $(objpfx)tst-interpose-aux-thread.o $(static-thread-library)
+
+tst-dynarray-ENV = VE_MALLOC_TRACE=$(objpfx)tst-dynarray.mtrace
+$(objpfx)tst-dynarray-mem.out: $(objpfx)tst-dynarray.out
+	$(common-objpfx)malloc/mtrace $(objpfx)tst-dynarray.mtrace > $@; \
+	$(evaluate-test)
+
+tst-dynarray-fail-ENV = VE_MALLOC_TRACE=$(objpfx)tst-dynarray-fail.mtrace
+$(objpfx)tst-dynarray-fail-mem.out: $(objpfx)tst-dynarray-fail.out
+	$(common-objpfx)malloc/mtrace $(objpfx)tst-dynarray-fail.mtrace > $@; \
+	$(evaluate-test)
+
+$(objpfx)tst-malloc-tcache-leak: $(shared-thread-library)
+$(objpfx)tst-malloc_info: $(shared-thread-library)
+$(objpfx)tst-mallocfork2: $(shared-thread-library)

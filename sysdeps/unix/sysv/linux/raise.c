@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,45 +14,40 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
-#include <limits.h>
 #include <signal.h>
 #include <sysdep.h>
-#include <nptl/pthreadP.h>
-
+#include <errno.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <internal-signals.h>
 
 int
-raise (sig)
-     int sig;
+raise (int sig)
 {
-  struct pthread *pd = THREAD_SELF;
-  pid_t pid = THREAD_GETMEM (pd, pid);
-  pid_t selftid = THREAD_GETMEM (pd, tid);
-  if (selftid == 0)
-    {
-      /* This system call is not supposed to fail.  */
-#ifdef INTERNAL_SYSCALL
-      INTERNAL_SYSCALL_DECL (err);
-      selftid = INTERNAL_SYSCALL (gettid, err, 0);
-#else
-      selftid = INLINE_SYSCALL (gettid, 0);
-#endif
-      THREAD_SETMEM (pd, tid, selftid);
+  /* rt_sigprocmask may fail if:
 
-      /* We do not set the PID field in the TID here since we might be
-	 called from a signal handler while the thread executes fork.  */
-      pid = selftid;
-    }
-  else
-    /* raise is an async-safe function.  It could be called while the
-       fork/vfork function temporarily invalidated the PID field.  Adjust for
-       that.  */
-    if (__glibc_unlikely (pid <= 0))
-      pid = (pid & INT_MAX) == 0 ? selftid : -pid;
+     1. sigsetsize != sizeof (sigset_t) (EINVAL)
+     2. a failure in copy from/to user space (EFAULT)
+     3. an invalid 'how' operation (EINVAL)
 
-  return INLINE_SYSCALL (tgkill, 3, pid, selftid, sig);
+     The first case is already handle in glibc syscall call by using the arch
+     defined _NSIG.  Second case is handled by using a stack allocated mask.
+     The last one should be handled by the block/unblock functions.  */
+
+  sigset_t set;
+  __libc_signal_block_app (&set);
+
+  INTERNAL_SYSCALL_DECL (err);
+  pid_t pid = INTERNAL_SYSCALL (getpid, err, 0);
+  pid_t tid = INTERNAL_SYSCALL (gettid, err, 0);
+
+  int ret = INLINE_SYSCALL (tgkill, 3, pid, tid, sig);
+
+  __libc_signal_restore_set (&set);
+
+  return ret;
 }
 libc_hidden_def (raise)
 weak_alias (raise, gsignal)

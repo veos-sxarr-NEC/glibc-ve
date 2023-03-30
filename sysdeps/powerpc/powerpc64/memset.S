@@ -1,5 +1,5 @@
 /* Optimized memset implementation for PowerPC64.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,24 +14,29 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <rtld-global-offsets.h>
 
 	.section	".toc","aw"
-.LC0:
-	.tc __cache_line_size[TC],__cache_line_size
+__GLRO_DEF(dl_cache_line_size)
+
 	.section	".text"
 	.align 2
 
-/* __ptr_t [r3] memset (__ptr_t s [r3], int c [r4], size_t n [r5]));
+/* void * [r3] memset (void *s [r3], int c [r4], size_t n [r5]));
    Returns 's'.
 
    The memset is done in three sizes: byte (8 bits), word (32 bits),
    cache line (256 bits). There is a special case for setting cache lines
    to 0, to take advantage of the dcbz instruction.  */
 
-EALIGN (memset, 5, 0)
+#ifndef MEMSET
+# define MEMSET memset
+#endif
+
+ENTRY (MEMSET, 5)
 	CALL_MCOUNT 3
 
 #define rTMP	r0
@@ -142,8 +147,10 @@ L(zloopstart):
 /* If the remaining length is less the 32 bytes, don't bother getting
 	 the cache line size.  */
 	beq	L(medium)
-	ld	rCLS,.LC0@toc(r2)
-	lwz	rCLS,0(rCLS)
+	/* Read the cache line size.  */
+	__GLRO (rCLS, dl_cache_line_size,
+		RTLD_GLOBAL_RO_DL_CACHE_LINE_SIZE_OFFSET)
+
 /* If the cache line size was not set just goto to L(nondcbz) which is
 	 safe for any cache line size.  */
 	cmpldi	cr1,rCLS,0
@@ -244,7 +251,7 @@ L(medium_27f):
 L(medium_28t):
 	std	rCHR, -8(rMEMP)
 	blr
-END_GEN_TB (memset,TB_TOCLESS)
+END_GEN_TB (MEMSET,TB_TOCLESS)
 libc_hidden_builtin_def (memset)
 
 #ifndef NO_BZERO_IMPL

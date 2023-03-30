@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+#ifndef _BITS_SIGACTION_H
+#define _BITS_SIGACTION_H 1
 
 #ifndef _SIGNAL_H
 # error "Never include <bits/sigaction.h> directly; use <signal.h> instead."
@@ -29,7 +32,7 @@
 struct sigaction
   {
     /* Signal handler.  */
-#ifdef __USE_POSIX199309
+#if defined __USE_POSIX199309 || defined __USE_XOPEN_EXTENDED
     union
       {
 	/* Used if SA_SIGINFO is not set.  */
@@ -52,10 +55,10 @@ struct sigaction
   };
 
 /* Bits in `sa_flags'.  */
-#if defined __USE_UNIX98 || defined __USE_MISC
+#if defined __USE_XOPEN_EXTENDED || defined __USE_MISC
 # define SA_ONSTACK	0x0001	/* Take signal on signal stack.  */
 #endif
-#if defined __USE_UNIX98 || defined __USE_XOPEN2K8
+#if defined __USE_XOPEN_EXTENDED || defined __USE_XOPEN2K8
 # define SA_RESTART	0x0002	/* Restart syscall on signal return.  */
 # define SA_NODEFER	0x0010	/* Don't automatically block the signal when
 				    its handler is being executed.  */
@@ -77,3 +80,5 @@ struct sigaction
 #define	SIG_BLOCK	1	/* Block signals.  */
 #define	SIG_UNBLOCK	2	/* Unblock signals.  */
 #define	SIG_SETMASK	3	/* Set the set of blocked signals.  */
+
+#endif

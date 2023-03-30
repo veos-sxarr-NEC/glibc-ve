@@ -20,14 +20,15 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
-static const long double one = 1.0, Zero[] = {0.0, -0.0,};
+static const _Float128 one = 1.0, Zero[] = {0.0, -0.0,};
 
-long double
-__ieee754_fmodl (long double x, long double y)
+_Float128
+__ieee754_fmodl (_Float128 x, _Float128 y)
 {
 	int64_t n,hx,hy,hz,ix,iy,sx,i;
-	u_int64_t lx,ly,lz;
+	uint64_t lx,ly,lz;
 
 	GET_LDOUBLE_WORDS64(hx,lx,x);
 	GET_LDOUBLE_WORDS64(hy,ly,y);
@@ -42,7 +43,7 @@ __ieee754_fmodl (long double x, long double y)
 	if(hx<=hy) {
 	    if((hx<hy)||(lx<ly)) return x;	/* |x|<|y| return x */
 	    if(lx==ly)
-		return Zero[(u_int64_t)sx>>63];	/* |x|=|y| return x*0*/
+		return Zero[(uint64_t)sx>>63];	/* |x|=|y| return x*0*/
 	}
 
     /* determine ix = ilogb(x) */
@@ -96,7 +97,7 @@ __ieee754_fmodl (long double x, long double y)
 	    if(hz<0){hx = hx+hx+(lx>>63); lx = lx+lx;}
 	    else {
 		if((hz|lz)==0)		/* return sign(x)*0 */
-		    return Zero[(u_int64_t)sx>>63];
+		    return Zero[(uint64_t)sx>>63];
 		hx = hz+hz+(lz>>63); lx = lz+lz;
 	    }
 	}
@@ -105,7 +106,7 @@ __ieee754_fmodl (long double x, long double y)
 
     /* convert back to floating value and restore the sign */
 	if((hx|lx)==0)			/* return sign(x)*0 */
-	    return Zero[(u_int64_t)sx>>63];
+	    return Zero[(uint64_t)sx>>63];
 	while(hx<0x0001000000000000LL) {	/* normalize x */
 	    hx = hx+hx+(lx>>63); lx = lx+lx;
 	    iy -= 1;
@@ -116,7 +117,7 @@ __ieee754_fmodl (long double x, long double y)
 	} else {		/* subnormal output */
 	    n = -16382 - iy;
 	    if(n<=48) {
-		lx = (lx>>n)|((u_int64_t)hx<<(64-n));
+		lx = (lx>>n)|((uint64_t)hx<<(64-n));
 		hx >>= n;
 	    } else if (n<=63) {
 		lx = (hx<<(64-n))|(lx>>n); hx = sx;
@@ -128,4 +129,4 @@ __ieee754_fmodl (long double x, long double y)
 	}
 	return x;		/* exact output */
 }
-strong_alias (__ieee754_fmodl, __fmodl_finite)
+libm_alias_finite (__ieee754_fmodl, __fmodl)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Denis Joseph Barrow <djbarrow@de.ibm.com>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _FENV_H
 # error "Never use <bits/fenv.h> directly; include <fenv.h> instead."
@@ -77,8 +77,10 @@ typedef unsigned int fexcept_t; /* size of fpc */
 typedef struct
 {
   fexcept_t __fpc;
-  void *__ieee_instruction_pointer;
-  /* failing instruction for ieee exceptions */
+  void *__unused;
+  /* The field __unused (formerly __ieee_instruction_pointer) is a relict from
+     commit "Remove PTRACE_PEEKUSER" (87b9b50f0d4b92248905e95a06a13c513dc45e59)
+     and isn´t used anymore.  */
 } fenv_t;
 
 /* If the default argument is used we use this value.  */
@@ -87,4 +89,12 @@ typedef struct
 #ifdef __USE_GNU
 /* Floating-point environment where none of the exceptions are masked.  */
 # define FE_NOMASK_ENV	((const fenv_t *) -2)
+#endif
+
+#if __GLIBC_USE (IEC_60559_BFP_EXT_C2X)
+/* Type representing floating-point control modes.  */
+typedef unsigned int femode_t;
+
+/* Default floating-point control modes.  */
+# define FE_DFL_MODE	((const femode_t *) -1L)
 #endif

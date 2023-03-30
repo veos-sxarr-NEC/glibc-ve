@@ -1,6 +1,6 @@
-#! /bin/sh
+#!/bin/sh
 # Test of gettext functions.
-# Copyright (C) 2000-2015 Free Software Foundation, Inc.
+# Copyright (C) 2000-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 set -e
 
@@ -42,9 +42,9 @@ mkdir -p ${objpfx}domaindir/existing-locale/LC_MESSAGES
 mkdir -p ${objpfx}domaindir/existing-locale/LC_TIME
 # Populate them.
 msgfmt -o ${objpfx}domaindir/existing-locale/LC_MESSAGES/existing-domain.mo \
-       -f ../po/de.po
+       -f ${objpfx}tst-gettext-de.po
 msgfmt -o ${objpfx}domaindir/existing-locale/LC_TIME/existing-time-domain.mo \
-       -f ../po/de.po
+       -f ${objpfx}tst-gettext-de.po
 
 # Now run the test.
 ${test_program_prefix_before_env} \

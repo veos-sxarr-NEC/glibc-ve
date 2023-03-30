@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,23 +13,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
-#define __need_NULL
-#include <stddef.h>
+#include <sigsetops.h>
 
 /* Test whether SET is empty.  */
 int
-sigisemptyset (set)
-     const sigset_t *set;
+sigisemptyset (const sigset_t *set)
 {
-  if (set == NULL)
+  if (!set)
     {
       __set_errno (EINVAL);
       return -1;
     }
 
-    return __sigisemptyset (set);
+  return __sigisemptyset (set);
 }

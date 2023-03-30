@@ -1,5 +1,5 @@
 /* Optimized strcmp implementation for Power7 using 'cmpb' instruction
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* The optimization is achieved here through cmpb instruction.
    8byte aligned strings are processed with double word comparision
@@ -23,10 +23,14 @@
 
 #include <sysdep.h>
 
+#ifndef STRCMP
+# define STRCMP strcmp
+#endif
+
 /* int [r3] strcmp (const char *s1 [r3], const char *s2 [r4])  */
 
 	.machine	power7
-EALIGN (strcmp, 4, 0)
+ENTRY_TOCLESS (STRCMP, 4)
 	CALL_MCOUNT 2
 
 	or r9, r3, r4
@@ -160,5 +164,5 @@ L(diffOfNULL):
 	extsw r3, r10		/* sign extend result  */
 	blr			/* return  */
 
-END (strcmp)
+END (STRCMP)
 libc_hidden_builtin_def (strcmp)

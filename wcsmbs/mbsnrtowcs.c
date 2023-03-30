@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <dlfcn.h>
@@ -38,12 +38,8 @@ static mbstate_t state;
    implementation of stdio because we have to deal with unterminated
    buffers.  At most NMC bytes will be converted.  */
 size_t
-__mbsnrtowcs (dst, src, nmc, len, ps)
-     wchar_t *dst;
-     const char **src;
-     size_t nmc;
-     size_t len;
-     mbstate_t *ps;
+__mbsnrtowcs (wchar_t *dst, const char **src, size_t nmc, size_t len,
+	      mbstate_t *ps)
 {
   const unsigned char *srcend;
   struct __gconv_step_data data;

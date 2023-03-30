@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <limits.h>
@@ -23,55 +23,27 @@
 #define MAX_SEC	(INT_MAX / 1000000L - 2)
 #define MIN_SEC	(INT_MIN / 1000000L + 2)
 
-#ifndef MOD_OFFSET
-#define modes mode
-#endif
-
-#ifndef TIMEVAL
-#define TIMEVAL timeval
-#endif
-
-#ifndef TIMEX
-#define TIMEX timex
-#endif
-
-#ifndef ADJTIME
-#define ADJTIME __adjtime
-#endif
-
-#ifndef ADJTIMEX
-#define NO_LOCAL_ADJTIME
-#define ADJTIMEX(x) __adjtimex (x)
-#endif
-
-#ifndef LINKAGE
-#define LINKAGE
-#endif
-
-LINKAGE int
-ADJTIME (const struct TIMEVAL *itv, struct TIMEVAL *otv)
+int
+__adjtime (const struct timeval *itv, struct timeval *otv)
 {
-  struct TIMEX tntx;
+  struct timex tntx;
 
   if (itv)
     {
-      struct TIMEVAL tmp;
+      struct timeval tmp;
 
       /* We will do some check here. */
       tmp.tv_sec = itv->tv_sec + itv->tv_usec / 1000000L;
       tmp.tv_usec = itv->tv_usec % 1000000L;
       if (tmp.tv_sec > MAX_SEC || tmp.tv_sec < MIN_SEC)
-	{
-	  __set_errno (EINVAL);
-	  return -1;
-	}
+	return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
       tntx.offset = tmp.tv_usec + tmp.tv_sec * 1000000L;
       tntx.modes = ADJ_OFFSET_SINGLESHOT;
     }
   else
     tntx.modes = ADJ_OFFSET_SS_READ;
 
-  if (__glibc_unlikely (ADJTIMEX (&tntx) < 0))
+  if (__glibc_unlikely (__adjtimex (&tntx) < 0))
     return -1;
 
   if (otv)
@@ -90,6 +62,9 @@ ADJTIME (const struct TIMEVAL *itv, struct TIMEVAL *otv)
   return 0;
 }
 
-#ifdef NO_LOCAL_ADJTIME
+#ifdef VERSION_adjtime
+weak_alias (__adjtime, __wadjtime);
+default_symbol_version (__wadjtime, adjtime, VERSION_adjtime);
+#else
 weak_alias (__adjtime, adjtime)
 #endif

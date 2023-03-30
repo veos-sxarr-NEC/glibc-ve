@@ -1,5 +1,5 @@
 /* Initialization code for TLS in statically linked application.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,15 +14,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <startup.h>
 #include <errno.h>
 #include <ldsodefs.h>
 #include <tls.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/param.h>
-
+#include <array_length.h>
 
 #ifdef SHARED
  #error makefile bug, this file is for static only
@@ -31,17 +32,11 @@
 dtv_t _dl_static_dtv[2 + TLS_SLOTINFO_SURPLUS];
 
 
-static struct
-{
-  struct dtv_slotinfo_list si;
-  /* The dtv_slotinfo_list data structure does not include the actual
-     information since it is defined as an array of size zero.  We define
-     here the necessary entries.  Note that it is not important whether
-     there is padding or not since we will always access the information
-     through the 'si' element.  */
-  struct dtv_slotinfo info[2 + TLS_SLOTINFO_SURPLUS];
-} static_slotinfo;
-
+static struct dtv_slotinfo_list static_slotinfo =
+  {
+   /* Allocate an array of 2 + TLS_SLOTINFO_SURPLUS elements.  */
+   .slotinfo =  { [array_length (_dl_static_dtv) - 1] = { 0 } },
+  };
 
 /* Highest dtv index currently needed.  */
 size_t _dl_tls_max_dtv_idx;
@@ -71,16 +66,16 @@ TLS_INIT_HELPER
 static void
 init_slotinfo (void)
 {
-  /* Create the slotinfo list.  */
-  static_slotinfo.si.len = (((char *) (&static_slotinfo + 1)
-			     - (char *) &static_slotinfo.si.slotinfo[0])
-			    / sizeof static_slotinfo.si.slotinfo[0]);
-  // static_slotinfo.si.next = NULL;	already zero
+  /* Create the slotinfo list.  Note that the type of static_slotinfo
+     has effectively a zero-length array, so we cannot use the size of
+     static_slotinfo to determine the array length.  */
+  static_slotinfo.len = array_length (_dl_static_dtv);
+  /* static_slotinfo.next = NULL; -- Already zero.  */
 
   /* The slotinfo list.  Will be extended by the code doing dynamic
      linking.  */
   GL(dl_tls_max_dtv_idx) = 1;
-  GL(dl_tls_dtv_slotinfo_list) = &static_slotinfo.si;
+  GL(dl_tls_dtv_slotinfo_list) = &static_slotinfo;
 }
 
 static void
@@ -102,16 +97,18 @@ init_static_tls (size_t memsz, size_t align)
 }
 
 void
-__libc_setup_tls (size_t tcbsize, size_t tcbalign)
+__libc_setup_tls (void)
 {
   void *tlsblock;
   size_t memsz = 0;
   size_t filesz = 0;
   void *initimage = NULL;
   size_t align = 0;
-  size_t max_align = tcbalign;
+  size_t max_align = TCB_ALIGNMENT;
   size_t tcb_offset;
   const ElfW(Phdr) *phdr;
+
+  struct link_map *main_map = GL(dl_ns)[LM_ID_BASE]._ns_loaded;
 
   /* Look through the TLS segment if there is any.  */
   if (_dl_phdr != NULL)
@@ -121,7 +118,7 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
 	  /* Remember the values we need.  */
 	  memsz = phdr->p_memsz;
 	  filesz = phdr->p_filesz;
-	  initimage = (void *) phdr->p_vaddr;
+	  initimage = (void *) phdr->p_vaddr + main_map->l_addr;
 	  align = phdr->p_align;
 	  if (phdr->p_align > max_align)
 	    max_align = phdr->p_align;
@@ -138,10 +135,13 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
      to request some surplus that permits dynamic loading of modules with
      IE-model TLS.  */
 #if TLS_TCB_AT_TP
-  tcb_offset = roundup (memsz + GL(dl_tls_static_size), tcbalign);
-  tlsblock = __sbrk (tcb_offset + tcbsize + max_align);
+  /* Align the TCB offset to the maximum alignment, as
+     _dl_allocate_tls_storage (in elf/dl-tls.c) does using __libc_memalign
+     and dl_tls_static_align.  */
+  tcb_offset = roundup (memsz + GL(dl_tls_static_size), max_align);
+  tlsblock = __sbrk (tcb_offset + TLS_INIT_TCB_SIZE + max_align);
 #elif TLS_DTV_AT_TP
-  tcb_offset = roundup (tcbsize, align ?: 1);
+  tcb_offset = roundup (TLS_INIT_TCB_SIZE, align ?: 1);
   tlsblock = __sbrk (tcb_offset + memsz + max_align
 		     + TLS_PRE_TCB_SIZE + GL(dl_tls_static_size));
   tlsblock += TLS_PRE_TCB_SIZE;
@@ -159,8 +159,6 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
   _dl_static_dtv[0].counter = (sizeof (_dl_static_dtv) / sizeof (_dl_static_dtv[0])) - 2;
   // _dl_static_dtv[1].counter = 0;		would be needed if not already done
 
-  struct link_map *main_map = GL(dl_ns)[LM_ID_BASE]._ns_loaded;
-
   /* Initialize the TLS block.  */
 #if TLS_TCB_AT_TP
   _dl_static_dtv[2].pointer.val = ((char *) tlsblock + tcb_offset
@@ -172,7 +170,7 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
 #else
 # error "Either TLS_TCB_AT_TP or TLS_DTV_AT_TP must be defined"
 #endif
-  _dl_static_dtv[2].pointer.is_static = true;
+  _dl_static_dtv[2].pointer.to_free = NULL;
   /* sbrk gives us zero'd memory, so we don't need to clear the remainder.  */
   memcpy (_dl_static_dtv[2].pointer.val, initimage, filesz);
 
@@ -190,7 +188,7 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
 # error "Either TLS_TCB_AT_TP or TLS_DTV_AT_TP must be defined"
 #endif
   if (__builtin_expect (lossage != NULL, 0))
-    __libc_fatal (lossage);
+    _startup_fatal (lossage);
 
   /* Update the executable's link map with enough information to make
      the TLS routines happy.  */
@@ -201,8 +199,8 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
   main_map->l_tls_modid = 1;
 
   init_slotinfo ();
-  // static_slotinfo.si.slotinfo[1].gen = 0; already zero
-  static_slotinfo.si.slotinfo[1].map = main_map;
+  /* static_slotinfo.slotinfo[1].gen = 0; -- Already zero.  */
+  static_slotinfo.slotinfo[1].map = main_map;
 
   memsz = roundup (memsz, align ?: 1);
 
@@ -211,32 +209,4 @@ __libc_setup_tls (size_t tcbsize, size_t tcbalign)
 #endif
 
   init_static_tls (memsz, MAX (TLS_TCB_ALIGN, max_align));
-}
-
-/* This is called only when the data structure setup was skipped at startup,
-   when there was no need for it then.  Now we have dynamically loaded
-   something needing TLS, or libpthread needs it.  */
-int
-internal_function
-_dl_tls_setup (void)
-{
-  init_slotinfo ();
-  init_static_tls (
-#if TLS_TCB_AT_TP
-		   TLS_TCB_SIZE,
-#else
-		   0,
-#endif
-		   TLS_TCB_ALIGN);
-  return 0;
-}
-
-
-/* This is the minimal initialization function used when libpthread is
-   not used.  */
-void
-__attribute__ ((weak))
-__pthread_initialize_minimal (void)
-{
-  __libc_setup_tls (TLS_INIT_TCB_SIZE, TLS_INIT_TCB_ALIGN);
 }

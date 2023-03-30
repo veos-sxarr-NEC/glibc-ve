@@ -1,5 +1,5 @@
 /* Test backtrace and backtrace_symbols for signal frames.
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <execinfo.h>
 #include <search.h>
@@ -26,10 +26,6 @@
 #include <unistd.h>
 
 #include "tst-backtrace.h"
-
-static int do_test (void);
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
 
 /* The backtrace should include at least handle_signal, a signal
    trampoline, 3 * fn, and do_test.  */
@@ -49,9 +45,9 @@ handle_signal (int signum)
 
   /* Get the backtrace addresses.  */
   n = backtrace (addresses, sizeof (addresses) / sizeof (addresses[0]));
-  printf ("Obtained backtrace with %d functions (but wanted at least %d)\n",
+  printf ("Obtained backtrace with %d functions (want at least %d)\n",
 	  n, NUM_FUNCTIONS);
-  /* Check that there are at least six functions.  */
+  /* Check that there are at least NUM_FUNCTIONS functions.  */
   if (n < NUM_FUNCTIONS)
     {
       FAIL ();
@@ -115,9 +111,11 @@ fn (int c)
   return 0;
 }
 
-NO_INLINE static int
+NO_INLINE int
 do_test (void)
 {
   fn (2);
   return ret;
 }
+
+#include <support/test-driver.c>

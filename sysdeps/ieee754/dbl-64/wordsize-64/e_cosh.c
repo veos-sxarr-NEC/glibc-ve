@@ -33,6 +33,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const double one = 1.0, half=0.5, huge = 1.0e300;
 
@@ -50,9 +51,10 @@ __ieee754_cosh (double x)
 	if (ix < 0x40360000) {
 	    /* |x| in [0,0.5*ln2], return 1+expm1(|x|)^2/(2*exp(|x|)) */
 		if(ix<0x3fd62e43) {
+		    if (ix<0x3c800000)			/* cosh(tiny) = 1 */
+		      return one;
 		    t = __expm1(fabs(x));
 		    w = one+t;
-		    if (ix<0x3c800000) return w;	/* cosh(tiny) = 1 */
 		    return one+(t*t)/(w+w);
 		}
 
@@ -80,4 +82,4 @@ __ieee754_cosh (double x)
     /* |x| > overflowthresold, cosh(x) overflow */
 	return huge*huge;
 }
-strong_alias (__ieee754_cosh, __cosh_finite)
+libm_alias_finite (__ieee754_cosh, __cosh)

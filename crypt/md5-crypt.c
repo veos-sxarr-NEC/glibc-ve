@@ -1,6 +1,6 @@
 /* One way encryption based on MD5 sum.
    Compatible with the behavior of MD5 crypt introduced in FreeBSD 2.0.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -89,11 +89,7 @@ extern char *__md5_crypt (const char *key, const char *salt);
 /* This entry point is equivalent to the `crypt' function in Unix
    libcs.  */
 char *
-__md5_crypt_r (key, salt, buffer, buflen)
-     const char *key;
-     const char *salt;
-     char *buffer;
-     int buflen;
+__md5_crypt_r (const char *key, const char *salt, char *buffer, int buflen)
 {
   unsigned char alt_result[16]
     __attribute__ ((__aligned__ (__alignof__ (md5_uint32))));
@@ -292,13 +288,13 @@ __md5_crypt_r (key, salt, buffer, buflen)
 #ifndef USE_NSS
   __md5_init_ctx (&ctx);
   __md5_finish_ctx (&ctx, alt_result);
-  memset (&ctx, '\0', sizeof (ctx));
-  memset (&alt_ctx, '\0', sizeof (alt_ctx));
+  explicit_bzero (&ctx, sizeof (ctx));
+  explicit_bzero (&alt_ctx, sizeof (alt_ctx));
 #endif
   if (copied_key != NULL)
-    memset (copied_key, '\0', key_len);
+    explicit_bzero (copied_key, key_len);
   if (copied_salt != NULL)
-    memset (copied_salt, '\0', salt_len);
+    explicit_bzero (copied_salt, salt_len);
 
   free (free_key);
   return buffer;

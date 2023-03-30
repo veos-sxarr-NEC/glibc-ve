@@ -25,14 +25,14 @@ static char rcsid[] = "$NetBSD: $";
 #include <math.h>
 #include <math_private.h>
 
-int __isnanl(long double x)
+int __isnanl(_Float128 x)
 {
 	int64_t hx,lx;
 	GET_LDOUBLE_WORDS64(hx,lx,x);
 	hx &= 0x7fffffffffffffffLL;
-	hx |= (u_int64_t)(lx|(-lx))>>63;
+	hx |= (uint64_t)(lx|(-lx))>>63;
 	hx = 0x7fff000000000000LL - hx;
-	return (int)((u_int64_t)hx>>63);
+	return (int)((uint64_t)hx>>63);
 }
-hidden_def (__isnanl)
+mathx_hidden_def (__isnanl)
 weak_alias (__isnanl, isnanl)

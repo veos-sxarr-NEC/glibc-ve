@@ -1,6 +1,6 @@
 /* Machine-dependent ELF dynamic relocation inline functions.
    PowerPC64 version.
-   Copyright 1995-2015 Free Software Foundation, Inc.
+   Copyright 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Library General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h
@@ -26,6 +26,8 @@
 #include <sys/param.h>
 #include <dl-tls.h>
 #include <sysdep.h>
+#include <hwcapinfo.h>
+#include <cpu-features.c>
 
 /* Translate a processor specific dynamic tag to the index
    in l_info array.  */
@@ -245,7 +247,7 @@ BODY_PREFIX "_dl_start_user:\n"						\
 "	" END_2(_dl_start_user) "\n"					\
 "	.popsection");
 
-/* ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to
+/* ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve to
    one of the main executable's symbols, as for a COPY reloc.
 
    To make function pointer comparisons work on most targets, the
@@ -295,6 +297,20 @@ BODY_PREFIX "_dl_start_user:\n"						\
 /* The PowerPC never uses REL relocations.  */
 #define ELF_MACHINE_NO_REL 1
 #define ELF_MACHINE_NO_RELA 0
+
+/* We define an initialization function to initialize HWCAP/HWCAP2 and
+   platform data so it can be copied into the TCB later.  This is called
+   very early in _dl_sysdep_start for dynamically linked binaries.  */
+#if defined(SHARED) && IS_IN (rtld)
+# define DL_PLATFORM_INIT dl_platform_init ()
+
+static inline void __attribute__ ((unused))
+dl_platform_init (void)
+{
+  __tcb_parse_hwcap_and_convert_at_platform ();
+  init_cpu_features (&GLRO(dl_powerpc_cpu_features));
+}
+#endif
 
 /* Stuff for the PLT.  */
 #if _CALL_ELF != 2
@@ -426,20 +442,30 @@ elf_machine_runtime_setup (struct link_map *map, int lazy, int profile)
 }
 
 #if _CALL_ELF == 2
-/* If the PLT entry whose reloc is 'reloc' resolves to a function in
-   the same object, return the target function's local entry point
-   offset if usable.  */
+extern void attribute_hidden _dl_error_localentry (struct link_map *map,
+						   const Elf64_Sym *refsym);
+
+/* If the PLT entry resolves to a function in the same object, return
+   the target function's local entry point offset if usable.  */
 static inline Elf64_Addr __attribute__ ((always_inline))
 ppc64_local_entry_offset (struct link_map *map, lookup_t sym_map,
-			  const Elf64_Rela *reloc)
+			  const ElfW(Sym) *refsym, const ElfW(Sym) *sym)
 {
-  const Elf64_Sym *symtab;
-  const Elf64_Sym *sym;
-
   /* If the target function is in a different object, we cannot
      use the local entry point.  */
   if (sym_map != map)
-    return 0;
+    {
+      /* Check that optimized plt call stubs for localentry:0 functions
+	 are not being satisfied by a non-zero localentry symbol.  */
+      if (map->l_info[DT_PPC64(OPT)]
+	  && (map->l_info[DT_PPC64(OPT)]->d_un.d_val & PPC64_OPT_LOCALENTRY) != 0
+	  && refsym->st_info == ELFW(ST_INFO) (STB_GLOBAL, STT_FUNC)
+	  && (STO_PPC64_LOCAL_MASK & refsym->st_other) == 0
+	  && (STO_PPC64_LOCAL_MASK & sym->st_other) != 0)
+	_dl_error_localentry (map, refsym);
+
+      return 0;
+    }
 
   /* If the linker inserted multiple TOCs, we cannot use the
      local entry point.  */
@@ -447,16 +473,13 @@ ppc64_local_entry_offset (struct link_map *map, lookup_t sym_map,
       && (map->l_info[DT_PPC64(OPT)]->d_un.d_val & PPC64_OPT_MULTI_TOC))
     return 0;
 
-  /* Otherwise, we can use the local entry point.  Retrieve its offset
-     from the symbol's ELF st_other field.  */
-  symtab = (const void *) D_PTR (map, l_info[DT_SYMTAB]);
-  sym = &symtab[ELFW(R_SYM) (reloc->r_info)];
-
   /* If the target function is an ifunc then the local entry offset is
      for the resolver, not the final destination.  */
   if (__builtin_expect (ELFW(ST_TYPE) (sym->st_info) == STT_GNU_IFUNC, 0))
     return 0;
 
+  /* Otherwise, we can use the local entry point.  Retrieve its offset
+     from the symbol's ELF st_other field.  */
   return PPC64_LOCAL_ENTRY_OFFSET (sym->st_other);
 }
 #endif
@@ -465,6 +488,7 @@ ppc64_local_entry_offset (struct link_map *map, lookup_t sym_map,
    routine.  */
 static inline Elf64_Addr __attribute__ ((always_inline))
 elf_machine_fixup_plt (struct link_map *map, lookup_t sym_map,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf64_Rela *reloc,
 		       Elf64_Addr *reloc_addr, Elf64_Addr finaladdr)
 {
@@ -472,19 +496,32 @@ elf_machine_fixup_plt (struct link_map *map, lookup_t sym_map,
   Elf64_FuncDesc *plt = (Elf64_FuncDesc *) reloc_addr;
   Elf64_FuncDesc *rel = (Elf64_FuncDesc *) finaladdr;
   Elf64_Addr offset = 0;
+  Elf64_FuncDesc zero_fd = {0, 0, 0};
 
   PPC_DCBT (&plt->fd_aux);
   PPC_DCBT (&plt->fd_func);
-  PPC_DCBT (&rel->fd_aux);
-  PPC_DCBT (&rel->fd_func);
 
-  /* If sym_map is NULL, it's a weak undefined sym;  Leave the plt zero.  */
+  /* If sym_map is NULL, it's a weak undefined sym;  Set the plt to
+     zero.  finaladdr should be zero already in this case, but guard
+     against invalid plt relocations with non-zero addends.  */
   if (sym_map == NULL)
-    return 0;
+    finaladdr = 0;
+
+  /* Don't die here if finaladdr is zero, die if this plt entry is
+     actually called.  Makes a difference when LD_BIND_NOW=1.
+     finaladdr may be zero for a weak undefined symbol, or when an
+     ifunc resolver returns zero.  */
+  if (finaladdr == 0)
+    rel = &zero_fd;
+  else
+    {
+      PPC_DCBT (&rel->fd_aux);
+      PPC_DCBT (&rel->fd_func);
+    }
 
   /* If the opd entry is not yet relocated (because it's from a shared
      object that hasn't been processed yet), then manually reloc it.  */
-  if (map != sym_map && !sym_map->l_relocated
+  if (finaladdr != 0 && map != sym_map && !sym_map->l_relocated
 #if !defined RTLD_BOOTSTRAP && defined SHARED
       /* Bootstrap map doesn't have l_relocated set for it.  */
       && sym_map != &GL(dl_rtld_map)
@@ -507,7 +544,7 @@ elf_machine_fixup_plt (struct link_map *map, lookup_t sym_map,
   PPC_DCBST (&plt->fd_func);
   PPC_ISYNC;
 #else
-  finaladdr += ppc64_local_entry_offset (map, sym_map, reloc);
+  finaladdr += ppc64_local_entry_offset (map, sym_map, refsym, sym);
   *reloc_addr = finaladdr;
 #endif
 
@@ -516,12 +553,20 @@ elf_machine_fixup_plt (struct link_map *map, lookup_t sym_map,
 
 static inline void __attribute__ ((always_inline))
 elf_machine_plt_conflict (struct link_map *map, lookup_t sym_map,
+			  const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 			  const Elf64_Rela *reloc,
 			  Elf64_Addr *reloc_addr, Elf64_Addr finaladdr)
 {
 #if _CALL_ELF != 2
   Elf64_FuncDesc *plt = (Elf64_FuncDesc *) reloc_addr;
   Elf64_FuncDesc *rel = (Elf64_FuncDesc *) finaladdr;
+  Elf64_FuncDesc zero_fd = {0, 0, 0};
+
+  if (sym_map == NULL)
+    finaladdr = 0;
+
+  if (finaladdr == 0)
+    rel = &zero_fd;
 
   plt->fd_func = rel->fd_func;
   plt->fd_aux = rel->fd_aux;
@@ -531,7 +576,7 @@ elf_machine_plt_conflict (struct link_map *map, lookup_t sym_map,
   PPC_DCBST (&plt->fd_toc);
   PPC_SYNC;
 #else
-  finaladdr += ppc64_local_entry_offset (map, sym_map, reloc);
+  finaladdr += ppc64_local_entry_offset (map, sym_map, refsym, sym);
   *reloc_addr = finaladdr;
 #endif
 }
@@ -570,11 +615,10 @@ elf_machine_plt_value (struct link_map *map, const Elf64_Rela *reloc,
 
 #define dont_expect(X) __builtin_expect ((X), 0)
 
-extern void _dl_reloc_overflow (struct link_map *map,
-				const char *name,
-				Elf64_Addr *const reloc_addr,
-				const Elf64_Sym *refsym)
-				attribute_hidden;
+extern void attribute_hidden _dl_reloc_overflow (struct link_map *map,
+						 const char *name,
+						 Elf64_Addr *const reloc_addr,
+						 const Elf64_Sym *refsym);
 
 auto inline void __attribute__ ((always_inline))
 elf_machine_rela_relative (Elf64_Addr l_addr, const Elf64_Rela *reloc,
@@ -664,8 +708,7 @@ elf_machine_rela (struct link_map *map,
   /* We need SYM_MAP even in the absence of TLS, for elf_machine_fixup_plt
      and STT_GNU_IFUNC.  */
   struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-  Elf64_Addr value = ((sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value)
-		      + reloc->r_addend);
+  Elf64_Addr value = SYMBOL_ADDRESS (sym_map, sym, true) + reloc->r_addend;
 
   if (sym != NULL
       && __builtin_expect (ELFW(ST_TYPE) (sym->st_info) == STT_GNU_IFUNC, 0)
@@ -694,13 +737,41 @@ elf_machine_rela (struct link_map *map,
       /* Fall thru */
     case R_PPC64_JMP_SLOT:
 #ifdef RESOLVE_CONFLICT_FIND_MAP
-      elf_machine_plt_conflict (map, sym_map, reloc, reloc_addr, value);
+      elf_machine_plt_conflict (map, sym_map, refsym, sym,
+				reloc, reloc_addr, value);
 #else
-      elf_machine_fixup_plt (map, sym_map, reloc, reloc_addr, value);
+      elf_machine_fixup_plt (map, sym_map, refsym, sym,
+			     reloc, reloc_addr, value);
 #endif
       return;
 
     case R_PPC64_DTPMOD64:
+      if (map->l_info[DT_PPC64(OPT)]
+	  && (map->l_info[DT_PPC64(OPT)]->d_un.d_val & PPC64_OPT_TLS))
+	{
+#ifdef RTLD_BOOTSTRAP
+	  reloc_addr[0] = 0;
+	  reloc_addr[1] = (sym_map->l_tls_offset - TLS_TP_OFFSET
+			   + TLS_DTV_OFFSET);
+	  return;
+#else
+	  if (sym_map != NULL)
+	    {
+# ifndef SHARED
+	      CHECK_STATIC_TLS (map, sym_map);
+# else
+	      if (TRY_STATIC_TLS (map, sym_map))
+# endif
+		{
+		  reloc_addr[0] = 0;
+		  /* Set up for local dynamic.  */
+		  reloc_addr[1] = (sym_map->l_tls_offset - TLS_TP_OFFSET
+				   + TLS_DTV_OFFSET);
+		  return;
+		}
+	    }
+#endif
+	}
 #ifdef RTLD_BOOTSTRAP
       /* During startup the dynamic linker is always index 1.  */
       *reloc_addr = 1;
@@ -713,6 +784,28 @@ elf_machine_rela (struct link_map *map,
       return;
 
     case R_PPC64_DTPREL64:
+      if (map->l_info[DT_PPC64(OPT)]
+	  && (map->l_info[DT_PPC64(OPT)]->d_un.d_val & PPC64_OPT_TLS))
+	{
+#ifdef RTLD_BOOTSTRAP
+	  *reloc_addr = TLS_TPREL_VALUE (sym_map, sym, reloc);
+	  return;
+#else
+	  if (sym_map != NULL)
+	    {
+	      /* This reloc is always preceded by R_PPC64_DTPMOD64.  */
+# ifndef SHARED
+	      assert (HAVE_STATIC_TLS (map, sym_map));
+# else
+	      if (HAVE_STATIC_TLS (map, sym_map))
+#  endif
+		{
+		  *reloc_addr = TLS_TPREL_VALUE (sym_map, sym, reloc);
+		  return;
+		}
+	    }
+#endif
+	}
       /* During relocation all TLS symbols are defined and used.
 	 Therefore the offset is already correct.  */
 #ifndef RTLD_BOOTSTRAP
@@ -809,6 +902,7 @@ elf_machine_rela (struct link_map *map,
     case R_PPC64_ADDR16_HI:
       if (dont_expect (value + 0x80000000 >= 0x100000000LL))
 	_dl_reloc_overflow (map, "R_PPC64_ADDR16_HI", reloc_addr, refsym);
+      /* Fall through.  */
     case R_PPC64_ADDR16_HIGH:
       *(Elf64_Half *) reloc_addr = PPC_HI (value);
       break;
@@ -816,6 +910,7 @@ elf_machine_rela (struct link_map *map,
     case R_PPC64_ADDR16_HA:
       if (dont_expect (value + 0x80008000 >= 0x100000000LL))
 	_dl_reloc_overflow (map, "R_PPC64_ADDR16_HA", reloc_addr, refsym);
+      /* Fall through.  */
     case R_PPC64_ADDR16_HIGHA:
       *(Elf64_Half *) reloc_addr = PPC_HA (value);
       break;

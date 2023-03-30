@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,16 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "pthreadP.h"
 
 
 int
-__pthread_equal (thread1, thread2)
-     pthread_t thread1;
-     pthread_t thread2;
+__pthread_equal (pthread_t thread1, pthread_t thread2)
 {
   return thread1 == thread2;
 }
-strong_alias (__pthread_equal, pthread_equal)
+weak_alias (__pthread_equal, pthread_equal)

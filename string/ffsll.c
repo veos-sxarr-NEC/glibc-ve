@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Torbjorn Granlund (tege@sics.se).
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <limits.h>
 #define ffsl __something_else
@@ -24,8 +24,7 @@
 
 /* Find the first bit set in I.  */
 int
-ffsll (i)
-     long long int i;
+ffsll (long long int i)
 {
   unsigned long long int x = i & -i;
 

@@ -1,5 +1,5 @@
 /* Internal function for converting integers to ASCII.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _ITOA_H
 #define _ITOA_H
@@ -42,18 +42,19 @@
    Use upper case letters iff UPPER_CASE is nonzero.  */
 
 extern char *_itoa (unsigned long long int value, char *buflim,
-		    unsigned int base, int upper_case);
+		    unsigned int base, int upper_case) attribute_hidden;
 
 extern const char _itoa_upper_digits[];
 extern const char _itoa_lower_digits[];
-#if IS_IN (libc) || IS_IN (rtld)
+#if IS_IN (libc) || (IS_IN (rtld) && !defined NO_RTLD_HIDDEN)
 hidden_proto (_itoa_upper_digits)
 hidden_proto (_itoa_lower_digits)
 #endif
 
 #if IS_IN (libc)
 extern char *_itoa_word (_ITOA_WORD_TYPE value, char *buflim,
-			 unsigned int base, int upper_case);
+			 unsigned int base,
+			 int upper_case) attribute_hidden;
 #else
 static inline char * __attribute__ ((unused, always_inline))
 _itoa_word (_ITOA_WORD_TYPE value, char *buflim,

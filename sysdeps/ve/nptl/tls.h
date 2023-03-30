@@ -1,5 +1,5 @@
-/* Definition for thread-local data handling.  NPTL/Alpha version.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Definition for thread-local data handling.  NPTL/VE version.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 /* TODO_PORT_HCLT:
  * 1. TBD: uintptr_t stack_guard; and uintptr_t pointer_guard; position
@@ -31,21 +31,12 @@
 #define _TLS_H	1
 
 # include <dl-sysdep.h>
+
 #ifndef __ASSEMBLER__
 # include <stdbool.h>
 # include <stddef.h>
 # include <stdint.h>
-
-/* Type for the dtv.  */
-typedef union dtv
-{
-  size_t counter;
-  struct
-  {
-    void *val;
-    bool is_static;
-  } pointer;
-} dtv_t;
+# include <dl-dtv.h>
 
 ///* Get system call information.  */
 //# include <sysdep.h>
@@ -59,12 +50,12 @@ typedef union dtv
 
 typedef struct
 {
-	dtv_t *dtv;
-	uintptr_t pointer_guard;
-	uintptr_t stack_guard;
-	int shm_offset;
-	void *__private;
-	char dummy_arr[8]; /*Adding dummy char array of 8 bytes to make tcb size equal to 0x30h*/
+  dtv_t *dtv;
+  uintptr_t pointer_guard;
+  uintptr_t stack_guard;
+  int shm_offset;
+  void *__private;
+  char dummy_arr[8]; /*Adding dummy char array of 8 bytes to make tcb size equal to 0x30h*/
 } tcbhead_t;
 
 /*  used to initialize the offset before tls setup for VE */
@@ -82,8 +73,8 @@ extern tcbhead_t tcbobject;
 /* This is the size of the TCB.  */
 # define TLS_TCB_SIZE		sizeof (tcbhead_t)
 
-/* This is the size we need before TCB. */
-# define TLS_PRE_TCB_SIZE 	sizeof (struct pthread)
+/* This is the size we need before TCB.  */
+# define TLS_PRE_TCB_SIZE	sizeof (struct pthread)
 
 /* Alignment requirements for the TCB.  */
 # define TLS_TCB_ALIGN		__alignof__ (struct pthread)
@@ -111,7 +102,7 @@ extern tcbhead_t tcbobject;
 
 /* Value passed to 'clone' for initialization of the thread register.  */
 # define TLS_DEFINE_INIT_TP(tp, pd) \
-   void *tp = (char *) (pd) + TLS_PRE_TCB_SIZE
+	void *tp = (char *) (pd) + TLS_PRE_TCB_SIZE
 
 /* Return the address of the dtv for the current thread.  */
 # define THREAD_DTV() \
@@ -177,6 +168,7 @@ extern tcbhead_t tcbobject;
   })
 
 /* Get and set the global scope generation counter in struct pthread.  */
+#define THREAD_GSCOPE_IN_TCB      1
 #define THREAD_GSCOPE_FLAG_UNUSED 0
 #define THREAD_GSCOPE_FLAG_USED   1
 #define THREAD_GSCOPE_FLAG_WAIT   2

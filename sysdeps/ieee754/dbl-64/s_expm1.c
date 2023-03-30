@@ -109,8 +109,12 @@
  */
 
 #include <errno.h>
+#include <float.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-double.h>
 #define one Q[0]
 static const double
   huge = 1.0e+300,
@@ -131,7 +135,7 @@ __expm1 (double x)
 {
   double y, hi, lo, c, t, e, hxs, hfx, r1, h2, h4, R1, R2, R3;
   int32_t k, xsb;
-  u_int32_t hx;
+  uint32_t hx;
 
   GET_HIGH_WORD (hx, x);
   xsb = hx & 0x80000000;                /* sign bit of x */
@@ -148,7 +152,7 @@ __expm1 (double x)
 	{
 	  if (hx >= 0x7ff00000)
 	    {
-	      u_int32_t low;
+	      uint32_t low;
 	      GET_LOW_WORD (low, x);
 	      if (((hx & 0xfffff) | low) != 0)
 		return x + x;            /* NaN */
@@ -194,6 +198,7 @@ __expm1 (double x)
     }
   else if (hx < 0x3c900000)             /* when |x|<2**-54, return x */
     {
+      math_check_force_underflow (x);
       t = huge + x;     /* return x with inexact flags when x!=0 */
       return x - (t - (huge + x));
     }
@@ -226,7 +231,7 @@ __expm1 (double x)
 	}
       if (k <= -2 || k > 56)         /* suffice to return exp(x)-1 */
 	{
-	  u_int32_t high;
+	  uint32_t high;
 	  y = one - (e - x);
 	  GET_HIGH_WORD (high, y);
 	  SET_HIGH_WORD (y, high + (k << 20));  /* add k to y's exponent */
@@ -235,7 +240,7 @@ __expm1 (double x)
       t = one;
       if (k < 20)
 	{
-	  u_int32_t high;
+	  uint32_t high;
 	  SET_HIGH_WORD (t, 0x3ff00000 - (0x200000 >> k));    /* t=1-2^-k */
 	  y = t - (e - x);
 	  GET_HIGH_WORD (high, y);
@@ -243,7 +248,7 @@ __expm1 (double x)
 	}
       else
 	{
-	  u_int32_t high;
+	  uint32_t high;
 	  SET_HIGH_WORD (t, ((0x3ff - k) << 20));       /* 2^-k */
 	  y = x - (e + t);
 	  y += one;
@@ -253,8 +258,4 @@ __expm1 (double x)
     }
   return y;
 }
-weak_alias (__expm1, expm1)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__expm1, __expm1l)
-weak_alias (__expm1, expm1l)
-#endif
+libm_alias_double (__expm1, expm1)

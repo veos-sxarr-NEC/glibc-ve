@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
@@ -22,11 +22,8 @@
 #include "dirstream.h"
 
 /* Seek to position POS in DIRP.  */
-/* XXX should be __seekdir ? */
 void
-seekdir (dirp, pos)
-     DIR *dirp;
-     long int pos;
+__seekdir (DIR *dirp, long int pos)
 {
   __libc_lock_lock (dirp->__lock);
   /* Change our entry index pointer to POS and discard any data already
@@ -37,3 +34,5 @@ seekdir (dirp, pos)
   dirp->__size = 0;
   __libc_lock_unlock (dirp->__lock);
 }
+
+weak_alias (__seekdir, seekdir)

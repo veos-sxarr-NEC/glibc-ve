@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <string.h>
@@ -23,10 +23,8 @@
 
 
 int
-__pthread_getschedparam (threadid, policy, param)
-     pthread_t threadid;
-     int *policy;
-     struct sched_param *param;
+__pthread_getschedparam (pthread_t threadid, int *policy,
+			 struct sched_param *param)
 {
   struct pthread *pd = (struct pthread *) threadid;
 
@@ -37,6 +35,7 @@ __pthread_getschedparam (threadid, policy, param)
 
   int result = 0;
 
+  /* See CREATE THREAD NOTES in nptl/pthread_create.c.  */
   lll_lock (pd->lock, LLL_PRIVATE);
 
   /* The library is responsible for maintaining the values at all

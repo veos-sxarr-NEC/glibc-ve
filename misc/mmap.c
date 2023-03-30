@@ -1,4 +1,4 @@
-/* Copyright (C) 1994-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -28,8 +28,8 @@
    for errors (in which case `errno' is set).  A successful `mmap' call
    deallocates any previous mapping for the affected region.  */
 
-__ptr_t
-__mmap (__ptr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
+void *
+__mmap (void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 {
   __set_errno (ENOSYS);
   return MAP_FAILED;
@@ -37,3 +37,4 @@ __mmap (__ptr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
 
 stub_warning (mmap)
 weak_alias (__mmap, mmap)
+libc_hidden_def (__mmap)

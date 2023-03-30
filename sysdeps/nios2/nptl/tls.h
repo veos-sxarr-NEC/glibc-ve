@@ -1,5 +1,5 @@
 /* Definition for thread-local data handling.  NPTL/Nios II version.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _TLS_H
 #define _TLS_H	1
@@ -25,17 +25,7 @@
 # include <stdbool.h>
 # include <stddef.h>
 # include <stdint.h>
-
-/* Type for the dtv.  */
-typedef union dtv
-{
-  size_t counter;
-  struct
-  {
-    void *val;
-    bool is_static;
-  } pointer;
-} dtv_t;
+# include <dl-dtv.h>
 
 #else /* __ASSEMBLER__ */
 # include <tcb-offsets.h>
@@ -147,6 +137,7 @@ register struct pthread *__thread_self __asm__("r23");
 # define NO_TLS_OFFSET		-1
 
 /* Get and set the global scope generation counter in struct pthread.  */
+#define THREAD_GSCOPE_IN_TCB      1
 #define THREAD_GSCOPE_FLAG_UNUSED 0
 #define THREAD_GSCOPE_FLAG_USED   1
 #define THREAD_GSCOPE_FLAG_WAIT   2

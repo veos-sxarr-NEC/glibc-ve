@@ -1,5 +1,5 @@
 /* Tests for 64bit AIO in librt.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define _LARGEFILE_SOURCE 1
 #include <aio.h>
@@ -35,9 +35,6 @@ extern int do_test (int argc, char *argv[]);
 /* We have a preparation function.  */
 #define PREPARE do_prepare
 
-/* We might need a bit longer timeout.  */
-#define TIMEOUT 20 /* sec */
-
 /* This defines the `main' function and some more.  */
 #include <test-skeleton.c>
 
@@ -52,15 +49,15 @@ do_prepare (int argc, char *argv[])
   size_t name_len;
 
   name_len = strlen (test_dir);
-  name = malloc (name_len + sizeof ("/aioXXXXXX"));
+  name = xmalloc (name_len + sizeof ("/aioXXXXXX"));
   mempcpy (mempcpy (name, test_dir, name_len),
 	   "/aioXXXXXX", sizeof ("/aioXXXXXX"));
-  add_temp_file (name);
 
   /* Open our test file.   */
   fd = mkstemp (name);
   if (fd == -1)
     error (EXIT_FAILURE, errno, "cannot open test file `%s'", name);
+  add_temp_file (name);
 }
 
 

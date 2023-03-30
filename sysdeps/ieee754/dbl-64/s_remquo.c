@@ -1,5 +1,5 @@
 /* Compute remainder and a congruent to the quotient.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,11 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-double.h>
 
 
 static const double zero = 0.0;
@@ -29,7 +30,7 @@ double
 __remquo (double x, double y, int *quo)
 {
   int32_t hx, hy;
-  u_int32_t sx, lx, ly;
+  uint32_t sx, lx, ly;
   int cquo, qs;
 
   EXTRACT_WORDS (hx, lx, x);
@@ -60,12 +61,12 @@ __remquo (double x, double y, int *quo)
   y = fabs (y);
   cquo = 0;
 
-  if (x >= 4 * y)
+  if (hy <= 0x7fcfffff && x >= 4 * y)
     {
       x -= 4 * y;
       cquo += 4;
     }
-  if (x >= 2 * y)
+  if (hy <= 0x7fdfffff && x >= 2 * y)
     {
       x -= 2 * y;
       cquo += 2;
@@ -101,12 +102,11 @@ __remquo (double x, double y, int *quo)
 
   *quo = qs ? -cquo : cquo;
 
+  /* Ensure correct sign of zero result in round-downward mode.  */
+  if (x == 0.0)
+    x = 0.0;
   if (sx)
     x = -x;
   return x;
 }
-weak_alias (__remquo, remquo)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__remquo, __remquol)
-weak_alias (__remquo, remquol)
-#endif
+libm_alias_double (__remquo, remquo)

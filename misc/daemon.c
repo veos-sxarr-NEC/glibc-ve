@@ -41,8 +41,7 @@ static char sccsid[] = "@(#)daemon.c	8.1 (Berkeley) 6/4/93";
 #include <not-cancel.h>
 
 int
-daemon(nochdir, noclose)
-	int nochdir, noclose;
+daemon (int nochdir, int noclose)
 {
 	int fd;
 
@@ -64,7 +63,7 @@ daemon(nochdir, noclose)
 	if (!noclose) {
 		struct stat64 st;
 
-		if ((fd = open_not_cancel(_PATH_DEVNULL, O_RDWR, 0)) != -1
+		if ((fd = __open_nocancel(_PATH_DEVNULL, O_RDWR, 0)) != -1
 		    && (__builtin_expect (__fxstat64 (_STAT_VER, fd, &st), 0)
 			== 0)) {
 			if (__builtin_expect (S_ISCHR (st.st_mode), 1) != 0
@@ -81,12 +80,12 @@ daemon(nochdir, noclose)
 			} else {
 				/* We must set an errno value since no
 				   function call actually failed.  */
-				close_not_cancel_no_status (fd);
+				__close_nocancel_nostatus (fd);
 				__set_errno (ENODEV);
 				return -1;
 			}
 		} else {
-			close_not_cancel_no_status (fd);
+			__close_nocancel_nostatus (fd);
 			return -1;
 		}
 	}

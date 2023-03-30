@@ -1,5 +1,5 @@
 /* Sleep for a given number of seconds.  POSIX.1 version.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <time.h>
 #include <unistd.h>
@@ -32,15 +32,6 @@
 unsigned int
 __sleep (unsigned int seconds)
 {
-  /* This is not necessary but some buggy programs depend on it.  */
-  if (__glibc_unlikely (seconds == 0))
-    {
-#ifdef CANCELLATION_P
-      CANCELLATION_P (THREAD_SELF);
-#endif
-      return 0;
-    }
-
   int save_errno = errno;
 
   const unsigned int max

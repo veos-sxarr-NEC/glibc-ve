@@ -28,8 +28,11 @@
  *	only sinh(0)=0 is exact for finite x.
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const long double one = 1.0, shuge = 1.0e307;
 
@@ -52,8 +55,10 @@ __ieee754_sinhl(long double x)
 	if (jx<0) h = -h;
     /* |x| in [0,40], return sign(x)*0.5*(E+E/(E+1))) */
 	if (ix < 0x4044000000000000LL) {	/* |x|<40 */
-	    if (ix<0x3e20000000000000LL)	/* |x|<2**-29 */
+	    if (ix<0x3c90000000000000LL) {	/* |x|<2**-54 */
+		math_check_force_underflow (x);
 		if(shuge+x>one) return x;/* sinhl(tiny) = tiny with inexact */
+	    }
 	    t = __expm1l(fabsl(x));
 	    if(ix<0x3ff0000000000000LL) return h*(2.0*t-t*t/(t+one));
 	    w = t/(t+one);
@@ -64,7 +69,7 @@ __ieee754_sinhl(long double x)
 	if (ix < 0x40862e42fefa39efLL)  return h*__ieee754_expl(fabsl(x));
 
     /* |x| in [log(maxdouble), overflowthresold] */
-	if (ix <= 0x408633ce8fb9f87dLL) {
+	if (ix <= 0x408633ce8fb9f87eLL) {
 	    w = __ieee754_expl(0.5*fabsl(x));
 	    t = h*w;
 	    return t*w;
@@ -73,4 +78,4 @@ __ieee754_sinhl(long double x)
     /* |x| > overflowthresold, sinh(x) overflow */
 	return x*shuge;
 }
-strong_alias (__ieee754_sinhl, __sinhl_finite)
+libm_alias_finite (__ieee754_sinhl, __sinhl)

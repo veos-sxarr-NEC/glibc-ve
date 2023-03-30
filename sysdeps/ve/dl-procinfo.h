@@ -1,5 +1,5 @@
 /* Stub version of processor capability information handling macros.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,10 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 /*TODO_HCLT: Do not trust this file. Changes were added temporary */
+
 #ifndef _DL_PROCINFO_H
 #define _DL_PROCINFO_H	1
 
@@ -27,9 +28,6 @@
 
 /* There are no hardware capabilities defined.  */
 #define _dl_hwcap_string(idx) ""
-
-/* There are no different platforms defined.  */
-#define _dl_platform_string(idx) ""
 
 /* By default there is no important hardware capability.  */
 #define HWCAP_IMPORTANT (0)

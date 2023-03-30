@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <lowlevellock.h>
 
@@ -24,29 +24,39 @@ extern unsigned long int __fork_generation attribute_hidden;
 /* Pointer to the fork generation counter in the thread library.  */
 extern unsigned long int *__fork_generation_pointer attribute_hidden;
 
-/* Lock to protect allocation and deallocation of fork handlers.  */
-extern int __fork_lock attribute_hidden;
-
 /* Elements of the fork handler lists.  */
 struct fork_handler
 {
-  struct fork_handler *next;
   void (*prepare_handler) (void);
   void (*parent_handler) (void);
   void (*child_handler) (void);
   void *dso_handle;
-  unsigned int refcntr;
-  int need_signal;
 };
-
-/* The single linked list of all currently registered for handlers.  */
-extern struct fork_handler *__fork_handlers attribute_hidden;
-
 
 /* Function to call to unregister fork handlers.  */
 extern void __unregister_atfork (void *dso_handle) attribute_hidden;
 #define UNREGISTER_ATFORK(dso_handle) __unregister_atfork (dso_handle)
 
+enum __run_fork_handler_type
+{
+  atfork_run_prepare,
+  atfork_run_child,
+  atfork_run_parent
+};
+
+/* Run the atfork handlers and lock/unlock the internal lock depending
+   of the WHO argument:
+
+   - atfork_run_prepare: run all the PREPARE_HANDLER in reverse order of
+			 insertion and locks the internal lock.
+   - atfork_run_child: run all the CHILD_HANDLER and unlocks the internal
+		       lock.
+   - atfork_run_parent: run all the PARENT_HANDLER and unlocks the internal
+			lock.
+
+   Perform locking only if DO_LOCKING.  */
+extern void __run_fork_handlers (enum __run_fork_handler_type who,
+				 _Bool do_locking) attribute_hidden;
 
 /* C library side function to register new fork handlers.  */
 extern int __register_atfork (void (*__prepare) (void),
@@ -54,6 +64,3 @@ extern int __register_atfork (void (*__prepare) (void),
 			      void (*__child) (void),
 			      void *dso_handle);
 libc_hidden_proto (__register_atfork)
-
-/* Add a new element to the fork list.  */
-extern void __linkin_atfork (struct fork_handler *newp) attribute_hidden;

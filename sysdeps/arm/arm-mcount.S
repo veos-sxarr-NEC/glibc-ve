@@ -1,5 +1,5 @@
 /* Implementation of profiling support.  ARM EABI version.
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Don't call mcount when calling mcount...  */
 #undef PROF
@@ -90,8 +90,7 @@ ENTRY(__mcount_arm_compat)
 	cfi_rel_offset (lr, 20)
 	movs r0, fp
 	ittt ne
-	sfi_breg r0, \
-	ldrne r0, [\B, #-4]
+	ldrne r0, [r0, #-4]
 	movsne r1, lr
 	blne __mcount_internal
 # if defined (__ARM_ARCH_4T__) && defined (__THUMB_INTERWORK__)

@@ -1,5 +1,5 @@
 /* Multiple versions of lrint.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,12 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_ldbl_opt.h>
 #include <shlib-compat.h>
 #include "init-arch.h"
+#include <libm-alias-double.h>
 
 extern __typeof (__lrint) __lrint_ppc32 attribute_hidden;
 extern __typeof (__lrint) __lrint_power6x attribute_hidden;
@@ -29,12 +30,4 @@ libc_ifunc (__lrint,
 	      __lrint_power6x
             : __lrint_ppc32);
 
-weak_alias (__lrint, lrint)
-
-#ifdef NO_LONG_DOUBLE
-weak_alias (__lrint, lrintl)
-strong_alias (__lrint, __lrintl)
-#endif
-#if LONG_DOUBLE_COMPAT(libm, GLIBC_2_1)
-compat_symbol (libm, __lrint, lrintl, GLIBC_2_1);
-#endif
+libm_alias_double (__lrint, lrint)

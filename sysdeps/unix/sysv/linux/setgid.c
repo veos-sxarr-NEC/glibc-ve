@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -23,7 +23,11 @@
 int
 __setgid (gid_t gid)
 {
+#ifdef __NR_setgid32
+  return INLINE_SETXID_SYSCALL (setgid32, 1, gid);
+#else
   return INLINE_SETXID_SYSCALL (setgid, 1, gid);
+#endif
 }
 #ifndef __setgid
 weak_alias (__setgid, setgid)

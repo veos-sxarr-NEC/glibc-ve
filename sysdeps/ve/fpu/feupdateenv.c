@@ -1,5 +1,5 @@
 /* Install given floating-point environment and raise exceptions.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,8 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <fenv.h>
 
@@ -25,6 +25,9 @@ __feupdateenv (const fenv_t *envp)
 {
   fexcept_t temp;
 
+    __asm__ __volatile__ (
+    DELAY_FOR_VLFA_EXCEPTION
+    );
   /* Save current exceptions.  */
   __asm__ __volatile("smir %%s1, %%psw\n\t"
 	"st2b %%s1, %0 ":: "m" (*&temp): "%s1");

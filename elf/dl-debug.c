@@ -1,5 +1,5 @@
 /* Communicate dynamic linker state to the debugger at runtime.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ldsodefs.h>
 
@@ -42,7 +42,6 @@ struct r_debug _r_debug;
    _r_debug.r_ldbase.  Returns the address of _r_debug.  */
 
 struct r_debug *
-internal_function
 _dl_debug_initialize (ElfW(Addr) ldbase, Lmid_t ns)
 {
   struct r_debug *r;

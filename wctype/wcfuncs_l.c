@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <wctype.h>
@@ -27,7 +27,7 @@
 /* Provide real-function versions of all the wctype macros.  */
 
 #define	func(name, type) \
-  int __isw##name (wint_t wc, __locale_t locale)			      \
+  int __isw##name (wint_t wc, locale_t locale)				      \
   {									      \
     if (isascii (wc))							      \
       return is##name ((int) wc, locale);				      \
@@ -54,7 +54,7 @@ func (upper_l, __ISwupper)
 func (xdigit_l, __ISwxdigit)
 
 wint_t
-(__towlower_l) (wint_t wc, __locale_t locale)
+(__towlower_l) (wint_t wc, locale_t locale)
 {
   size_t i = locale->__locales[LC_CTYPE]->values[_NL_ITEM_INDEX (_NL_CTYPE_MAP_OFFSET)].word + __TOW_tolower;
   const char *desc = locale->__locales[LC_CTYPE]->values[i].string;
@@ -64,7 +64,7 @@ libc_hidden_def (__towlower_l)
 weak_alias (__towlower_l, towlower_l)
 
 wint_t
-(__towupper_l) (wint_t wc, __locale_t locale)
+(__towupper_l) (wint_t wc, locale_t locale)
 {
   size_t i = locale->__locales[LC_CTYPE]->values[_NL_ITEM_INDEX (_NL_CTYPE_MAP_OFFSET)].word + __TOW_toupper;
   const char *desc = locale->__locales[LC_CTYPE]->values[i].string;

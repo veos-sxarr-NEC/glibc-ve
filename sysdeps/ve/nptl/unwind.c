@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>
    and Richard Henderson <rth@redhat.com>, 2003.
@@ -15,8 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <setjmp.h>
 #include <stdio.h>
@@ -25,8 +25,6 @@
 #include <unistd.h>
 #include "pthreadP.h"
 #include <jmpbuf-unwind.h>
-
-#ifdef HAVE_FORCED_UNWIND
 
 #ifdef _STACK_GROWS_DOWN
 # define FRAME_LEFT(frame, other, adj) \
@@ -101,6 +99,7 @@ unwind_stop (int version, _Unwind_Action actions,
   return _URC_NO_REASON;
 }
 
+
 static void
 unwind_cleanup (_Unwind_Reason_Code reason, struct _Unwind_Exception *exc)
 {
@@ -108,9 +107,8 @@ unwind_cleanup (_Unwind_Reason_Code reason, struct _Unwind_Exception *exc)
      cannot handle this case and therefore abort.  */
   __libc_fatal ("FATAL: exception not rethrown\n");
 }
-#endif
-#endif	/* have forced unwind */
 
+#endif
 
 void
 __cleanup_fct_attribute __attribute ((noreturn))
@@ -119,7 +117,7 @@ __pthread_unwind (__pthread_unwind_buf_t *buf)
   struct pthread_unwind_buf *ibuf = (struct pthread_unwind_buf *) buf;
   struct pthread *self = THREAD_SELF;
 
-#if defined HAVE_FORCED_UNWIND && !defined __ve__
+#if !defined __ve__
   /* Current vegcc does not provide "libgcc_s.so.1". _Unwind_ForcedUnwind()
    * function needs "libgcc_s.so.1" library to provide force unwinding.
    * As a workaround we decided to use __libc_unwind_longjmp() for unwinding.

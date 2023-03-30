@@ -14,7 +14,9 @@
  */
 
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static float pzerof(float), qzerof(float);
 
@@ -58,10 +60,10 @@ __ieee754_j0f(float x)
 	 * j0(x) = 1/sqrt(pi) * (P(0,x)*cc - Q(0,x)*ss) / sqrt(x)
 	 * y0(x) = 1/sqrt(pi) * (P(0,x)*ss + Q(0,x)*cc) / sqrt(x)
 	 */
-		if(ix>0x48000000) z = (invsqrtpi*cc)/__ieee754_sqrtf(x);
+		if(ix>0x48000000) z = (invsqrtpi*cc)/sqrtf(x);
 		else {
 		    u = pzerof(x); v = qzerof(x);
-		    z = invsqrtpi*(u*cc-v*ss)/__ieee754_sqrtf(x);
+		    z = invsqrtpi*(u*cc-v*ss)/sqrtf(x);
 		}
 		return z;
 	}
@@ -80,7 +82,7 @@ __ieee754_j0f(float x)
 	    return((one+u)*(one-u)+z*(r/s));
 	}
 }
-strong_alias (__ieee754_j0f, __j0f_finite)
+libm_alias_finite (__ieee754_j0f, __j0f)
 
 static const float
 u00  = -7.3804296553e-02, /* 0xbd9726b5 */
@@ -105,7 +107,7 @@ __ieee754_y0f(float x)
 	ix = 0x7fffffff&hx;
     /* Y0(NaN) is NaN, y0(-inf) is Nan, y0(inf) is 0, y0(0) is -inf.  */
 	if(ix>=0x7f800000) return  one/(x+x*x);
-	if(ix==0) return -HUGE_VALF+x;  /* -inf and overflow exception.  */
+	if(ix==0) return -1/zero; /* -inf and divide by zero exception.  */
 	if(hx<0) return zero/(zero*x);
 	if(ix >= 0x40000000) {  /* |x| >= 2.0 */
 	/* y0(x) = sqrt(2/(pi*x))*(p0(x)*sin(x0)+q0(x)*cos(x0))
@@ -131,10 +133,10 @@ __ieee754_y0f(float x)
 		    if ((s*c)<zero) cc = z/ss;
 		    else            ss = z/cc;
 		}
-		if(ix>0x48000000) z = (invsqrtpi*ss)/__ieee754_sqrtf(x);
+		if(ix>0x48000000) z = (invsqrtpi*ss)/sqrtf(x);
 		else {
 		    u = pzerof(x); v = qzerof(x);
-		    z = invsqrtpi*(u*ss+v*cc)/__ieee754_sqrtf(x);
+		    z = invsqrtpi*(u*ss+v*cc)/sqrtf(x);
 		}
 		return z;
 	}
@@ -146,7 +148,7 @@ __ieee754_y0f(float x)
 	v = one+z*(v01+z*(v02+z*(v03+z*v04)));
 	return(u/v + tpi*(__ieee754_j0f(x)*__ieee754_logf(x)));
 }
-strong_alias (__ieee754_y0f, __y0f_finite)
+libm_alias_finite (__ieee754_y0f, __y0f)
 
 /* The asymptotic expansions of pzero is
  *	1 - 9/128 s^2 + 11025/98304 s^4 - ...,	where s = 1/x.
@@ -228,10 +230,11 @@ pzerof(float x)
 	int32_t ix;
 	GET_FLOAT_WORD(ix,x);
 	ix &= 0x7fffffff;
+	/* ix >= 0x40000000 for all calls to this function.  */
 	if(ix>=0x41000000)     {p = pR8; q= pS8;}
 	else if(ix>=0x40f71c58){p = pR5; q= pS5;}
 	else if(ix>=0x4036db68){p = pR3; q= pS3;}
-	else if(ix>=0x40000000){p = pR2; q= pS2;}
+	else {p = pR2; q= pS2;}
 	z = one/(x*x);
 	r = p[0]+z*(p[1]+z*(p[2]+z*(p[3]+z*(p[4]+z*p[5]))));
 	s = one+z*(q[0]+z*(q[1]+z*(q[2]+z*(q[3]+z*q[4]))));
@@ -324,10 +327,11 @@ qzerof(float x)
 	int32_t ix;
 	GET_FLOAT_WORD(ix,x);
 	ix &= 0x7fffffff;
+	/* ix >= 0x40000000 for all calls to this function.  */
 	if(ix>=0x41000000)     {p = qR8; q= qS8;}
 	else if(ix>=0x40f71c58){p = qR5; q= qS5;}
 	else if(ix>=0x4036db68){p = qR3; q= qS3;}
-	else if(ix>=0x40000000){p = qR2; q= qS2;}
+	else {p = qR2; q= qS2;}
 	z = one/(x*x);
 	r = p[0]+z*(p[1]+z*(p[2]+z*(p[3]+z*(p[4]+z*p[5]))));
 	s = one+z*(q[0]+z*(q[1]+z*(q[2]+z*(q[3]+z*(q[4]+z*q[5])))));

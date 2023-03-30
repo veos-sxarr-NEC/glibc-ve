@@ -1,4 +1,4 @@
-/* Copyright (C) 2010-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2010-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,17 +13,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pwd.h>
 #include <unistd.h>
 #include <not-cancel.h>
+#include <scratch_buffer.h>
 
 #define STATIC static
 static int getlogin_r_fd0 (char *name, size_t namesize);
-#define getlogin_r getlogin_r_fd0
+#define __getlogin_r getlogin_r_fd0
 #include <sysdeps/unix/getlogin_r.c>
-#undef getlogin_r
+#undef __getlogin_r
 
 
 /* Try to determine login name from /proc/self/loginuid and return 0
@@ -32,20 +33,18 @@ static int getlogin_r_fd0 (char *name, size_t namesize);
 
 int
 attribute_hidden
-__getlogin_r_loginuid (name, namesize)
-     char *name;
-     size_t namesize;
+__getlogin_r_loginuid (char *name, size_t namesize)
 {
-  int fd = open_not_cancel_2 ("/proc/self/loginuid", O_RDONLY);
+  int fd = __open_nocancel ("/proc/self/loginuid", O_RDONLY);
   if (fd == -1)
     return -1;
 
   /* We are reading a 32-bit number.  12 bytes are enough for the text
      representation.  If not, something is wrong.  */
   char uidbuf[12];
-  ssize_t n = TEMP_FAILURE_RETRY (read_not_cancel (fd, uidbuf,
+  ssize_t n = TEMP_FAILURE_RETRY (__read_nocancel (fd, uidbuf,
 						   sizeof (uidbuf)));
-  close_not_cancel_no_status (fd);
+  __close_nocancel_nostatus (fd);
 
   uid_t uid;
   char *endp;
@@ -56,29 +55,31 @@ __getlogin_r_loginuid (name, namesize)
 	  endp == uidbuf || *endp != '\0'))
     return -1;
 
-  size_t buflen = 1024;
-  char *buf = alloca (buflen);
-  bool use_malloc = false;
+  /* If there is no login uid, linux sets /proc/self/loginid to the sentinel
+     value of, (uid_t) -1, so check if that value is set and return early to
+     avoid making unneeded nss lookups. */
+  if (uid == (uid_t) -1)
+    {
+      __set_errno (ENXIO);
+      return ENXIO;
+    }
+
   struct passwd pwd;
   struct passwd *tpwd;
   int result = 0;
   int res;
+  struct scratch_buffer tmpbuf;
+  scratch_buffer_init (&tmpbuf);
 
-  while ((res = __getpwuid_r (uid, &pwd, buf, buflen, &tpwd)) == ERANGE)
-    if (__libc_use_alloca (2 * buflen))
-      buf = extend_alloca (buf, buflen, 2 * buflen);
-    else
-      {
-	buflen *= 2;
-	char *newp = realloc (use_malloc ? buf : NULL, buflen);
-	if (newp == NULL)
-	  {
-	    result = ENOMEM;
-	    goto out;
-	  }
-	buf = newp;
-	use_malloc = true;
-      }
+  while ((res =  __getpwuid_r (uid, &pwd,
+			       tmpbuf.data, tmpbuf.length, &tpwd)) == ERANGE)
+    {
+      if (!scratch_buffer_grow (&tmpbuf))
+	{
+	  result = ENOMEM;
+	  goto out;
+	}
+    }
 
   if (res != 0 || tpwd == NULL)
     {
@@ -97,9 +98,7 @@ __getlogin_r_loginuid (name, namesize)
   memcpy (name, pwd.pw_name, needed);
 
  out:
-  if (use_malloc)
-    free (buf);
-
+  scratch_buffer_free (&tmpbuf);
   return result;
 }
 
@@ -109,9 +108,7 @@ __getlogin_r_loginuid (name, namesize)
    code.  Otherwise return 0.  */
 
 int
-getlogin_r (name, namesize)
-     char *name;
-     size_t namesize;
+__getlogin_r (char *name, size_t namesize)
 {
   int res = __getlogin_r_loginuid (name, namesize);
   if (res >= 0)
@@ -119,4 +116,6 @@ getlogin_r (name, namesize)
 
   return getlogin_r_fd0 (name, namesize);
 }
-libc_hidden_def (getlogin_r)
+libc_hidden_def (__getlogin_r)
+weak_alias (__getlogin_r, getlogin_r)
+libc_hidden_weak (getlogin_r)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,35 +14,55 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include "pthreadP.h"
-#include <lowlevellock.h>
-#include <elide.h>
+#include <atomic.h>
 
-
+/* See pthread_rwlock_common.c for an overview.  */
 int
 __pthread_rwlock_trywrlock (pthread_rwlock_t *rwlock)
 {
-  int result = EBUSY;
-
-  if (ELIDE_TRYLOCK (rwlock->__data.__rwelision,
-		     rwlock->__data.__lock == 0
-		     && rwlock->__data.__nr_readers == 0
-		     && rwlock->__data.__writer, 1))
-    return 0;
-
-  lll_lock (rwlock->__data.__lock, rwlock->__data.__shared);
-
-  if (rwlock->__data.__writer == 0 && rwlock->__data.__nr_readers == 0)
+  /* When in a trywrlock, we can acquire the write lock if it is in states
+     #1 (idle and read phase) and #5 (idle and write phase), and also in #6
+     (readers waiting, write phase) if we prefer writers.
+     If we observe any other state, we are allowed to fail and do not need to
+     "synchronize memory" as specified by POSIX (hence relaxed MO is
+     sufficient for the first load and the CAS failure path).
+     We face a similar issue as in tryrdlock in that we need to both avoid
+     live-locks / starvation and must not fail spuriously (see there for
+     further comments) -- and thus must loop until we get a definitive
+     observation or state change.  */
+  unsigned int r = atomic_load_relaxed (&rwlock->__data.__readers);
+  bool prefer_writer =
+      (rwlock->__data.__flags != PTHREAD_RWLOCK_PREFER_READER_NP);
+  while (((r & PTHREAD_RWLOCK_WRLOCKED) == 0)
+      && (((r >> PTHREAD_RWLOCK_READER_SHIFT) == 0)
+	  || (prefer_writer && ((r & PTHREAD_RWLOCK_WRPHASE) != 0))))
     {
-      rwlock->__data.__writer = THREAD_GETMEM (THREAD_SELF, tid);
-      result = 0;
+      /* Try to transition to states #7 or #8 (i.e., acquire the lock).  */
+      if (atomic_compare_exchange_weak_acquire (
+	  &rwlock->__data.__readers, &r,
+	  r | PTHREAD_RWLOCK_WRPHASE | PTHREAD_RWLOCK_WRLOCKED))
+	{
+	  /* We have become the primary writer and we cannot have shared
+	     the PTHREAD_RWLOCK_FUTEX_USED flag with someone else, so we
+	     can simply enable blocking (see full wrlock code).  */
+	  atomic_store_relaxed (&rwlock->__data.__writers_futex, 1);
+	  /* If we started a write phase, we need to enable readers to
+	     wait.  If we did not, we must not change it because other threads
+	     may have set the PTHREAD_RWLOCK_FUTEX_USED in the meantime.  */
+	  if ((r & PTHREAD_RWLOCK_WRPHASE) == 0)
+	    atomic_store_relaxed (&rwlock->__data.__wrphase_futex, 1);
+	  atomic_store_relaxed (&rwlock->__data.__cur_writer,
+	      THREAD_GETMEM (THREAD_SELF, tid));
+	  return 0;
+	}
+      /* TODO Back-off.  */
+      /* See above.  */
     }
-
-  lll_unlock (rwlock->__data.__lock, rwlock->__data.__shared);
-
-  return result;
+  return EBUSY;
 }
+
 strong_alias (__pthread_rwlock_trywrlock, pthread_rwlock_trywrlock)

@@ -1,5 +1,5 @@
 /* Definition for thread-local data handling.  nptl/x86_64 version.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _TLS_H
 #define _TLS_H	1
@@ -26,8 +26,9 @@
 # include <stdint.h>
 # include <stdlib.h>
 # include <sysdep.h>
-# include <libc-internal.h>
+# include <libc-pointer-arith.h> /* For cast_to_integer.  */
 # include <kernel-features.h>
+# include <dl-dtv.h>
 
 /* Replacement type for __m128 since this file is included by ld.so,
    which is compiled with -mno-sse.  It must not change the alignment
@@ -36,18 +37,6 @@ typedef struct
 {
   int i[4];
 } __128bits;
-
-
-/* Type for the dtv.  */
-typedef union dtv
-{
-  size_t counter;
-  struct
-  {
-    void *val;
-    bool is_static;
-  } pointer;
-} dtv_t;
 
 
 typedef struct
@@ -62,22 +51,40 @@ typedef struct
   uintptr_t stack_guard;
   uintptr_t pointer_guard;
   unsigned long int vgetcpu_cache[2];
-# ifndef __ASSUME_PRIVATE_FUTEX
-  int private_futex;
-# else
-  int __glibc_reserved1;
-# endif
-  int rtld_must_xmm_save;
+  /* Bit 0: X86_FEATURE_1_IBT.
+     Bit 1: X86_FEATURE_1_SHSTK.
+   */
+  unsigned int feature_1;
+  int __glibc_unused1;
   /* Reservation of some values for the TM ABI.  */
   void *__private_tm[4];
   /* GCC split stack support.  */
   void *__private_ss;
-  long int __glibc_reserved2;
-  /* Have space for the post-AVX register size.  */
-  __128bits rtld_savespace_sse[8][4] __attribute__ ((aligned (32)));
+  /* The lowest address of shadow stack,  */
+  unsigned long long int ssp_base;
+  /* Must be kept even if it is no longer used by glibc since programs,
+     like AddressSanitizer, depend on the size of tcbhead_t.  */
+  __128bits __glibc_unused2[8][4] __attribute__ ((aligned (32)));
 
   void *__padding[8];
 } tcbhead_t;
+
+# ifdef __ILP32__
+/* morestack.S in libgcc uses offset 0x40 to access __private_ss,   */
+_Static_assert (offsetof (tcbhead_t, __private_ss) == 0x40,
+		"offset of __private_ss != 0x40");
+/* NB: ssp_base used to be "long int __glibc_reserved2", which was
+   changed from 32 bits to 64 bits.  Make sure that the offset of the
+   next field, __glibc_unused2, is unchanged.  */
+_Static_assert (offsetof (tcbhead_t, __glibc_unused2) == 0x60,
+		"offset of __glibc_unused2 != 0x60");
+# else
+/* morestack.S in libgcc uses offset 0x70 to access __private_ss,   */
+_Static_assert (offsetof (tcbhead_t, __private_ss) == 0x70,
+		"offset of __private_ss != 0x70");
+_Static_assert (offsetof (tcbhead_t, __glibc_unused2) == 0x80,
+		"offset of __glibc_unused2 != 0x80");
+# endif
 
 #else /* __ASSEMBLER__ */
 # include <tcb-offsets.h>
@@ -250,7 +257,7 @@ typedef struct
 #endif
 
 
-/* Same as THREAD_SETMEM, but the member offset can be non-constant.  */
+/* Set member of the thread descriptor directly.  */
 # define THREAD_SETMEM(descr, member, value) \
   ({ if (sizeof (descr->member) == 1)					      \
        asm volatile ("movb %b0,%%fs:%P1" :				      \
@@ -273,7 +280,7 @@ typedef struct
        }})
 
 
-/* Set member of the thread descriptor directly.  */
+/* Same as THREAD_SETMEM, but the member offset can be non-constant.  */
 # define THREAD_SETMEM_NC(descr, member, idx, value) \
   ({ if (sizeof (descr->member[0]) == 1)				      \
        asm volatile ("movb %b0,%%fs:%P1(%q2)" :				      \
@@ -299,55 +306,6 @@ typedef struct
        }})
 
 
-/* Atomic compare and exchange on TLS, returning old value.  */
-# define THREAD_ATOMIC_CMPXCHG_VAL(descr, member, newval, oldval) \
-  ({ __typeof (descr->member) __ret;					      \
-     __typeof (oldval) __old = (oldval);				      \
-     if (sizeof (descr->member) == 4)					      \
-       asm volatile (LOCK_PREFIX "cmpxchgl %2, %%fs:%P3"		      \
-		     : "=a" (__ret)					      \
-		     : "0" (__old), "r" (newval),			      \
-		       "i" (offsetof (struct pthread, member)));	      \
-     else								      \
-       /* Not necessary for other sizes in the moment.  */		      \
-       abort ();							      \
-     __ret; })
-
-
-/* Atomic logical and.  */
-# define THREAD_ATOMIC_AND(descr, member, val) \
-  (void) ({ if (sizeof ((descr)->member) == 4)				      \
-	      asm volatile (LOCK_PREFIX "andl %1, %%fs:%P0"		      \
-			    :: "i" (offsetof (struct pthread, member)),	      \
-			       "ir" (val));				      \
-	    else							      \
-	      /* Not necessary for other sizes in the moment.  */	      \
-	      abort (); })
-
-
-/* Atomic set bit.  */
-# define THREAD_ATOMIC_BIT_SET(descr, member, bit) \
-  (void) ({ if (sizeof ((descr)->member) == 4)				      \
-	      asm volatile (LOCK_PREFIX "orl %1, %%fs:%P0"		      \
-			    :: "i" (offsetof (struct pthread, member)),	      \
-			       "ir" (1 << (bit)));			      \
-	    else							      \
-	      /* Not necessary for other sizes in the moment.  */	      \
-	      abort (); })
-
-
-# define CALL_THREAD_FCT(descr) \
-  ({ void *__res;							      \
-     asm volatile ("movq %%fs:%P2, %%rdi\n\t"				      \
-		   "callq *%%fs:%P1"					      \
-		   : "=a" (__res)					      \
-		   : "i" (offsetof (struct pthread, start_routine)),	      \
-		     "i" (offsetof (struct pthread, arg))		      \
-		   : "di", "si", "cx", "dx", "r8", "r9", "r10", "r11",	      \
-		     "memory", "cc");					      \
-     __res; })
-
-
 /* Set the stack guard field in TCB head.  */
 # define THREAD_SET_STACK_GUARD(value) \
     THREAD_SETMEM (THREAD_SELF, header.stack_guard, value)
@@ -365,6 +323,7 @@ typedef struct
 
 
 /* Get and set the global scope generation counter in the TCB head.  */
+# define THREAD_GSCOPE_IN_TCB      1
 # define THREAD_GSCOPE_FLAG_UNUSED 0
 # define THREAD_GSCOPE_FLAG_USED   1
 # define THREAD_GSCOPE_FLAG_WAIT   2
@@ -383,41 +342,6 @@ typedef struct
   THREAD_SETMEM (THREAD_SELF, header.gscope_flag, THREAD_GSCOPE_FLAG_USED)
 # define THREAD_GSCOPE_WAIT() \
   GL(dl_wait_lookup_done) ()
-
-
-# ifdef SHARED
-/* Defined in dl-trampoline.S.  */
-extern void _dl_x86_64_save_sse (void);
-extern void _dl_x86_64_restore_sse (void);
-
-# define RTLD_CHECK_FOREIGN_CALL \
-  (THREAD_GETMEM (THREAD_SELF, header.rtld_must_xmm_save) != 0)
-
-/* NB: Don't use the xchg operation because that would imply a lock
-   prefix which is expensive and unnecessary.  The cache line is also
-   not contested at all.  */
-#  define RTLD_ENABLE_FOREIGN_CALL \
-  int old_rtld_must_xmm_save = THREAD_GETMEM (THREAD_SELF,		      \
-					      header.rtld_must_xmm_save);     \
-  THREAD_SETMEM (THREAD_SELF, header.rtld_must_xmm_save, 1)
-
-#  define RTLD_PREPARE_FOREIGN_CALL \
-  do if (THREAD_GETMEM (THREAD_SELF, header.rtld_must_xmm_save))	      \
-    {									      \
-      _dl_x86_64_save_sse ();						      \
-      THREAD_SETMEM (THREAD_SELF, header.rtld_must_xmm_save, 0);	      \
-    }									      \
-  while (0)
-
-#  define RTLD_FINALIZE_FOREIGN_CALL \
-  do {									      \
-    if (THREAD_GETMEM (THREAD_SELF, header.rtld_must_xmm_save) == 0)	      \
-      _dl_x86_64_restore_sse ();					      \
-    THREAD_SETMEM (THREAD_SELF, header.rtld_must_xmm_save,		      \
-		   old_rtld_must_xmm_save);				      \
-  } while (0)
-# endif
-
 
 #endif /* __ASSEMBLER__ */
 

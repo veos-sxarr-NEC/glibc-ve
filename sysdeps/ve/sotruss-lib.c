@@ -1,5 +1,5 @@
 /* Trace calls through PLTs and show caller, callee, and parameters.
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gmail.com>, 2011.
 
@@ -15,7 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <error.h>
 #include <fcntl.h>
@@ -84,11 +85,11 @@ init (void)
 
       if (out_filename != NULL && out_filename[0] != 0)
 	{
-	  size_t out_filename_len = strlen (out_filename) + 12;
+	  size_t out_filename_len = strlen (out_filename) + 13;
 	  char fullname[out_filename_len];
 	  char *endp = stpcpy (fullname, out_filename);
 	  if (which_process == NULL || which_process[0] == '\0')
-	    snprintf (endp, 12, ".%lu", (unsigned long int) pid);
+	    snprintf (endp, 13, ".%ld", (long int) pid);
 
 	  out_fd = open (fullname, O_RDWR | O_CREAT | O_TRUNC, 0666);
 	  if (out_fd != -1)

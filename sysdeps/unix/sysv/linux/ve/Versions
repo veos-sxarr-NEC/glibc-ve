@@ -15,9 +15,6 @@ libc {
     __read_hook; __pread_hook; __readv_hook; __preadv_hook;
     __write_hook; __pwrite_hook; __writev_hook; __pwritev_hook;
   }
-  GLIBC_PRIVATE {
-    __vdso_clock_gettime;
-  }
 }
 
 librt {

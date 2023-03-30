@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -13,13 +13,12 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
-#include <error.h>
 #include <langinfo.h>
 #include <string.h>
 #include <stdint.h>
@@ -87,9 +86,8 @@ paper_finish (struct localedef_t *locale, const struct charmap_t *charmap)
 	 empty one.  */
       if (paper == NULL)
 	{
-	  if (! be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
-No definition for %s category found"), "LC_PAPER"));
+	  record_warning (_("\
+No definition for %s category found"), "LC_PAPER");
 	  paper_startup (NULL, locale, 0);
 	  paper = locale->categories[LC_PAPER].paper;
 	  nothing = 1;
@@ -99,8 +97,8 @@ No definition for %s category found"), "LC_PAPER"));
   if (paper->height == 0)
     {
       if (! nothing)
-	WITH_CUR_LOCALE (error (0, 0, _("%s: field `%s' not defined"),
-				"LC_PAPER", "height"));
+	record_error (0, 0, _("%s: field `%s' not defined"),
+		      "LC_PAPER", "height");
       /* Use as default values the values from the i18n locale.  */
       paper->height = 297;
     }
@@ -108,8 +106,8 @@ No definition for %s category found"), "LC_PAPER"));
   if (paper->width == 0)
     {
       if (! nothing)
-	WITH_CUR_LOCALE (error (0, 0, _("%s: field `%s' not defined"),
-				"LC_PAPER", "width"));
+	record_error (0, 0, _("%s: field `%s' not defined"),
+		      "LC_PAPER", "width");
       /* Use as default values the values from the i18n locale.  */
       paper->width = 210;
     }

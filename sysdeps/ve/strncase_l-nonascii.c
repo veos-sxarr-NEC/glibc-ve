@@ -1,9 +1,9 @@
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <string.h>
 
 extern int __strncasecmp_l_nonascii (const char *__s1, const char *__s2,
-				     size_t __n, __locale_t __loc);
+				     size_t __n, locale_t __loc);
 
 #define __strncasecmp_l __strncasecmp_l_nonascii
 #define USE_IN_EXTENDED_LOCALE_MODEL    1

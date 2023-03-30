@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,15 +13,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <ldsodefs.h>
 #include <sysdep.h>
 
+#ifndef SHARED
+#include <hwcapinfo.h>
+#endif
 
-int __cache_line_size attribute_hidden;
 /* The main work is done in the generic function.  */
 #define LIBC_START_MAIN generic_start_main
 #define LIBC_START_DISABLE_INLINE
@@ -68,14 +70,30 @@ __libc_start_main (int argc, char **argv,
       rtld_fini = NULL;
     }
 
-  /* Initialize the __cache_line_size variable from the aux vector.  */
   for (ElfW (auxv_t) * av = auxvec; av->a_type != AT_NULL; ++av)
     switch (av->a_type)
       {
-      case AT_DCACHEBSIZE:
-	__cache_line_size = av->a_un.a_val;
+      /* For the static case, we also need _dl_hwcap, _dl_hwcap2 and
+         _dl_platform, so we can call
+         __tcb_parse_hwcap_and_convert_at_platform ().  */
+#ifndef SHARED
+      case AT_HWCAP:
+	_dl_hwcap = (unsigned long int) av->a_un.a_val;
 	break;
+      case AT_HWCAP2:
+	_dl_hwcap2 = (unsigned long int) av->a_un.a_val;
+	break;
+      case AT_PLATFORM:
+	_dl_platform = (void *) av->a_un.a_val;
+	break;
+#endif
       }
+
+  /* Initialize hwcap/hwcap2 and platform data so it can be copied to
+     the TCB later in __libc_setup_tls (). (static case only).  */
+#ifndef SHARED
+  __tcb_parse_hwcap_and_convert_at_platform ();
+#endif
 
   return generic_start_main (stinfo->main, argc, argv, auxvec,
 			     stinfo->init, stinfo->fini, rtld_fini,

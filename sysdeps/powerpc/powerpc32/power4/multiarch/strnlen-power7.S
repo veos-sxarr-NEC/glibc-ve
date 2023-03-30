@@ -1,5 +1,5 @@
 /* Optimized strnlen implementation for PowerPC32/POWER7 using cmpb insn.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    Contributed by Luis Machado <luisgpm@br.ibm.com>.
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -30,6 +30,9 @@
 #define END(name)						\
  cfi_endproc;							\
  ASM_SIZE_DIRECTIVE(__strnlen_power7)
+
+#undef libc_hidden_def
+#define libc_hidden_def(name)
 
 #undef libc_hidden_builtin_def
 #define libc_hidden_builtin_def(name)

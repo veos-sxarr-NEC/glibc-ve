@@ -1,5 +1,5 @@
 /* Convert string representing a number to integer value, using given locale.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,13 +15,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define UNSIGNED	1
 
-#include <xlocale.h>
+#include <locale.h>
 
 extern unsigned long int ____strtoul_l_internal (const char *, char **, int,
-						 int, __locale_t);
+						 int, locale_t);
 
 #include "strtol_l.c"

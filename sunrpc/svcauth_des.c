@@ -44,6 +44,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <rpc/rpc.h>
@@ -53,6 +54,7 @@
 #include <rpc/svc_auth.h>
 #include <rpc/svc.h>
 #include <rpc/des_crypt.h>
+#include <shlib-compat.h>
 
 #define debug(msg)		/*printf("svcauth_des: %s\n", msg) */
 
@@ -71,33 +73,31 @@ struct cache_entry
     struct rpc_timeval laststamp;	/* detect replays of creds */
     char *localcred;		/* generic local credential */
   };
-#ifdef _RPC_THREAD_SAFE_
 #define authdes_cache RPC_THREAD_VARIABLE(authdes_cache_s)
 #define authdes_lru RPC_THREAD_VARIABLE(authdes_lru_s)
-#else
-static struct cache_entry *authdes_cache;
-static int *authdes_lru;
+
+static void cache_init (void); /* initialize the cache */
+static short cache_spot (des_block *, char *, struct rpc_timeval *);
+  /* find an entry in the cache */
+static void cache_ref (uint32_t sid); /* note that sid was ref'd */
+
+static void invalidate (char *cred); /* invalidate entry in cache */
+
+/* Cache statistics.  Accidental historic export without a matching
+   declaration in any header file.  */
+#ifndef SHARED
+static
 #endif
-
-static void cache_init (void) internal_function; /* initialize the cache */
-static short cache_spot (des_block *, char *, struct rpc_timeval *)
-     internal_function;		/* find an entry in the cache */
-static void cache_ref (uint32_t sid) internal_function;
-				/* note that sid was ref'd */
-
-static void invalidate (char *cred) internal_function;
-				/* invalidate entry in cache */
-
-/*
- * cache statistics
- */
 struct
   {
     u_long ncachehits;		/* times cache hit, and is not replay */
     u_long ncachereplays;	/* times cache hit, and is replay */
     u_long ncachemisses;	/* times cache missed */
   }
-svcauthdes_stats;
+svcauthdes_stats __attribute__ ((nocommon));
+#ifdef SHARED
+compat_symbol (libc, svcauthdes_stats, svcauthdes_stats, GLIBC_2_0);
+#endif
 
 /*
  * Service side authenticator for AUTH_DES
@@ -296,7 +296,11 @@ _svcauth_des (register struct svc_req *rqst, register struct rpc_msg *msg)
 	debug ("timestamp before last seen");
 	return AUTH_REJECTEDVERF;	/* replay */
       }
-    __gettimeofday (&current, (struct timezone *) NULL);
+    {
+      struct timespec now;
+      __clock_gettime (CLOCK_REALTIME, &now);
+      TIMESPEC_TO_TIMEVAL (&current, &now);
+    }
     current.tv_sec -= window;	/* allow for expiration */
     if (!BEFORE (&current, &timestamp))
       {
@@ -389,7 +393,6 @@ _svcauth_des (register struct svc_req *rqst, register struct rpc_msg *msg)
  * Initialize the cache
  */
 static void
-internal_function
 cache_init (void)
 {
   register int i;
@@ -421,7 +424,6 @@ cache_victim (void)
  * Note that sid was referenced
  */
 static void
-internal_function
 cache_ref (register uint32_t sid)
 {
   register int i;
@@ -444,7 +446,6 @@ cache_ref (register uint32_t sid)
  * return the spot in the cache.
  */
 static short
-internal_function
 cache_spot (register des_block *key, char *name,
 	    struct rpc_timeval *timestamp)
 {
@@ -587,7 +588,6 @@ authdes_getucred (const struct authdes_cred *adc, uid_t * uid, gid_t * gid,
 libc_hidden_nolink_sunrpc (authdes_getucred, GLIBC_2_1)
 
 static void
-internal_function
 invalidate (char *cred)
 {
   if (cred == NULL)

@@ -38,6 +38,7 @@
 #include <rpc/pmap_prot.h>
 #include <rpc/pmap_clnt.h>
 #include <sys/socket.h>
+#include <shlib-compat.h>
 
 /*
  * Create a socket that is locally bound to a non-reserve port. For
@@ -45,7 +46,6 @@
  * create the socket.
  */
 int
-internal_function
 __get_socket (struct sockaddr_in *saddr)
 {
   int so = __socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -81,15 +81,9 @@ __get_socket (struct sockaddr_in *saddr)
  * Returns 0 if no map exists.
  */
 u_short
-internal_function
-__libc_rpc_getport (address, program, version, protocol, timeout_sec,
-		    tottimeout_sec)
-     struct sockaddr_in *address;
-     u_long program;
-     u_long version;
-     u_int protocol;
-     time_t timeout_sec;
-     time_t tottimeout_sec;
+__libc_rpc_getport (struct sockaddr_in *address, u_long program,
+		    u_long version, u_int protocol, time_t timeout_sec,
+		    time_t tottimeout_sec)
 {
   const struct timeval timeout = {timeout_sec, 0};
   const struct timeval tottimeout = {tottimeout_sec, 0};
@@ -152,11 +146,8 @@ libc_hidden_nolink_sunrpc (__libc_rpc_getport, GLIBC_PRIVATE)
  * Returns 0 if no map exists.
  */
 u_short
-pmap_getport (address, program, version, protocol)
-     struct sockaddr_in *address;
-     u_long program;
-     u_long version;
-     u_int protocol;
+pmap_getport (struct sockaddr_in *address, u_long program, u_long version,
+	      u_int protocol)
 {
   return __libc_rpc_getport (address, program, version, protocol, 5, 60);
 }

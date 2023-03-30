@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -22,13 +22,13 @@
    terminate program execution, using the low-order 8 bits of the
    given integer as status.  */
 void
-_exit (status)
-     int status;
+_exit (int status)
 {
   status &= 0xff;
   abort ();
 }
 libc_hidden_def (_exit)
+rtld_hidden_def (_exit)
 weak_alias (_exit, _Exit)
 
 stub_warning (_exit)

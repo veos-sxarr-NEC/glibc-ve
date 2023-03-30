@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  PA-RISC version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    Contributed by David Huggins-Daines <dhd@debian.org>
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h 1
@@ -62,7 +62,7 @@ __hppa_init_bootstrap_fdesc_table (struct link_map *map)
 }
 
 #define ELF_MACHINE_BEFORE_RTLD_RELOC(dynamic_info)		\
-	__hppa_init_bootstrap_fdesc_table (&bootstrap_map);	\
+	__hppa_init_bootstrap_fdesc_table (BOOTSTRAP_MAP);	\
 	_dl_fptr_init();
 
 /* Return nonzero iff ELF header is compatible with the running host.  */
@@ -81,10 +81,9 @@ elf_machine_dynamic (void)
 {
   Elf32_Addr dynamic;
 
-  asm ("b,l	1f,%0\n"
-"	depi	0,31,2,%0\n"
-"1:	addil	L'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 8),%0\n"
-"	ldw	R'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 12)(%%r1),%0\n"
+  asm ("bl	1f,%0\n"
+"	addil	L'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 1),%0\n"
+"1:	ldw	R'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 5)(%%r1),%0\n"
        : "=r" (dynamic) : : "r1");
 
   return dynamic;
@@ -100,10 +99,9 @@ elf_machine_load_address (void)
   Elf32_Addr dynamic;
 
   asm (
-"	b,l	1f,%0\n"
-"	depi	0,31,2,%0\n"
-"1:	addil	L'_DYNAMIC - ($PIC_pcrel$0 - 8),%0\n"
-"	ldo	R'_DYNAMIC - ($PIC_pcrel$0 - 12)(%%r1),%0\n"
+"	bl	1f,%0\n"
+"	addil	L'_DYNAMIC - ($PIC_pcrel$0 - 1),%0\n"
+"1:	ldo	R'_DYNAMIC - ($PIC_pcrel$0 - 5)(%%r1),%0\n"
    : "=r" (dynamic) : : "r1");
 
   return dynamic - elf_machine_dynamic ();
@@ -112,6 +110,7 @@ elf_machine_load_address (void)
 /* Fixup a PLT entry to bounce directly to the function at VALUE. */
 static inline struct fdesc __attribute__ ((always_inline))
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf32_Rela *reloc,
 		       Elf32_Addr *reloc_addr, struct fdesc value)
 {
@@ -167,7 +166,7 @@ elf_machine_runtime_setup (struct link_map *l, int lazy, int profile)
       /* FIXME: Search for the got, but backwards through the relocs, technically we should
 	 find it on the first try. However, assuming the relocs got out of order the
 	 routine is made a bit more robust by searching them all in case of failure. */
-      for (iplt = (end_jmprel - sizeof(Elf32_Rela)); iplt >= jmprel; iplt -= sizeof (Elf32_Rela))
+      for (iplt = (end_jmprel - sizeof (Elf32_Rela)); iplt >= jmprel; iplt -= sizeof (Elf32_Rela))
 	{
 
 	  reloc = (const Elf32_Rela *) iplt;
@@ -302,6 +301,10 @@ elf_machine_runtime_setup (struct link_map *l, int lazy, int profile)
 #define ARCH_LA_PLTENTER hppa_gnu_pltenter
 #define ARCH_LA_PLTEXIT hppa_gnu_pltexit
 
+/* Adjust DL_STACK_END to get value we want in __libc_stack_end.  */
+#define DL_STACK_END(cookie) \
+  ((void *) (((long) (cookie)) + 0x160))
+
 /* Initial entry point code for the dynamic linker.
    The C function `_dl_start' is the real entry point;
    its return value is the user program's entry point.  */
@@ -334,14 +337,13 @@ asm (									\
 	   just like a branch reloc.  This sequence gets us the		\
 	   runtime address of _DYNAMIC. */				\
 "	bl	0f,%r19\n"						\
-"	depi	0,31,2,%r19\n"	/* clear priviledge bits */		\
-"0:	addil	L'_DYNAMIC - ($PIC_pcrel$0 - 8),%r19\n"			\
-"	ldo	R'_DYNAMIC - ($PIC_pcrel$0 - 12)(%r1),%r26\n"		\
+"	addil	L'_DYNAMIC - ($PIC_pcrel$0 - 1),%r19\n"			\
+"0:	ldo	R'_DYNAMIC - ($PIC_pcrel$0 - 5)(%r1),%r26\n"		\
 									\
 	/* The link time address is stored in the first entry of the	\
 	   GOT.  */							\
-"	addil	L'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 16),%r19\n"	\
-"	ldw	R'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 20)(%r1),%r20\n" \
+"	addil	L'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 9),%r19\n"	\
+"	ldw	R'_GLOBAL_OFFSET_TABLE_ - ($PIC_pcrel$0 - 13)(%r1),%r20\n" \
 									\
 "	sub	%r26,%r20,%r20\n"	/* Calculate load offset */	\
 									\
@@ -401,11 +403,6 @@ asm (									\
 	/* Save the entry point in %r3. */				\
 "	copy	%ret0,%r3\n"						\
 									\
-	/* Remember the lowest stack address. */			\
-"	addil	LT'__libc_stack_end,%r19\n"				\
-"	ldw	RT'__libc_stack_end(%r1),%r20\n"			\
-"	stw	%sp,0(%r20)\n"						\
-									\
 	/* See if we were called as a command with the executable file	\
 	   name as an extra leading argument. */			\
 "	addil	LT'_dl_skip_args,%r19\n"				\
@@ -463,9 +460,9 @@ asm (									\
 
 /* ELF_RTYPE_CLASS_PLT iff TYPE describes relocation of a PLT entry or
    a TLS variable, so references should not be allowed to define the value.
-   ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to one
+   ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve to one
    of the main executable's symbols, as for a COPY reloc.  */
-#if defined USE_TLS && (!defined RTLD_BOOTSTRAP || USE___THREAD)
+#if !defined RTLD_BOOTSTRAP
 # define elf_machine_type_class(type)				\
   ((((type) == R_PARISC_IPLT					\
   || (type) == R_PARISC_EPLT					\
@@ -565,7 +562,7 @@ elf_machine_rela (struct link_map *map,
 
   if (sym_map)
     {
-      value = sym ? sym_map->l_addr + sym->st_value : 0;
+      value = SYMBOL_ADDRESS (sym_map, sym, true);
       value += reloc->r_addend;
     }
   else
@@ -589,8 +586,8 @@ elf_machine_rela (struct link_map *map,
     case R_PARISC_DIR21L:
       {
 	unsigned int insn = *(unsigned int *)reloc_addr;
-	value = sym_map->l_addr + sym->st_value
-		+ ((reloc->r_addend + 0x1000) & -0x2000);
+	value = (SYMBOL_ADDRESS (sym_map, sym, true)
+		 + ((reloc->r_addend + 0x1000) & -0x2000));
 	value = value >> 11;
 	insn = (insn &~ 0x1fffff) | reassemble_21 (value);
 	*(unsigned int *)reloc_addr = insn;
@@ -600,8 +597,8 @@ elf_machine_rela (struct link_map *map,
     case R_PARISC_DIR14R:
       {
 	unsigned int insn = *(unsigned int *)reloc_addr;
-	value = ((sym_map->l_addr + sym->st_value) & 0x7ff)
-		+ (((reloc->r_addend & 0x1fff) ^ 0x1000) - 0x1000);
+	value = ((SYMBOL_ADDRESS (sym_map, sym, true) & 0x7ff)
+		 + (((reloc->r_addend & 0x1fff) ^ 0x1000) - 0x1000));
 	insn = (insn &~ 0x3fff) | reassemble_14 (value);
 	*(unsigned int *)reloc_addr = insn;
       }
@@ -653,13 +650,13 @@ elf_machine_rela (struct link_map *map,
     case R_PARISC_IPLT:
       if (__builtin_expect (sym_map != NULL, 1))
 	{
-	  elf_machine_fixup_plt (NULL, sym_map, reloc, reloc_addr,
+	  elf_machine_fixup_plt (NULL, sym_map, NULL, NULL, reloc, reloc_addr,
 				 DL_FIXUP_MAKE_VALUE(sym_map, value));
 	}
       else
 	{
 	  /* If we get here, it's a (weak) undefined sym.  */
-	  elf_machine_fixup_plt (NULL, map, reloc, reloc_addr,
+	  elf_machine_fixup_plt (NULL, map, NULL, NULL, reloc, reloc_addr,
 				 DL_FIXUP_MAKE_VALUE(map, value));
 	}
       return;
@@ -684,7 +681,7 @@ elf_machine_rela (struct link_map *map,
 	      MIN (sym->st_size, refsym->st_size));
       return;
 
-#if defined USE_TLS && (!defined RTLD_BOOTSTRAP)
+#if !defined RTLD_BOOTSTRAP
     case R_PARISC_TLS_DTPMOD32:
       value = sym_map->l_tls_modid;
       break;
@@ -693,7 +690,7 @@ elf_machine_rela (struct link_map *map,
       /* During relocation all TLS symbols are defined and used.
 	 Therefore the offset is already correct.  */
       if (sym != NULL)
-	*reloc_addr = sym->st_value;
+	*reloc_addr = sym->st_value + reloc->r_addend;
       return;
 
     case R_PARISC_TLS_TPREL32:

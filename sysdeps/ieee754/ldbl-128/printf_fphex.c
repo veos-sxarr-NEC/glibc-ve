@@ -1,6 +1,6 @@
 /* Print floating point number in hexadecimal notation according to
    ISO C99.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,93 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <ldbl-128/printf_fphex_macros.h>
 #define PRINT_FPHEX_LONG_DOUBLE \
-do {									      \
-      /* We have 112 bits of mantissa plus one implicit digit.  Since	      \
-	 112 bits are representable without rest using hexadecimal	      \
-	 digits we use only the implicit digits for the number before	      \
-	 the decimal point.  */						      \
-      unsigned long long int num0, num1;				      \
-      union ieee854_long_double u;					      \
-      u.d = fpnum.ldbl;							      \
-									      \
-      assert (sizeof (long double) == 16);				      \
-									      \
-      num0 = (((unsigned long long int) u.ieee.mantissa0) << 32		      \
-	     | u.ieee.mantissa1);					      \
-      num1 = (((unsigned long long int) u.ieee.mantissa2) << 32		      \
-	     | u.ieee.mantissa3);					      \
-									      \
-      zero_mantissa = (num0|num1) == 0;					      \
-									      \
-      if (sizeof (unsigned long int) > 6)				      \
-	{								      \
-	  numstr = _itoa_word (num1, numbuf + sizeof numbuf, 16,	      \
-			       info->spec == 'A');			      \
-	  wnumstr = _itowa_word (num1,					      \
-				 wnumbuf + sizeof (wnumbuf) / sizeof (wchar_t),\
-				 16, info->spec == 'A');		      \
-	}								      \
-      else								      \
-	{								      \
-	  numstr = _itoa (num1, numbuf + sizeof numbuf, 16,		      \
-			  info->spec == 'A');				      \
-	  wnumstr = _itowa (num1,					      \
-			    wnumbuf + sizeof (wnumbuf) / sizeof (wchar_t),    \
-			    16, info->spec == 'A');			      \
-	}								      \
-									      \
-      while (numstr > numbuf + (sizeof numbuf - 64 / 4))		      \
-	{								      \
-	  *--numstr = '0';						      \
-	  *--wnumstr = L'0';						      \
-	}								      \
-									      \
-      if (sizeof (unsigned long int) > 6)				      \
-	{								      \
-	  numstr = _itoa_word (num0, numstr, 16, info->spec == 'A');	      \
-	  wnumstr = _itowa_word (num0, wnumstr, 16, info->spec == 'A');	      \
-	}								      \
-      else								      \
-	{								      \
-	  numstr = _itoa (num0, numstr, 16, info->spec == 'A');		      \
-	  wnumstr = _itowa (num0, wnumstr, 16, info->spec == 'A');	      \
-	}								      \
-									      \
-      /* Fill with zeroes.  */						      \
-      while (numstr > numbuf + (sizeof numbuf - 112 / 4))		      \
-	{								      \
-	  *--numstr = '0';						      \
-	  *--wnumstr = L'0';						      \
-	}								      \
-									      \
-      leading = u.ieee.exponent == 0 ? '0' : '1';			      \
-									      \
-      exponent = u.ieee.exponent;					      \
-									      \
-      if (exponent == 0)						      \
-	{								      \
-	  if (zero_mantissa)						      \
-	    expnegative = 0;						      \
-	  else								      \
-	    {								      \
-	      /* This is a denormalized number.  */			      \
-	      expnegative = 1;						      \
-	      exponent = IEEE854_LONG_DOUBLE_BIAS - 1;			      \
-	    }								      \
-	}								      \
-      else if (exponent >= IEEE854_LONG_DOUBLE_BIAS)			      \
-	{								      \
-	  expnegative = 0;						      \
-	  exponent -= IEEE854_LONG_DOUBLE_BIAS;				      \
-	}								      \
-      else								      \
-	{								      \
-	  expnegative = 1;						      \
-	  exponent = -(exponent - IEEE854_LONG_DOUBLE_BIAS);		      \
-	}								      \
-} while (0)
+  PRINT_FPHEX (long double, fpnum.ldbl, ieee854_long_double, \
+	       IEEE854_LONG_DOUBLE_BIAS)
 
 #include <stdio-common/printf_fphex.c>

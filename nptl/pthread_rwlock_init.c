@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,11 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "pthreadP.h"
 #include <string.h>
-#include <kernel-features.h>
+#include <pthread-offsets.h>
 
 
 static const struct pthread_rwlockattr default_rwlockattr =
@@ -28,45 +28,30 @@ static const struct pthread_rwlockattr default_rwlockattr =
   };
 
 
+/* See pthread_rwlock_common.c.  */
 int
-__pthread_rwlock_init (rwlock, attr)
-     pthread_rwlock_t *rwlock;
-     const pthread_rwlockattr_t *attr;
+__pthread_rwlock_init (pthread_rwlock_t *rwlock,
+		       const pthread_rwlockattr_t *attr)
 {
+  ASSERT_TYPE_SIZE (pthread_rwlock_t, __SIZEOF_PTHREAD_RWLOCK_T);
+
+  /* The __flags is the only field where its offset should be checked to
+     avoid ABI breakage with static initializers.  */
+  ASSERT_PTHREAD_INTERNAL_OFFSET (pthread_rwlock_t, __data.__flags,
+				  __PTHREAD_RWLOCK_FLAGS_OFFSET);
+  ASSERT_PTHREAD_INTERNAL_MEMBER_SIZE (pthread_rwlock_t, __data.__flags,
+				       int);
+
   const struct pthread_rwlockattr *iattr;
 
   iattr = ((const struct pthread_rwlockattr *) attr) ?: &default_rwlockattr;
 
   memset (rwlock, '\0', sizeof (*rwlock));
 
-  rwlock->__data.__flags
-    = iattr->lockkind == PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP;
+  rwlock->__data.__flags = iattr->lockkind;
 
-  /* The __SHARED field is computed to minimize the work that needs to
-     be done while handling the futex.  There are two inputs: the
-     availability of private futexes and whether the rwlock is shared
-     or private.  Unfortunately the value of a private rwlock is
-     fixed: it must be zero.  The PRIVATE_FUTEX flag has the value
-     0x80 in case private futexes are available and zero otherwise.
-     This leads to the following table:
-
-		 |     pshared     |     result
-		 | shared  private | shared  private |
-     ------------+-----------------+-----------------+
-     !avail 0    |     0       0   |     0       0   |
-      avail 0x80 |  0x80       0   |     0    0x80   |
-
-     If the pshared value is in locking functions XORed with avail
-     we get the expected result.  */
-#ifdef __ASSUME_PRIVATE_FUTEX
-  rwlock->__data.__shared = (iattr->pshared == PTHREAD_PROCESS_PRIVATE
-			     ? 0 : FUTEX_PRIVATE_FLAG);
-#else
-  rwlock->__data.__shared = (iattr->pshared == PTHREAD_PROCESS_PRIVATE
-			     ? 0
-			     : THREAD_GETMEM (THREAD_SELF,
-					      header.private_futex));
-#endif
+  /* The value of __SHARED in a private rwlock must be zero.  */
+  rwlock->__data.__shared = (iattr->pshared != PTHREAD_PROCESS_PRIVATE);
 
   return 0;
 }

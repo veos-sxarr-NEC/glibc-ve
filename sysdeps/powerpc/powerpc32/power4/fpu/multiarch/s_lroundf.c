@@ -1,5 +1,5 @@
 /* Multiple versions of lroundf.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include "init-arch.h"
+#include <libm-alias-float.h>
 
 /* It's safe to use double-precision implementation for single-precision.  */
 extern __typeof (__lroundf) __lround_ppc32 attribute_hidden;
@@ -31,4 +32,4 @@ libc_ifunc (__lroundf,
 		  __lround_power5plus
             : __lround_ppc32);
 
-weak_alias (__lroundf, lroundf)
+libm_alias_float (__lround, lround)

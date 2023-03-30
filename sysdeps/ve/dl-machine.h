@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  VE version.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>.
 
@@ -15,8 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef dl_machine_h
 #define dl_machine_h
@@ -223,6 +223,7 @@ dl_platform_init (void)
 
 static inline ElfW(Addr)
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+			const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const ElfW(Rela) *reloc,
 		       ElfW(Addr) *reloc_addr, ElfW(Addr) value)
 {
@@ -291,8 +292,7 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
   else
     {
       struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-      ElfW(Addr) value = (sym == NULL ? 0
-			  : (ElfW(Addr)) sym_map->l_addr + sym->st_value);
+      ElfW(Addr) value = SYMBOL_ADDRESS (sym_map, sym, true);
 
       if (sym != NULL
 	  && __builtin_expect (ELFW(ST_TYPE) (sym->st_info) == STT_GNU_IFUNC,

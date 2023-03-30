@@ -1,5 +1,5 @@
 /* mpn_add_n -- add (or subtract) bignums.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <arm-features.h>
@@ -52,40 +52,31 @@ ENTRY (FUNC)
 	add	lr, r1, r3, lsl #2	/* compute end src1 */
 	beq	1f
 
-	sfi_breg r1, \
-	ldr	r4, [\B], #4		/* do one to make count even */
-	sfi_breg r2, \
-	ldr	r5, [\B], #4
+	ldr	r4, [r1], #4		/* do one to make count even */
+	ldr	r5, [r2], #4
 	OPC	r4, r4, r5
 	teq	r1, lr			/* end of count? (preserve carry) */
-	sfi_breg r0, \
-	str	r4, [\B], #4
+	str	r4, [r0], #4
 	beq	9f
 1:
 	tst	r3, #2			/* count & 2 == 2?  */
 	beq	2f
-	sfi_breg r1, \
-	ldm	\B!, { r4, r5 }		/* do two to make count 0 mod 4 */
-	sfi_breg r2, \
-	ldm	\B!, { r6, r7 }
+	ldm	r1!, { r4, r5 }		/* do two to make count 0 mod 4 */
+	ldm	r2!, { r6, r7 }
 	OPC	r4, r4, r6
 	OPC	r5, r5, r7
 	teq	r1, lr			/* end of count? */
-	sfi_breg r0, \
-	stm	\B!, { r4, r5 }
+	stm	r0!, { r4, r5 }
 	beq	9f
 2:
-	sfi_breg r1, \
-	ldm	\B!, { r3, r5, r7, r10 }	/* do four each loop */
-	sfi_breg r2, \
-	ldm	\B!, { r4, r6, r8, ip }
+	ldm	r1!, { r3, r5, r7, r10 }	/* do four each loop */
+	ldm	r2!, { r4, r6, r8, ip }
 	OPC	r3, r3, r4
 	OPC	r5, r5, r6
 	OPC	r7, r7, r8
 	OPC	r10, r10, ip
 	teq	r1, lr
-	sfi_breg r0, \
-	stm	\B!, { r3, r5, r7, r10 }
+	stm	r0!, { r3, r5, r7, r10 }
 	bne	2b
 
 9:

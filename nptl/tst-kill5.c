@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,13 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 
 int
@@ -28,7 +29,7 @@ do_test (void)
 {
   /* XXX This test might require architecture and system specific changes.
      There is no guarantee that this signal number is invalid.  */
-  int e = pthread_kill (pthread_self (), SIGRTMAX + 10);
+  int e = pthread_kill (pthread_self (), INT_MAX);
   if (e == 0)
     {
       puts ("kill didn't failed");

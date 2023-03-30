@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  ARM version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h
@@ -53,14 +53,29 @@ elf_machine_dynamic (void)
 static inline Elf32_Addr __attribute__ ((unused))
 elf_machine_load_address (void)
 {
-  extern Elf32_Addr internal_function __dl_start (void *) asm ("_dl_start");
-  Elf32_Addr got_addr = (Elf32_Addr) &__dl_start;
   Elf32_Addr pcrel_addr;
-#ifdef __thumb__
-  /* Clear the low bit of the funciton address.  */
-  got_addr &= ~(Elf32_Addr) 1;
-#endif
+#ifdef SHARED
+  extern Elf32_Addr __dl_start (void *) asm ("_dl_start");
+  Elf32_Addr got_addr = (Elf32_Addr) &__dl_start;
   asm ("adr %0, _dl_start" : "=r" (pcrel_addr));
+#else
+  extern Elf32_Addr __dl_relocate_static_pie (void *)
+    asm ("_dl_relocate_static_pie") attribute_hidden;
+  Elf32_Addr got_addr = (Elf32_Addr) &__dl_relocate_static_pie;
+  asm ("adr %0, _dl_relocate_static_pie" : "=r" (pcrel_addr));
+#endif
+#ifdef __thumb__
+  /* Clear the low bit of the function address.
+
+     NOTE: got_addr is from GOT table whose lsb is always set by linker if it's
+     Thumb function address.  PCREL_ADDR comes from PC-relative calculation
+     which will finish during assembling.  GAS assembler before the fix for
+     PR gas/21458 was not setting the lsb but does after that.  Always do the
+     strip for both, so the code works with various combinations of glibc and
+     Binutils.  */
+  got_addr &= ~(Elf32_Addr) 1;
+  pcrel_addr &= ~(Elf32_Addr) 1;
+#endif
   return pcrel_addr - got_addr;
 }
 
@@ -111,10 +126,6 @@ elf_machine_runtime_setup (struct link_map *l, int lazy, int profile)
 	   the offset on the stack, and then jump to the resolved address.  */
 	got[2] = (Elf32_Addr) &_dl_runtime_resolve;
     }
-
-  if (l->l_info[ADDRIDX (DT_TLSDESC_GOT)] && lazy)
-    *(Elf32_Addr*)(D_PTR (l, l_info[ADDRIDX (DT_TLSDESC_GOT)]) + l->l_addr)
-      = (Elf32_Addr) &_dl_tlsdesc_lazy_resolver;
 
   return lazy;
 }
@@ -223,19 +234,23 @@ _dl_start_user:\n\
 /* ELF_RTYPE_CLASS_PLT iff TYPE describes relocation of a PLT entry or
    TLS variable, so undefined references should not be allowed to
    define the value.
-   ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to one
-   of the main executable's symbols, as for a COPY reloc.  */
+   ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve to one
+   of the main executable's symbols, as for a COPY reloc.
+   ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA iff TYPE describes relocation against
+   protected data whose address may be external due to copy relocation.  */
 #ifndef RTLD_BOOTSTRAP
 # define elf_machine_type_class(type) \
   ((((type) == R_ARM_JUMP_SLOT || (type) == R_ARM_TLS_DTPMOD32		\
      || (type) == R_ARM_TLS_DTPOFF32 || (type) == R_ARM_TLS_TPOFF32	\
      || (type) == R_ARM_TLS_DESC)					\
     * ELF_RTYPE_CLASS_PLT)						\
-   | (((type) == R_ARM_COPY) * ELF_RTYPE_CLASS_COPY))
+   | (((type) == R_ARM_COPY) * ELF_RTYPE_CLASS_COPY)			\
+   | (((type) == R_ARM_GLOB_DAT) * ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA))
 #else
 #define elf_machine_type_class(type) \
   ((((type) == R_ARM_JUMP_SLOT) * ELF_RTYPE_CLASS_PLT)	\
-   | (((type) == R_ARM_COPY) * ELF_RTYPE_CLASS_COPY))
+   | (((type) == R_ARM_COPY) * ELF_RTYPE_CLASS_COPY)	\
+   | (((type) == R_ARM_GLOB_DAT) * ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA))
 #endif
 
 /* A reloc type used for ld.so cmdline arg lookups to reject PLT entries.  */
@@ -259,6 +274,7 @@ dl_platform_init (void)
 
 static inline Elf32_Addr
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf32_Rel *reloc,
 		       Elf32_Addr *reloc_addr, Elf32_Addr value)
 {
@@ -376,7 +392,7 @@ elf_machine_rel (struct link_map *map, const Elf32_Rel *reloc,
     {
       const Elf32_Sym *const refsym = sym;
       struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-      Elf32_Addr value = sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value;
+      Elf32_Addr value = SYMBOL_ADDRESS (sym_map, sym, true);
 
       if (sym != NULL
 	  && __builtin_expect (ELFW(ST_TYPE) (sym->st_info) == STT_GNU_IFUNC, 0)
@@ -436,7 +452,7 @@ elf_machine_rel (struct link_map *map, const Elf32_Rel *reloc,
 		 binding found in the user program or a loaded library
 		 rather than the dynamic linker's built-in definitions
 		 used while loading those libraries.  */
-	      value -= map->l_addr + refsym->st_value;
+	      value -= SYMBOL_ADDRESS (map, refsym, true);
 # endif
 	    /* Support relocations on mis-aligned offsets.  */
 	    ((struct unaligned *) reloc_addr)->x += value;
@@ -444,8 +460,7 @@ elf_machine_rel (struct link_map *map, const Elf32_Rel *reloc,
 	  }
 	case R_ARM_TLS_DESC:
 	  {
-	    struct tlsdesc volatile *td =
-	      (struct tlsdesc volatile *)reloc_addr;
+	    struct tlsdesc *td = (struct tlsdesc *)reloc_addr;
 
 # ifndef RTLD_BOOTSTRAP
 	    if (! sym)
@@ -507,7 +522,8 @@ elf_machine_rel (struct link_map *map, const Elf32_Rel *reloc,
 	  break;
 	case R_ARM_IRELATIVE:
 	  value = map->l_addr + *reloc_addr;
-	  value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
+	  if (__glibc_likely (!skip_ifunc))
+	    value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
 	  *reloc_addr = value;
 	  break;
 #endif
@@ -538,7 +554,7 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
       const Elf32_Sym *const refsym = sym;
 # endif
       struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-      Elf32_Addr value = sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value;
+      Elf32_Addr value = SYMBOL_ADDRESS (sym_map, sym, true);
 
       if (sym != NULL
 	  && __builtin_expect (ELFW(ST_TYPE) (sym->st_info) == STT_GNU_IFUNC, 0)
@@ -574,32 +590,6 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
 	case R_ARM_ABS32:
 	  *reloc_addr = value + reloc->r_addend;
 	  break;
-#  ifdef RESOLVE_CONFLICT_FIND_MAP
-	case R_ARM_TLS_DESC:
-	  {
-	    struct tlsdesc volatile *td =
-	      (struct tlsdesc volatile *) reloc_addr;
-
-	    RESOLVE_CONFLICT_FIND_MAP (map, reloc_addr);
-
-	    /* Make sure we know what's going on.  */
-	    assert (td->entry
-		    == (void *) (D_PTR (map, l_info[ADDRIDX (DT_TLSDESC_PLT)])
-				 + map->l_addr));
-	    assert (map->l_info[ADDRIDX (DT_TLSDESC_GOT)]);
-
-	    /* Set up the lazy resolver and store the pointer to our link
-	       map in _GLOBAL_OFFSET_TABLE[1] now as for a prelinked
-	       binary elf_machine_runtime_setup() is not called and hence
-	       neither has been initialized.  */
-	    *(Elf32_Addr *) (D_PTR (map, l_info[ADDRIDX (DT_TLSDESC_GOT)])
-			     + map->l_addr)
-	      = (Elf32_Addr) &_dl_tlsdesc_lazy_resolver;
-	    ((Elf32_Addr *) D_PTR (map, l_info[DT_PLTGOT]))[1]
-	      = (Elf32_Addr) map;
-	  }
-	  break;
-#  endif /* RESOLVE_CONFLICT_FIND_MAP */
 	case R_ARM_PC24:
           relocate_pc24 (map, value, reloc_addr, reloc->r_addend);
 	  break;
@@ -625,7 +615,8 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
 	  break;
 	case R_ARM_IRELATIVE:
 	  value = map->l_addr + reloc->r_addend;
-	  value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
+	  if (__glibc_likely (!skip_ifunc))
+	    value = ((Elf32_Addr (*) (int)) value) (GLRO(dl_hwcap));
 	  *reloc_addr = value;
 	  break;
 #endif
@@ -675,17 +666,21 @@ elf_machine_lazy_rel (struct link_map *map,
     }
   else if (__builtin_expect (r_type == R_ARM_TLS_DESC, 1))
     {
-      struct tlsdesc volatile *td =
-	(struct tlsdesc volatile *)reloc_addr;
+      const Elf_Symndx symndx = ELFW (R_SYM) (reloc->r_info);
+      const ElfW (Sym) *symtab = (const void *)D_PTR (map, l_info[DT_SYMTAB]);
+      const ElfW (Sym) *sym = &symtab[symndx];
+      const struct r_found_version *version = NULL;
 
-      /* The linker must have given us the parameter we need in the
-	 first GOT entry, and left the second one empty.  The latter
-	 will have been preset by the prelinker if used though.
-	 We fill it with the resolver address.  */
-      assert (td->entry == 0
-	      || map->l_info[VALIDX (DT_GNU_PRELINKED)] != NULL);
-      td->entry = (void*)(D_PTR (map, l_info[ADDRIDX (DT_TLSDESC_PLT)])
-			  + map->l_addr);
+      if (map->l_info[VERSYMIDX (DT_VERSYM)] != NULL)
+	{
+	  const ElfW (Half) *vernum =
+	    (const void *)D_PTR (map, l_info[VERSYMIDX (DT_VERSYM)]);
+	  version = &map->l_versions[vernum[symndx] & 0x7fff];
+	}
+
+      /* Always initialize TLS descriptors completely, because lazy
+	 initialization requires synchronization at every TLS access.  */
+      elf_machine_rel (map, reloc, sym, version, reloc_addr, skip_ifunc);
     }
   else
     _dl_reloc_bad_type (map, r_type, 1);

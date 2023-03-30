@@ -1,6 +1,6 @@
 /* Test backtrace and backtrace_symbols for signal frames, where a
    system call was interrupted by a signal.
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <execinfo.h>
 #include <search.h>
@@ -31,10 +31,6 @@
 #ifndef SIGACTION_FLAGS
 # define SIGACTION_FLAGS 0
 #endif
-
-static int do_test (void);
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
 
 /* The backtrace should include at least handle_signal, a signal
    trampoline, read, 3 * fn, and do_test.  */
@@ -73,17 +69,18 @@ handle_signal (int signum)
       FAIL ();
       return;
     }
-  /* Do not check name for signal trampoline.  */
-  i = 2;
-  if (!match (symbols[i++], "read"))
+
+  /* Do not check name for signal trampoline or cancellable syscall
+     wrappers (__syscall_cancel*).  */
+  for (; i < n - 1; i++)
+    if (match (symbols[i], "read"))
+      break;
+  if (i == n - 1)
     {
-      /* Perhaps symbols[2] is __kernel_vsyscall?  */
-      if (!match (symbols[i++], "read"))
-	{
-	  FAIL ();
-	  return;
-	}
+      FAIL ();
+      return;
     }
+
   for (; i < n - 1; i++)
     if (!match (symbols[i], "fn"))
       {
@@ -92,6 +89,18 @@ handle_signal (int signum)
       }
   /* Symbol names are not available for static functions, so we do not
      check do_test.  */
+
+  /* Check that backtrace does not return more than what fits in the array
+     (bug 25423).  */
+  for (int j = 0; j < NUM_FUNCTIONS; j++)
+    {
+      n = backtrace (addresses, j);
+      if (n > j)
+	{
+	  FAIL ();
+	  return;
+	}
+    }
 }
 
 NO_INLINE int
@@ -133,9 +142,11 @@ fn (int c, int flags)
   return 0;
 }
 
-NO_INLINE static int
+NO_INLINE int
 do_test (void)
 {
   fn (2, SIGACTION_FLAGS);
   return ret;
 }
+
+#include <support/test-driver.c>

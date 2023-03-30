@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Zack Weinberg <zack@rabi.phys.columbia.edu>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <paths.h>
 #include <stdlib.h>
@@ -32,5 +32,5 @@ unlockpt (int fd)
   /* BSD doesn't have a lock, but it does have `revoke'.  */
   if (__ptsname_r (fd, buf, sizeof (buf)))
     return -1;
-  return revoke (buf);
+  return __revoke (buf);
 }

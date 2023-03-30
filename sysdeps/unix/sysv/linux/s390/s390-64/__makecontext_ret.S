@@ -1,4 +1,4 @@
-/* Copyright (C) 2012-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,11 +13,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
 ENTRY(__makecontext_ret)
+	/* Mark r14 as undefined in order to stop unwinding here!  */
+	cfi_undefined (r14)
 	basr	%r14,%r7
 	ltgr	%r8,%r8			/* Check whether uc_link is 0.  */
 	jz	1f

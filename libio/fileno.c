@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,8 +28,7 @@
 #include <stdio.h>
 
 int
-__fileno (fp)
-     _IO_FILE* fp;
+__fileno (FILE *fp)
 {
   CHECK_FILE (fp, EOF);
 
@@ -45,10 +44,8 @@ libc_hidden_def (__fileno)
 weak_alias (__fileno, fileno)
 libc_hidden_weak (fileno)
 
-#ifdef weak_alias
 /* The fileno implementation for libio does not require locking because
    it only accesses once a single variable and this is already atomic
    (at least at thread level).  Therefore we don't test _IO_MTSAFE_IO here.  */
 
 weak_alias (__fileno, fileno_unlocked)
-#endif

@@ -1,5 +1,5 @@
 /* Test compilation of tgmath macros.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com> and
    Ulrich Drepper <drepper@redhat.com>, 2001.
@@ -16,12 +16,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef HAVE_MAIN
 #undef __NO_MATH_INLINES
 #define __NO_MATH_INLINES 1
+#include <float.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <tgmath.h>
 
@@ -29,7 +31,7 @@
 
 static void compile_test (void);
 static void compile_testf (void);
-#ifndef NO_LONG_DOUBLE
+#if LDBL_MANT_DIG > DBL_MANT_DIG
 static void compile_testl (void);
 #endif
 
@@ -43,19 +45,19 @@ complex float fz;
 complex double dz;
 complex long double lz;
 
-int count_double;
-int count_float;
-int count_ldouble;
-int count_cdouble;
-int count_cfloat;
-int count_cldouble;
+volatile int count_double;
+volatile int count_float;
+volatile int count_ldouble;
+volatile int count_cdouble;
+volatile int count_cfloat;
+volatile int count_cldouble;
 
-#define NCALLS     115
+#define NCALLS     132
 #define NCALLS_INT 4
 #define NCCALLS    47
 
-int
-main (void)
+static int
+do_test (void)
 {
   int result = 0;
 
@@ -134,7 +136,7 @@ main (void)
       result = 1;
     }
 
-#ifndef NO_LONG_DOUBLE
+#if LDBL_MANT_DIG > DBL_MANT_DIG
   count_float = count_double = count_ldouble = 0;
   count_cfloat = count_cdouble = count_cldouble = 0;
   compile_testl ();
@@ -199,7 +201,7 @@ main (void)
 #define ccount count_cfloat
 #include "test-tgmath.c"
 
-#ifndef NO_LONG_DOUBLE
+#if LDBL_MANT_DIG > DBL_MANT_DIG
 #define F(name) name##l
 #define TYPE long double
 #define x lx
@@ -209,6 +211,9 @@ main (void)
 #define ccount count_cldouble
 #include "test-tgmath.c"
 #endif
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
 
 #else
 
@@ -223,10 +228,12 @@ F(compile_test) (void)
 {
   TYPE a, b, c = 1.0;
   complex TYPE d;
-  int i;
+  int i = 2;
   int saved_count;
   long int j;
   long long int k;
+  intmax_t m;
+  uintmax_t um;
 
   a = cos (cos (x));
   b = acos (acos (a));
@@ -261,24 +268,32 @@ F(compile_test) (void)
   b = fmod (fmod (a, b), fmod (c, x));
   a = nearbyint (nearbyint (x));
   b = round (round (a));
+  c = roundeven (roundeven (a));
   a = trunc (trunc (x));
   b = remquo (remquo (a, b, &i), remquo (c, x, &i), &i);
   j = lrint (x) + lround (a);
   k = llrint (b) + llround (c);
+  m = fromfp (a, FP_INT_UPWARD, 2) + fromfpx (b, FP_INT_DOWNWARD, 3);
+  um = ufromfp (c, FP_INT_TONEAREST, 4) + ufromfpx (a, FP_INT_TOWARDZERO, 5);
   a = erf (erf (x));
   b = erfc (erfc (a));
   a = tgamma (tgamma (x));
   b = lgamma (lgamma (a));
   a = rint (rint (x));
   b = nextafter (nextafter (a, b), nextafter (c, x));
-  a = nexttoward (nexttoward (x, a), c);
+  a = nextdown (nextdown (a));
+  b = nexttoward (nexttoward (x, a), c);
+  a = nextup (nextup (a));
   b = remainder (remainder (a, b), remainder (c, x));
   a = scalb (scalb (x, a), (TYPE) (6));
   k = scalbn (a, 7) + scalbln (c, 10l);
   i = ilogb (x);
+  j = llogb (x);
   a = fdim (fdim (x, a), fdim (c, b));
   b = fmax (fmax (a, x), fmax (c, b));
   a = fmin (fmin (x, a), fmin (c, b));
+  b = fmaxmag (fmaxmag (a, x), fmaxmag (c, b));
+  a = fminmag (fminmag (x, a), fminmag (c, b));
   b = fma (sin (a), sin (x), sin (c));
 
 #ifdef TEST_INT
@@ -287,7 +302,7 @@ F(compile_test) (void)
   c = fma (i, b, i);
   a = pow (i, c);
 #endif
-  x = a + b + c + i + j + k;
+  x = a + b + c + i + j + k + m + um;
 
   saved_count = count;
   if (ccount != 0)
@@ -357,10 +372,14 @@ F(compile_test) (void)
       a = fmod (y, y);
       a = nearbyint (y);
       a = round (y);
+      a = roundeven (y);
       a = trunc (y);
       a = remquo (y, y, &i);
       j = lrint (y) + lround (y);
       k = llrint (y) + llround (y);
+      m = fromfp (y, FP_INT_UPWARD, 6) + fromfpx (y, FP_INT_DOWNWARD, 7);
+      um = (ufromfp (y, FP_INT_TONEAREST, 8)
+	    + ufromfpx (y, FP_INT_TOWARDZERO, 9));
       a = erf (y);
       a = erfc (y);
       a = tgamma (y);
@@ -372,9 +391,12 @@ F(compile_test) (void)
       a = scalb (y, (const TYPE) (6));
       k = scalbn (y, 7) + scalbln (y, 10l);
       i = ilogb (y);
+      j = llogb (y);
       a = fdim (y, y);
       a = fmax (y, y);
       a = fmin (y, y);
+      a = fmaxmag (y, y);
+      a = fminmag (y, y);
       a = fma (y, y, y);
 
 #ifdef TEST_INT
@@ -678,6 +700,14 @@ TYPE
 }
 
 TYPE
+(F(roundeven)) (TYPE x)
+{
+  ++count;
+  P ();
+  return x;
+}
+
+TYPE
 (F(trunc)) (TYPE x)
 {
   ++count;
@@ -719,6 +749,38 @@ long long int
 
 long long int
 (F(llround)) (TYPE x)
+{
+  ++count;
+  P ();
+  return x;
+}
+
+intmax_t
+(F(fromfp)) (TYPE x, int round, unsigned int width)
+{
+  ++count;
+  P ();
+  return x;
+}
+
+intmax_t
+(F(fromfpx)) (TYPE x, int round, unsigned int width)
+{
+  ++count;
+  P ();
+  return x;
+}
+
+uintmax_t
+(F(ufromfp)) (TYPE x, int round, unsigned int width)
+{
+  ++count;
+  P ();
+  return x;
+}
+
+uintmax_t
+(F(ufromfpx)) (TYPE x, int round, unsigned int width)
 {
   ++count;
   P ();
@@ -774,11 +836,27 @@ TYPE
 }
 
 TYPE
+(F(nextdown)) (TYPE x)
+{
+  ++count;
+  P ();
+  return x;
+}
+
+TYPE
 (F(nexttoward)) (TYPE x, long double y)
 {
   ++count;
   P ();
   return x + y;
+}
+
+TYPE
+(F(nextup)) (TYPE x)
+{
+  ++count;
+  P ();
+  return x;
 }
 
 TYPE
@@ -821,6 +899,14 @@ int
   return x;
 }
 
+long int
+(F(llogb)) (TYPE x)
+{
+  ++count;
+  P ();
+  return x;
+}
+
 TYPE
 (F(fdim)) (TYPE x, TYPE y)
 {
@@ -839,6 +925,22 @@ TYPE
 
 TYPE
 (F(fmax)) (TYPE x, TYPE y)
+{
+  ++count;
+  P ();
+  return x + y;
+}
+
+TYPE
+(F(fminmag)) (TYPE x, TYPE y)
+{
+  ++count;
+  P ();
+  return x + y;
+}
+
+TYPE
+(F(fmaxmag)) (TYPE x, TYPE y)
 {
   ++count;
   P ();

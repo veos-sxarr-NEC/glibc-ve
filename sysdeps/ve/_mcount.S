@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 /* Machine-specific calling sequence for `mcount' profiling function.  x86-64 version.
@@ -41,8 +41,7 @@ C_LABEL(_mcount)
 	st     %s6, 0x38(0,%sp)
 	st     %s7, 0x40(0,%sp)
 	st     %got,0x48(0,%sp)
-	lea    %got,_GLOBAL_OFFSET_TABLE_@PC_LO(-24)
-	and    %got,%got,(32)0
+	addi %got,-16,_GLOBAL_OFFSET_TABLE_@PC_LO
 	sic    %plt
 	lea.sl %got,_GLOBAL_OFFSET_TABLE_@PC_HI(%got,%plt)
 
@@ -57,12 +56,10 @@ C_LABEL(_mcount)
 	or	%s1, 0, %lr
 	st	%s1, -176-8(,%sp) /* Saving function address on stack */
 #ifndef PIC
-        lea     %s12, __mcount_internal@CALL_LO
-        and     %s12, %s12,(32)0
+        addi %s12,0,__mcount_internal@CALL_LO
         lea.sl  %s12, __mcount_internal@CALL_HI(,%s12)
 #else
-        lea     %s12, __mcount_internal@PLT_LO(-24)
-        and     %s12,%s12,(32)0
+        addi %s12,-16,__mcount_internal@PLT_LO
         sic     %s55
         lea.sl  %s12, __mcount_internal@PLT_HI(%s12,%s55)
 #endif

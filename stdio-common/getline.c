@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,23 +13,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stddef.h>
 #include <stdio.h>
+#include "../libio/libioP.h"
 
 #undef __getline
-
-#include "../libio/libioP.h"
-#undef ssize_t
-#define ssize_t _IO_ssize_t
-#define __getdelim _IO_getdelim
 
 /* Like getdelim, but always looks for a newline.  */
 ssize_t
 __getline (char **lineptr, size_t *n, FILE *stream)
 {
-  return __getdelim (lineptr, n, '\n', stream);
+  return _IO_getdelim (lineptr, n, '\n', stream);
 }
 
 weak_alias (__getline, getline)

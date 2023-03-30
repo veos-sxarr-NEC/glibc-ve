@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2009.
 
@@ -14,16 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <tcb-offsets.h>
 #include <kernel-features.h>
-#include "lowlevellock.h"
+#include <lowlevellock-futex.h>
 
+#define PTHREAD_UNWIND JUMPTARGET(__pthread_unwind)
 #if IS_IN (libpthread)
 # if defined SHARED && !defined NO_HIDDEN
-#  define __pthread_unwind __GI___pthread_unwind
+#  undef PTHREAD_UNWIND
+#  define PTHREAD_UNWIND __GI___pthread_unwind
 # endif
 #else
 # ifndef SHARED
@@ -32,19 +34,8 @@
 #endif
 
 
-#ifdef __ASSUME_PRIVATE_FUTEX
-# define LOAD_PRIVATE_FUTEX_WAIT(reg) \
+#define LOAD_PRIVATE_FUTEX_WAIT(reg) \
 	movl	$(FUTEX_WAIT | FUTEX_PRIVATE_FLAG), reg
-#else
-# if FUTEX_WAIT == 0
-#  define LOAD_PRIVATE_FUTEX_WAIT(reg) \
-	movl	%fs:PRIVATE_FUTEX, reg
-# else
-#  define LOAD_PRIVATE_FUTEX_WAIT(reg) \
-	movl	%fs:PRIVATE_FUTEX, reg ; \
-	orl	$FUTEX_WAIT, reg
-# endif
-#endif
 
 /* It is crucial that the functions in this file don't modify registers
    other than %rax and %r11.  The syscall wrapper code depends on this
@@ -76,11 +67,7 @@ ENTRY(__pthread_enable_asynccancel)
 	lock
 	orl	$TCB_EXITING_BITMASK, %fs:CANCELHANDLING
 	mov	%fs:CLEANUP_JMP_BUF, %RDI_LP
-#ifdef SHARED
-	call	__pthread_unwind@PLT
-#else
-	call	__pthread_unwind
-#endif
+	call	PTHREAD_UNWIND
 	hlt
 END(__pthread_enable_asynccancel)
 

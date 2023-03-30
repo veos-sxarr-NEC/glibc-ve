@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -13,13 +13,12 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
-#include <error.h>
 #include <langinfo.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,9 +128,8 @@ identification_finish (struct localedef_t *locale,
 	 empty one.  */
       if (identification == NULL)
 	{
-	  if (! be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
-No definition for %s category found"), "LC_IDENTIFICATION"));
+	  record_warning (_("\
+No definition for %s category found"), "LC_IDENTIFICATION");
 	  identification_startup (NULL, locale, 0);
 	  identification
 	    = locale->categories[LC_IDENTIFICATION].identification;
@@ -143,8 +141,8 @@ No definition for %s category found"), "LC_IDENTIFICATION"));
   if (identification->cat == NULL)					      \
     {									      \
       if (verbose && ! nothing)						      \
-	WITH_CUR_LOCALE (error (0, 0, _("%s: field `%s' not defined"),	      \
-				"LC_IDENTIFICATION", #cat));		      \
+	record_warning (_("%s: field `%s' not defined"), "LC_IDENTIFICATION", \
+			#cat);						      \
       identification->cat = "";						      \
     }
 
@@ -164,14 +162,45 @@ No definition for %s category found"), "LC_IDENTIFICATION"));
   TEST_ELEM (date);
 
   for (num = 0; num < __LC_LAST; ++num)
-    if (num != LC_ALL && identification->category[num] == NULL)
-      {
-	if (verbose && ! nothing)
-	  WITH_CUR_LOCALE (error (0, 0, _("\
-%s: no identification for category `%s'"),
-				  "LC_IDENTIFICATION", category_name[num]));
-	identification->category[num] = "";
-      }
+    {
+      /* We don't accept/parse this category, so skip it early.  */
+      if (num == LC_ALL)
+	continue;
+
+      if (identification->category[num] == NULL)
+	{
+	  if (verbose && ! nothing)
+	    record_warning (_("\
+%s: no identification for category `%s'"), "LC_IDENTIFICATION",
+			    category_name[num]);
+	  identification->category[num] = "";
+	}
+      else
+	{
+	  /* Only list the standards we care about.  This is based on the
+	     ISO 30112 WD10 [2014] standard which supersedes all previous
+	     revisions of the ISO 14652 standard.  */
+	  static const char * const standards[] =
+	    {
+	      "posix:1993",
+	      "i18n:2004",
+	      "i18n:2012",
+	    };
+	  size_t i;
+	  bool matched = false;
+
+	  for (i = 0; i < sizeof (standards) / sizeof (standards[0]); ++i)
+	    if (strcmp (identification->category[num], standards[i]) == 0)
+	      matched = true;
+
+	  if (matched != true)
+	    record_error (0, 0, _("\
+%s: unknown standard `%s' for category `%s'"),
+			  "LC_IDENTIFICATION",
+			  identification->category[num],
+			  category_name[num]);
+	}
+    }
 }
 
 

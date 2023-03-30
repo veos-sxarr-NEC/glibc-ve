@@ -28,13 +28,13 @@ static char rcsid[] = "$NetBSD: $";
 #include <math.h>
 #include <math_private.h>
 
-static const long double
-two114 = 2.0769187434139310514121985316880384E+34L, /* 0x4071000000000000, 0 */
-twom114 = 4.8148248609680896326399448564623183E-35L, /* 0x3F8D000000000000, 0 */
-huge   = 1.0E+4900L,
-tiny   = 1.0E-4900L;
+static const _Float128
+two114 = L(2.0769187434139310514121985316880384E+34), /* 0x4071000000000000, 0 */
+twom114 = L(4.8148248609680896326399448564623183E-35), /* 0x3F8D000000000000, 0 */
+huge   = L(1.0E+4900),
+tiny   = L(1.0E-4900);
 
-long double __scalblnl (long double x, long int n)
+_Float128 __scalblnl (_Float128 x, long int n)
 {
 	int64_t k,hx,lx;
 	GET_LDOUBLE_WORDS64(hx,lx,x);
@@ -46,16 +46,16 @@ long double __scalblnl (long double x, long int n)
 	    k = ((hx>>48)&0x7fff) - 114;
 	}
         if (k==0x7fff) return x+x;		/* NaN or Inf */
-	if (n< -50000) return tiny*__copysignl(tiny,x); /*underflow*/
+	if (n< -50000) return tiny*copysignl(tiny,x); /*underflow*/
         if (n> 50000 || k+n > 0x7ffe)
-	  return huge*__copysignl(huge,x); /* overflow  */
+	  return huge*copysignl(huge,x); /* overflow  */
 	/* Now k and n are bounded we know that k = k+n does not
 	   overflow.  */
         k = k+n;
         if (k > 0) 				/* normal result */
 	    {SET_LDOUBLE_MSW64(x,(hx&0x8000ffffffffffffULL)|(k<<48)); return x;}
         if (k <= -114)
-	  return tiny*__copysignl(tiny,x); 	/*underflow*/
+	  return tiny*copysignl(tiny,x); 	/*underflow*/
         k += 114;				/* subnormal result */
 	SET_LDOUBLE_MSW64(x,(hx&0x8000ffffffffffffULL)|(k<<48));
         return x*twom114;

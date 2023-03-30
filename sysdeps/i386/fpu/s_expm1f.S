@@ -1,5 +1,5 @@
 /* ix87 specific implementation of exp(x)-1.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
    Based on code by John C. Bowman <bowman@ipp-garching.mpg.de>.
@@ -17,12 +17,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 	/* Using: e^x - 1 = 2^(x * log2(e)) - 1 */
 
 #include <sysdep.h>
 #include <machine/asm.h>
+#include <i386-math-asm.h>
+#include <libm-alias-float.h>
 
 	.section .rodata
 
@@ -36,6 +38,8 @@ one:	.double 1.0
 	.type l2e,@object
 l2e:	.tfloat 1.442695040888963407359924681002
 	ASM_SIZE_DIRECTIVE(l2e)
+
+DEFINE_FLT_MIN
 
 #ifdef PIC
 #define MO(op) op##@GOTOFF(%edx)
@@ -100,10 +104,11 @@ ENTRY(__expm1f)
 	fsubrl	MO(one)		// 1-2^int(log2(e)*x) : int(log2(e)*x) : 2^(log2(e)*x)-2^int(log2(e)*x)
 	fstp	%st(1)		// 1-2^int(log2(e)*x) : 2^(log2(e)*x)-2^int(log2(e)*x)
 	fsubrp	%st, %st(1)	// 2^(log2(e)*x)
+	FLT_CHECK_FORCE_UFLOW
 	ret
 
 2:	fstp	%st
 	fldl	MO(minus1)	// Set result to -1.0.
 3:	ret
 END(__expm1f)
-weak_alias (__expm1f, expm1f)
+libm_alias_float (__expm1, expm1)

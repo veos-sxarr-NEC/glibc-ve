@@ -1,5 +1,5 @@
 /* Multiple versions of strlen. PowerPC64 version.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if defined SHARED && IS_IN (libc)
 /* Redefine strlen so that the compiler won't complain about the type
@@ -29,11 +29,14 @@ extern __typeof (__redirect_strlen) __libc_strlen;
 
 extern __typeof (__redirect_strlen) __strlen_ppc attribute_hidden;
 extern __typeof (__redirect_strlen) __strlen_power7 attribute_hidden;
+extern __typeof (__redirect_strlen) __strlen_power8 attribute_hidden;
 
 libc_ifunc (__libc_strlen,
-            (hwcap & PPC_FEATURE_HAS_VSX)
-            ? __strlen_power7
-            : __strlen_ppc);
+	    (hwcap2 & PPC_FEATURE2_ARCH_2_07)
+	    ? __strlen_power8 :
+	      (hwcap & PPC_FEATURE_HAS_VSX)
+	      ? __strlen_power7
+	      : __strlen_ppc);
 
 #undef strlen
 strong_alias (__libc_strlen, strlen)

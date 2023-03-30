@@ -1,5 +1,5 @@
 /* Startup code compliant to the ELF x86-64 ABI.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 2001.
 
@@ -32,7 +32,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This is the canonical entry point, usually the first thing in the text
    segment.  The SVR4/i386 ABI (pages 3-31, 3-32) says that when the entry
@@ -96,27 +96,28 @@ ENTRY (_start)
 	   which grow downwards).  */
 	pushq %rsp
 
-#ifdef SHARED
+#ifdef PIC
 	/* Pass address of our own entry points to .fini and .init.  */
 	mov __libc_csu_fini@GOTPCREL(%rip), %R8_LP
 	mov __libc_csu_init@GOTPCREL(%rip), %RCX_LP
 
 	mov main@GOTPCREL(%rip), %RDI_LP
-
-	/* Call the user's main function, and exit with its value.
-	   But let the libc call main.	  */
-	call __libc_start_main@PLT
 #else
 	/* Pass address of our own entry points to .fini and .init.  */
 	mov $__libc_csu_fini, %R8_LP
 	mov $__libc_csu_init, %RCX_LP
 
 	mov $main, %RDI_LP
+#endif
 
 	/* Call the user's main function, and exit with its value.
-	   But let the libc call main.	  */
-	call __libc_start_main
-#endif
+	   But let the libc call main.  Since __libc_start_main in
+	   libc.so is called very early, lazy binding isn't relevant
+	   here.  Use indirect branch via GOT to avoid extra branch
+	   to PLT slot.  In case of static executable, ld in binutils
+	   2.26 or above can convert indirect branch into direct
+	   branch.  */
+	call *__libc_start_main@GOTPCREL(%rip)
 
 	hlt			/* Crash if somehow `exit' does return.	 */
 END (_start)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -30,9 +30,7 @@
 
 
 int
-pthread_getattr_np (thread_id, attr)
-     pthread_t thread_id;
-     pthread_attr_t *attr;
+pthread_getattr_np (pthread_t thread_id, pthread_attr_t *attr)
 {
   struct pthread *thread = (struct pthread *) thread_id;
   struct pthread_attr *iattr = (struct pthread_attr *) attr;
@@ -59,14 +57,20 @@ pthread_getattr_np (thread_id, attr)
   /* The sizes are subject to alignment.  */
   if (__glibc_likely (thread->stackblock != NULL))
     {
-      iattr->stacksize = thread->stackblock_size;
-      iattr->stackaddr = (char *) thread->stackblock + iattr->stacksize;
+      /* The stack size reported to the user should not include the
+	 guard size.  */
+      iattr->stacksize = thread->stackblock_size - thread->guardsize;
+#if _STACK_GROWS_DOWN
+      iattr->stackaddr = (char *) thread->stackblock
+			 + thread->stackblock_size;
+#else
+      iattr->stackaddr = (char *) thread->stackblock;
+#endif
     }
   else
     {
       /* No stack information available.  This must be for the initial
 	 thread.  Get the info in some magical way.  */
-      assert (abs (thread->pid) == thread->tid);
 
       /* Stack size limit.  */
       struct rlimit rl;
@@ -105,7 +109,9 @@ pthread_getattr_np (thread_id, attr)
 
 	      char *line = NULL;
 	      size_t linelen = 0;
+#if _STACK_GROWS_DOWN
 	      uintptr_t last_to = 0;
+#endif
 
 	      while (! feof_unlocked (fp))
 		{
@@ -129,17 +135,24 @@ pthread_getattr_np (thread_id, attr)
 		         stack extension request.  */
 		      iattr->stacksize = (iattr->stacksize
 					  & -(intptr_t) GLRO(dl_pagesize));
-
+#if _STACK_GROWS_DOWN
 		      /* The limit might be too high.  */
 		      if ((size_t) iattr->stacksize
 			  > (size_t) iattr->stackaddr - last_to)
 			iattr->stacksize = (size_t) iattr->stackaddr - last_to;
-
+#else
+		      /* The limit might be too high.  */
+		      if ((size_t) iattr->stacksize
+			  > to - (size_t) iattr->stackaddr)
+			iattr->stacksize = to - (size_t) iattr->stackaddr;
+#endif
 		      /* We succeed and no need to look further.  */
 		      ret = 0;
 		      break;
 		    }
+#if _STACK_GROWS_DOWN
 		  last_to = to;
+#endif
 		}
 
 	      free (line);

@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Per Bothner <bothner@cygnus.com>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -25,68 +25,23 @@
    This exception applies to code released by its copyright holders
    in files containing the exception.  */
 
-#ifndef _POSIX_SOURCE
-# define _POSIX_SOURCE
-#endif
 #include "libioP.h"
+#include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
-#ifdef _LIBC
-# include <unistd.h>
-# include <shlib-compat.h>
-# include <not-cancel.h>
-#endif
+#include <shlib-compat.h>
+#include <not-cancel.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <kernel-features.h>
-
-#ifndef _IO_fork
-#ifdef _LIBC
-#define _IO_fork __fork
-#else
-#define _IO_fork fork /* defined in libiberty, if needed */
-#endif
-extern _IO_pid_t _IO_fork (void) __THROW;
-#endif
-
-#ifndef _IO_dup2
-#ifdef _LIBC
-#define _IO_dup2 __dup2
-#else
-#define _IO_dup2 dup2
-#endif
-extern int _IO_dup2 (int fd, int fd2) __THROW;
-#endif
-
-#ifndef _IO_waitpid
-#ifdef _LIBC
-#define _IO_waitpid waitpid_not_cancel
-#else
-#define _IO_waitpid waitpid
-#endif
-#endif
-
-#ifndef _IO_execl
-#define _IO_execl execl
-#endif
-#ifndef _IO__exit
-#define _IO__exit _exit
-#endif
-
-#ifndef _IO_close
-#ifdef _LIBC
-#define _IO_close close_not_cancel
-#else
-#define _IO_close close
-#endif
-#endif
+#include <spawn.h>
+#include <paths.h>
 
 struct _IO_proc_file
 {
   struct _IO_FILE_plus file;
   /* Following fields must match those in class procbuf (procbuf.h) */
-  _IO_pid_t pid;
+  pid_t pid;
   struct _IO_proc_file *next;
 };
 typedef struct _IO_proc_file _IO_proc_file;
@@ -105,16 +60,60 @@ unlock (void *not_used)
 }
 #endif
 
-_IO_FILE *
-_IO_new_proc_open (fp, command, mode)
-     _IO_FILE *fp;
-     const char *command;
-     const char *mode;
+/* POSIX states popen shall ensure that any streams from previous popen()
+   calls that remain open in the parent process should be closed in the new
+   child process.
+   To avoid a race-condition between checking which file descriptors need to
+   be close (by transversing the proc_file_chain list) and the insertion of a
+   new one after a successful posix_spawn this function should be called
+   with proc_file_chain_lock acquired.  */
+static bool
+spawn_process (posix_spawn_file_actions_t *fa, FILE *fp, const char *command,
+	       int do_cloexec, int pipe_fds[2], int parent_end, int child_end,
+	       int child_pipe_fd)
+{
+
+  for (struct _IO_proc_file *p = proc_file_chain; p; p = p->next)
+    {
+      int fd = _IO_fileno ((FILE *) p);
+
+      /* If any stream from previous popen() calls has fileno
+	 child_pipe_fd, it has been already closed by the adddup2 action
+	 above.  */
+      if (fd != child_pipe_fd
+	  && __posix_spawn_file_actions_addclose (fa, fd) != 0)
+	return false;
+    }
+
+  if (__posix_spawn (&((_IO_proc_file *) fp)->pid, _PATH_BSHELL, fa, 0,
+		     (char *const[]){ (char*) "sh", (char*) "-c",
+		     (char *) command, NULL }, __environ) != 0)
+    return false;
+
+  __close_nocancel (pipe_fds[child_end]);
+
+  if (!do_cloexec)
+    /* Undo the effects of the pipe2 call which set the
+       close-on-exec flag.  */
+    __fcntl (pipe_fds[parent_end], F_SETFD, 0);
+
+  _IO_fileno (fp) = pipe_fds[parent_end];
+
+  ((_IO_proc_file *) fp)->next = proc_file_chain;
+  proc_file_chain = (_IO_proc_file *) fp;
+
+  return true;
+}
+
+FILE *
+_IO_new_proc_open (FILE *fp, const char *command, const char *mode)
 {
   int read_or_write;
+  /* These are indexes for pipe_fds.  */
   int parent_end, child_end;
   int pipe_fds[2];
-  _IO_pid_t child_pid;
+  int child_pipe_fd;
+  bool spawn_ok;
 
   int do_read = 0;
   int do_write = 0;
@@ -143,138 +142,82 @@ _IO_new_proc_open (fp, command, mode)
   if (_IO_file_is_open (fp))
     return NULL;
 
-#ifdef O_CLOEXEC
-# ifndef __ASSUME_PIPE2
-  if (__have_pipe2 >= 0)
-# endif
-    {
-      int r = __pipe2 (pipe_fds, O_CLOEXEC);
-# ifndef __ASSUME_PIPE2
-      if (__have_pipe2 == 0)
-	__have_pipe2 = r != -1 || errno != ENOSYS ? 1 : -1;
-
-      if (__have_pipe2 > 0)
-# endif
-	if (r < 0)
-	  return NULL;
-    }
-#endif
-#ifndef __ASSUME_PIPE2
-# ifdef O_CLOEXEC
-  if (__have_pipe2 < 0)
-# endif
-    if (__pipe (pipe_fds) < 0)
-      return NULL;
-#endif
+  /* Atomically set the O_CLOEXEC flag for the pipe end used by the
+     child process (to avoid leaking the file descriptor in case of a
+     concurrent fork).  This is later reverted in the child process.
+     When popen returns, the parent pipe end can be O_CLOEXEC or not,
+     depending on the 'e' open mode, but there is only one flag which
+     controls both descriptors.  The parent end is adjusted below,
+     after creating the child process.  (In the child process, the
+     parent end should be closed on execve, so O_CLOEXEC remains set
+     there.)  */
+  if (__pipe2 (pipe_fds, O_CLOEXEC) < 0)
+    return NULL;
 
   if (do_read)
     {
-      parent_end = pipe_fds[0];
-      child_end = pipe_fds[1];
+      parent_end = 0;
+      child_end = 1;
       read_or_write = _IO_NO_WRITES;
+      child_pipe_fd = 1;
     }
   else
     {
-      parent_end = pipe_fds[1];
-      child_end = pipe_fds[0];
+      parent_end = 1;
+      child_end = 0;
       read_or_write = _IO_NO_READS;
+      child_pipe_fd = 0;
     }
 
-  ((_IO_proc_file *) fp)->pid = child_pid = _IO_fork ();
-  if (child_pid == 0)
+  posix_spawn_file_actions_t fa;
+  /* posix_spawn_file_actions_init does not fail.  */
+  __posix_spawn_file_actions_init (&fa);
+
+  /* The descriptor is already the one the child will use.  In this case
+     it must be moved to another one otherwise, there is no safe way to
+     remove the close-on-exec flag in the child without creating a FD leak
+     race in the parent.  */
+  if (pipe_fds[child_end] == child_pipe_fd)
     {
-      int child_std_end = do_read ? 1 : 0;
-      struct _IO_proc_file *p;
-
-#ifndef __ASSUME_PIPE2
-      /* If we have pipe2 the descriptor is marked for close-on-exec.  */
-      _IO_close (parent_end);
-#endif
-      if (child_end != child_std_end)
-	{
-	  _IO_dup2 (child_end, child_std_end);
-#ifndef __ASSUME_PIPE2
-	  _IO_close (child_end);
-#endif
-	}
-#ifdef O_CLOEXEC
-      else
-	{
-	  /* The descriptor is already the one we will use.  But it must
-	     not be marked close-on-exec.  Undo the effects.  */
-# ifndef __ASSUME_PIPE2
-	  if (__have_pipe2 > 0)
-# endif
-	    __fcntl (child_end, F_SETFD, 0);
-	}
-#endif
-      /* POSIX.2:  "popen() shall ensure that any streams from previous
-         popen() calls that remain open in the parent process are closed
-	 in the new child process." */
-      for (p = proc_file_chain; p; p = p->next)
-	{
-	  int fd = _IO_fileno ((_IO_FILE *) p);
-
-	  /* If any stream from previous popen() calls has fileno
-	     child_std_end, it has been already closed by the dup2 syscall
-	     above.  */
-	  if (fd != child_std_end)
-	    _IO_close (fd);
-	}
-
-      _IO_execl ("/bin/sh", "sh", "-c", command, (char *) 0);
-      _IO__exit (127);
-    }
-  _IO_close (child_end);
-  if (child_pid < 0)
-    {
-      _IO_close (parent_end);
-      return NULL;
+      int tmp = __fcntl (child_pipe_fd, F_DUPFD_CLOEXEC, 0);
+      if (tmp < 0)
+	goto spawn_failure;
+      __close_nocancel (pipe_fds[child_end]);
+      pipe_fds[child_end] = tmp;
     }
 
-  if (do_cloexec)
-    {
-#ifndef __ASSUME_PIPE2
-# ifdef O_CLOEXEC
-      if (__have_pipe2 < 0)
-# endif
-	__fcntl (parent_end, F_SETFD, FD_CLOEXEC);
-#endif
-    }
-  else
-    {
-#ifdef O_CLOEXEC
-      /* Undo the effects of the pipe2 call which set the
-	 close-on-exec flag.  */
-# ifndef __ASSUME_PIPE2
-      if (__have_pipe2 > 0)
-# endif
-	__fcntl (parent_end, F_SETFD, 0);
-#endif
-    }
+  if (__posix_spawn_file_actions_adddup2 (&fa, pipe_fds[child_end],
+      child_pipe_fd) != 0)
+    goto spawn_failure;
 
-  _IO_fileno (fp) = parent_end;
-
-  /* Link into proc_file_chain. */
 #ifdef _IO_MTSAFE_IO
   _IO_cleanup_region_start_noarg (unlock);
   _IO_lock_lock (proc_file_chain_lock);
 #endif
-  ((_IO_proc_file *) fp)->next = proc_file_chain;
-  proc_file_chain = (_IO_proc_file *) fp;
+  spawn_ok = spawn_process (&fa, fp, command, do_cloexec, pipe_fds,
+			    parent_end, child_end, child_pipe_fd);
 #ifdef _IO_MTSAFE_IO
   _IO_lock_unlock (proc_file_chain_lock);
   _IO_cleanup_region_end (0);
 #endif
 
+  __posix_spawn_file_actions_destroy (&fa);
+
+  if (!spawn_ok)
+    {
+    spawn_failure:
+      __close_nocancel (pipe_fds[child_end]);
+      __close_nocancel (pipe_fds[parent_end]);
+      __set_errno (ENOMEM);
+      return NULL;
+    }
+
   _IO_mask_flags (fp, read_or_write, _IO_NO_READS|_IO_NO_WRITES);
   return fp;
 }
 
-_IO_FILE *
-_IO_new_popen (command, mode)
-     const char *command;
-     const char *mode;
+FILE *
+_IO_new_popen (const char *command, const char *mode)
 {
   struct locked_FILE
   {
@@ -283,7 +226,7 @@ _IO_new_popen (command, mode)
     _IO_lock_t lock;
 #endif
   } *new_f;
-  _IO_FILE *fp;
+  FILE *fp;
 
   new_f = (struct locked_FILE *) malloc (sizeof (struct locked_FILE));
   if (new_f == NULL)
@@ -292,27 +235,23 @@ _IO_new_popen (command, mode)
   new_f->fpx.file.file._lock = &new_f->lock;
 #endif
   fp = &new_f->fpx.file.file;
-  _IO_init (fp, 0);
+  _IO_init_internal (fp, 0);
   _IO_JUMPS (&new_f->fpx.file) = &_IO_proc_jumps;
-  _IO_new_file_init (&new_f->fpx.file);
-#if  !_IO_UNIFIED_JUMPTABLES
-  new_f->fpx.file.vtable = NULL;
-#endif
+  _IO_new_file_init_internal (&new_f->fpx.file);
   if (_IO_new_proc_open (fp, command, mode) != NULL)
-    return (_IO_FILE *) &new_f->fpx.file;
+    return (FILE *) &new_f->fpx.file;
   _IO_un_link (&new_f->fpx.file);
   free (new_f);
   return NULL;
 }
 
 int
-_IO_new_proc_close (fp)
-     _IO_FILE *fp;
+_IO_new_proc_close (FILE *fp)
 {
   /* This is not name-space clean. FIXME! */
   int wstatus;
   _IO_proc_file **ptr = &proc_file_chain;
-  _IO_pid_t wait_pid;
+  pid_t wait_pid;
   int status = -1;
 
   /* Unlink from proc_file_chain. */
@@ -334,7 +273,7 @@ _IO_new_proc_close (fp)
   _IO_cleanup_region_end (0);
 #endif
 
-  if (status < 0 || _IO_close (_IO_fileno(fp)) < 0)
+  if (status < 0 || __close_nocancel (_IO_fileno(fp)) < 0)
     return -1;
   /* POSIX.2 Rationale:  "Some historical implementations either block
      or ignore the signals SIGINT, SIGQUIT, and SIGHUP while waiting
@@ -342,7 +281,11 @@ _IO_new_proc_close (fp)
      described in POSIX.2, such implementations are not conforming." */
   do
     {
-      wait_pid = _IO_waitpid (((_IO_proc_file *) fp)->pid, &wstatus, 0);
+      int state;
+      __libc_ptf_call (__pthread_setcancelstate,
+		       (PTHREAD_CANCEL_DISABLE, &state), 0);
+      wait_pid = __waitpid (((_IO_proc_file *) fp)->pid, &wstatus, 0);
+      __libc_ptf_call (__pthread_setcancelstate, (state, NULL), 0);
     }
   while (wait_pid == -1 && errno == EINTR);
   if (wait_pid == -1)
@@ -350,7 +293,7 @@ _IO_new_proc_close (fp)
   return wstatus;
 }
 
-static const struct _IO_jump_t _IO_proc_jumps = {
+static const struct _IO_jump_t _IO_proc_jumps libio_vtable = {
   JUMP_INIT_DUMMY,
   JUMP_INIT(finish, _IO_new_file_finish),
   JUMP_INIT(overflow, _IO_new_file_overflow),

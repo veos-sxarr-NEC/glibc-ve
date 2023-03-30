@@ -1,5 +1,5 @@
 /* Test for ptsname/ptsname_r.
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Aurelien Jarno <aurelien@aurel32.net>, 2014.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -70,7 +70,6 @@ do_test (void)
   if (fd != -1)
     {
       result |= do_single_test (fd, buf, sizeof (buf), 0);
-      result |= do_single_test (fd, NULL, sizeof (buf), EINVAL);
       result |= do_single_test (fd, buf, 1, ERANGE);
       close (fd);
     }

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Torbjorn Granlund (tege@sics.se),
    with help from Dan Sahlin (dan@sics.se);
@@ -16,17 +16,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <stdlib.h>
 
 #undef strlen
 
+#ifndef STRLEN
+# define STRLEN strlen
+#endif
+
 /* Return the length of the null-terminated string STR.  Scan for
    the null terminator quickly by testing four bytes at a time.  */
 size_t
-strlen (const char *str)
+STRLEN (const char *str)
 {
   const char *char_ptr;
   const unsigned long int *longword_ptr;

@@ -1,6 +1,6 @@
 /* Compare at most N characters of two strings without taking care for
    the case.
-   Copyright (C) 1992-2015 Free Software Foundation, Inc.
+   Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -36,11 +36,9 @@
 #endif
 
 #ifdef USE_IN_EXTENDED_LOCALE_MODEL
-# define LOCALE_PARAM , loc
-# define LOCALE_PARAM_DECL __locale_t loc;
+# define LOCALE_PARAM , locale_t loc
 #else
 # define LOCALE_PARAM
-# define LOCALE_PARAM_DECL
 #endif
 
 /* Compare no more than N characters of S1 and S2,
@@ -48,14 +46,10 @@
    greater than zero if S1 is lexicographically less
    than, equal to or greater than S2.  */
 int
-__strncasecmp (s1, s2, n LOCALE_PARAM)
-     const char *s1;
-     const char *s2;
-     size_t n;
-     LOCALE_PARAM_DECL
+__strncasecmp (const char *s1, const char *s2, size_t n LOCALE_PARAM)
 {
 #if defined _LIBC && !defined USE_IN_EXTENDED_LOCALE_MODEL
-  __locale_t loc = _NL_CURRENT_LOCALE;
+  locale_t loc = _NL_CURRENT_LOCALE;
 #endif
   const unsigned char *p1 = (const unsigned char *) s1;
   const unsigned char *p2 = (const unsigned char *) s2;

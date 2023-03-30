@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -21,13 +21,12 @@
 /* Perform the I/O control operation specified by REQUEST on FD.
    The actual type and use of ARG and the return value depend on REQUEST.  */
 int
-__ioctl (fd, request)
-     int fd;
-     unsigned long int request;
+__ioctl (int fd, unsigned long int request, ...)
 {
   __set_errno (ENOSYS);
   return -1;
 }
 stub_warning (ioctl)
 
+libc_hidden_def (__ioctl)
 weak_alias (__ioctl, ioctl)

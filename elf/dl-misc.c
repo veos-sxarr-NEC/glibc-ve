@@ -1,5 +1,5 @@
 /* Miscellaneous support functions for dynamic linker
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <fcntl.h>
@@ -33,23 +33,18 @@
 #include <sysdep.h>
 #include <_itoa.h>
 #include <dl-writev.h>
-
+#include <not-cancel.h>
 
 /* Read the whole contents of FILE into new mmap'd space with given
    protections.  *SIZEP gets the size of the file.  On error MAP_FAILED
    is returned.  */
 
 void *
-internal_function
 _dl_sysdep_read_whole_file (const char *file, size_t *sizep, int prot)
 {
   void *result = MAP_FAILED;
   struct stat64 st;
-  int flags = O_RDONLY;
-#ifdef O_CLOEXEC
-  flags |= O_CLOEXEC;
-#endif
-  int fd = __open (file, flags);
+  int fd = __open64_nocancel (file, O_RDONLY | O_CLOEXEC);
   if (fd >= 0)
     {
       if (__fxstat64 (_STAT_VER, fd, &st) >= 0)
@@ -70,7 +65,7 @@ _dl_sysdep_read_whole_file (const char *file, size_t *sizep, int prot)
 #endif
 			     , fd, 0);
 	}
-      __close (fd);
+      __close_nocancel (fd);
     }
   return result;
 }
@@ -283,7 +278,6 @@ _dl_dprintf (int fd, const char *fmt, ...)
 
 /* Test whether given NAME matches any of the names of the given object.  */
 int
-internal_function
 _dl_name_match_p (const char *name, const struct link_map *map)
 {
   if (strcmp (name, map->l_name) == 0)
@@ -302,7 +296,6 @@ _dl_name_match_p (const char *name, const struct link_map *map)
 
 
 unsigned long int
-internal_function
 _dl_higher_prime_number (unsigned long int n)
 {
   /* These are primes that are near, but slightly smaller than, a
@@ -363,4 +356,87 @@ _dl_higher_prime_number (unsigned long int n)
 #endif
 
   return *low;
+}
+
+/* A stripped down strtoul-like implementation for very early use.  It
+   does not set errno if the result is outside bounds because it may get
+   called before errno may have been set up.  */
+
+uint64_t
+_dl_strtoul (const char *nptr, char **endptr)
+{
+  uint64_t result = 0;
+  bool positive = true;
+  unsigned max_digit;
+
+  while (*nptr == ' ' || *nptr == '\t')
+    ++nptr;
+
+  if (*nptr == '-')
+    {
+      positive = false;
+      ++nptr;
+    }
+  else if (*nptr == '+')
+    ++nptr;
+
+  if (*nptr < '0' || *nptr > '9')
+    {
+      if (endptr != NULL)
+	*endptr = (char *) nptr;
+      return 0UL;
+    }
+
+  int base = 10;
+  max_digit = 9;
+  if (*nptr == '0')
+    {
+      if (nptr[1] == 'x' || nptr[1] == 'X')
+	{
+	  base = 16;
+	  nptr += 2;
+	}
+      else
+	{
+	  base = 8;
+	  max_digit = 7;
+	}
+    }
+
+  while (1)
+    {
+      int digval;
+      if (*nptr >= '0' && *nptr <= '0' + max_digit)
+        digval = *nptr - '0';
+      else if (base == 16)
+        {
+	  if (*nptr >= 'a' && *nptr <= 'f')
+	    digval = *nptr - 'a' + 10;
+	  else if (*nptr >= 'A' && *nptr <= 'F')
+	    digval = *nptr - 'A' + 10;
+	  else
+	    break;
+	}
+      else
+        break;
+
+      if (result >= (UINT64_MAX - digval) / base)
+	{
+	  if (endptr != NULL)
+	    *endptr = (char *) nptr;
+	  return UINT64_MAX;
+	}
+      result *= base;
+      result += digval;
+      ++nptr;
+    }
+
+  if (endptr != NULL)
+    *endptr = (char *) nptr;
+
+  /* Avoid 64-bit multiplication.  */
+  if (!positive)
+    result = -result;
+
+  return result;
 }

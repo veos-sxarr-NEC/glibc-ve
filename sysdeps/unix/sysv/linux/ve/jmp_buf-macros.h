@@ -1,0 +1,6 @@
+#define JMP_BUF_SIZE  sizeof (jmp_buf)
+#define SIGJMP_BUF_SIZE  sizeof (sigjmp_buf)
+#define JMP_BUF_ALIGN __alignof__ (jmp_buf)
+#define SIGJMP_BUF_ALIGN __alignof__ (sigjmp_buf)
+#define MASK_WAS_SAVED_OFFSET offsetof (struct __jmp_buf_tag, __mask_was_saved)
+#define SAVED_MASK_OFFSET offsetof (struct __jmp_buf_tag, __saved_mask)

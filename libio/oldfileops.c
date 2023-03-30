@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Per Bothner <bothner@cygnus.com>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -30,9 +30,6 @@
 #include <shlib-compat.h>
 #if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_1)
 
-#ifndef _POSIX_SOURCE
-# define _POSIX_SOURCE
-#endif
 #define _IO_USE_OLD_IO_FILE
 #include "libioP.h"
 #include <fcntl.h>
@@ -41,21 +38,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#ifndef errno
-extern int errno;
-#endif
-#ifndef __set_errno
-# define __set_errno(Val) errno = (Val)
-#endif
-
-
-#ifdef _LIBC
-# define open(Name, Flags, Prot) __open (Name, Flags, Prot)
-# define close(FD) __close (FD)
-# define lseek(FD, Offset, Whence) __lseek (FD, Offset, Whence)
-# define read(FD, Buf, NBytes) __read (FD, Buf, NBytes)
-# define write(FD, Buf, NBytes) __write (FD, Buf, NBytes)
-#endif
+#include <unistd.h>
 
 /* An fstream can be in at most one of put mode, get mode, or putback mode.
    Putback mode is a variant of get mode.
@@ -113,35 +96,36 @@ extern int errno;
 
 void
 attribute_compat_text_section
-_IO_old_file_init (fp)
-     struct _IO_FILE_plus *fp;
+_IO_old_file_init_internal (struct _IO_FILE_plus *fp)
 {
   /* POSIX.1 allows another file handle to be used to change the position
      of our file descriptor.  Hence we actually don't know the actual
      position before we do the first fseek (and until a following fflush). */
   fp->file._old_offset = _IO_pos_BAD;
-  fp->file._IO_file_flags |= CLOSED_FILEBUF_FLAGS;
+  fp->file._flags |= CLOSED_FILEBUF_FLAGS;
 
   _IO_link_in (fp);
   fp->file._vtable_offset = ((int) sizeof (struct _IO_FILE)
 			     - (int) sizeof (struct _IO_FILE_complete));
   fp->file._fileno = -1;
 
-#if defined SHARED && defined _LIBC
-  if (__builtin_expect (&_IO_stdin_used != NULL, 1)
-      || (fp != (struct _IO_FILE_plus *) _IO_stdin
-	  && fp != (struct _IO_FILE_plus *) _IO_stdout
-	  && fp != (struct _IO_FILE_plus *) _IO_stderr))
+  if (&_IO_stdin_used != NULL || !_IO_legacy_file ((FILE *) fp))
     /* The object is dynamically allocated and large enough.  Initialize
        the _mode element as well.  */
     ((struct _IO_FILE_complete *) fp)->_mode = -1;
-#endif
+}
+
+void
+attribute_compat_text_section
+_IO_old_file_init (struct _IO_FILE_plus *fp)
+{
+  IO_set_accept_foreign_vtables (&_IO_vtable_check);
+  _IO_old_file_init_internal (fp);
 }
 
 int
 attribute_compat_text_section
-_IO_old_file_close_it (fp)
-     _IO_FILE *fp;
+_IO_old_file_close_it (FILE *fp)
 {
   int write_status, close_status;
   if (!_IO_file_is_open (fp))
@@ -169,9 +153,7 @@ _IO_old_file_close_it (fp)
 
 void
 attribute_compat_text_section
-_IO_old_file_finish (fp, dummy)
-     _IO_FILE *fp;
-     int dummy;
+_IO_old_file_finish (FILE *fp, int dummy)
 {
   if (_IO_file_is_open (fp))
     {
@@ -182,12 +164,9 @@ _IO_old_file_finish (fp, dummy)
   _IO_default_finish (fp, 0);
 }
 
-_IO_FILE *
+FILE *
 attribute_compat_text_section
-_IO_old_file_fopen (fp, filename, mode)
-     _IO_FILE *fp;
-     const char *filename;
-     const char *mode;
+_IO_old_file_fopen (FILE *fp, const char *filename, const char *mode)
 {
   int oflags = 0, omode;
   int read_write, fdesc;
@@ -219,24 +198,22 @@ _IO_old_file_fopen (fp, filename, mode)
       omode = O_RDWR;
       read_write &= _IO_IS_APPENDING;
     }
-  fdesc = open (filename, omode|oflags, oprot);
+  fdesc = __open (filename, omode|oflags, oprot);
   if (fdesc < 0)
     return NULL;
   fp->_fileno = fdesc;
   _IO_mask_flags (fp, read_write,_IO_NO_READS+_IO_NO_WRITES+_IO_IS_APPENDING);
   if (read_write & _IO_IS_APPENDING)
-    if (_IO_SEEKOFF (fp, (_IO_off_t)0, _IO_seek_end, _IOS_INPUT|_IOS_OUTPUT)
+    if (_IO_SEEKOFF (fp, (off_t)0, _IO_seek_end, _IOS_INPUT|_IOS_OUTPUT)
 	== _IO_pos_BAD && errno != ESPIPE)
       return NULL;
   _IO_link_in ((struct _IO_FILE_plus *) fp);
   return fp;
 }
 
-_IO_FILE *
+FILE *
 attribute_compat_text_section
-_IO_old_file_attach (fp, fd)
-     _IO_FILE *fp;
-     int fd;
+_IO_old_file_attach (FILE *fp, int fd)
 {
   if (_IO_file_is_open (fp))
     return NULL;
@@ -246,18 +223,15 @@ _IO_old_file_attach (fp, fd)
   /* Get the current position of the file. */
   /* We have to do that since that may be junk. */
   fp->_old_offset = _IO_pos_BAD;
-  if (_IO_SEEKOFF (fp, (_IO_off_t)0, _IO_seek_cur, _IOS_INPUT|_IOS_OUTPUT)
+  if (_IO_SEEKOFF (fp, (off_t)0, _IO_seek_cur, _IOS_INPUT|_IOS_OUTPUT)
       == _IO_pos_BAD && errno != ESPIPE)
     return NULL;
   return fp;
 }
 
-_IO_FILE *
+FILE *
 attribute_compat_text_section
-_IO_old_file_setbuf (fp, p, len)
-     _IO_FILE *fp;
-     char *p;
-     _IO_ssize_t len;
+_IO_old_file_setbuf (FILE *fp, char *p, ssize_t len)
 {
     if (_IO_default_setbuf (fp, p, len) == NULL)
       return NULL;
@@ -269,30 +243,24 @@ _IO_old_file_setbuf (fp, p, len)
     return fp;
 }
 
-static int old_do_write (_IO_FILE *, const char *, _IO_size_t);
+static int old_do_write (FILE *, const char *, size_t);
 
 /* Write TO_DO bytes from DATA to FP.
    Then mark FP as having empty buffers. */
 
 int
 attribute_compat_text_section
-_IO_old_do_write (fp, data, to_do)
-     _IO_FILE *fp;
-     const char *data;
-     _IO_size_t to_do;
+_IO_old_do_write (FILE *fp, const char *data, size_t to_do)
 {
-  return (to_do == 0 || (_IO_size_t) old_do_write (fp, data, to_do) == to_do)
+  return (to_do == 0 || (size_t) old_do_write (fp, data, to_do) == to_do)
 	 ? 0 : EOF;
 }
 
 static int
 attribute_compat_text_section
-old_do_write (fp, data, to_do)
-     _IO_FILE *fp;
-     const char *data;
-     _IO_size_t to_do;
+old_do_write (FILE *fp, const char *data, size_t to_do)
 {
-  _IO_size_t count;
+  size_t count;
   if (fp->_flags & _IO_IS_APPENDING)
     /* On a system without a proper O_APPEND implementation,
        you would need to sys_seek(0, SEEK_END) here, but is
@@ -302,7 +270,7 @@ old_do_write (fp, data, to_do)
     fp->_old_offset = _IO_pos_BAD;
   else if (fp->_IO_read_end != fp->_IO_write_base)
     {
-      _IO_off_t new_pos
+      off_t new_pos
 	= _IO_SYSSEEK (fp, fp->_IO_write_base - fp->_IO_read_end, 1);
       if (new_pos == _IO_pos_BAD)
 	return 0;
@@ -313,22 +281,20 @@ old_do_write (fp, data, to_do)
     fp->_cur_column = _IO_adjust_column (fp->_cur_column - 1, data, count) + 1;
   _IO_setg (fp, fp->_IO_buf_base, fp->_IO_buf_base, fp->_IO_buf_base);
   fp->_IO_write_base = fp->_IO_write_ptr = fp->_IO_buf_base;
-  fp->_IO_write_end = ((fp->_flags & (_IO_LINE_BUF+_IO_UNBUFFERED))
+  fp->_IO_write_end = ((fp->_flags & (_IO_LINE_BUF | _IO_UNBUFFERED))
 		       ? fp->_IO_buf_base : fp->_IO_buf_end);
   return count;
 }
 
 int
 attribute_compat_text_section
-_IO_old_file_underflow (fp)
-     _IO_FILE *fp;
+_IO_old_file_underflow (FILE *fp)
 {
-  _IO_ssize_t count;
-#if 0
-  /* SysV does not make this test; take it out for compatibility */
+  ssize_t count;
+
+  /* C99 requires EOF to be "sticky".  */
   if (fp->_flags & _IO_EOF_SEEN)
-    return (EOF);
-#endif
+    return EOF;
 
   if (fp->_flags & _IO_NO_READS)
     {
@@ -385,9 +351,7 @@ _IO_old_file_underflow (fp)
 
 int
 attribute_compat_text_section
-_IO_old_file_overflow (f, ch)
-      _IO_FILE *f;
-      int ch;
+_IO_old_file_overflow (FILE *f, int ch)
 {
   if (f->_flags & _IO_NO_WRITES) /* SET ERROR */
     {
@@ -418,7 +382,7 @@ _IO_old_file_overflow (f, ch)
       f->_IO_write_end = f->_IO_buf_end;
       f->_IO_read_base = f->_IO_read_ptr = f->_IO_read_end;
 
-      if (f->_flags & (_IO_LINE_BUF+_IO_UNBUFFERED))
+      if (f->_flags & (_IO_LINE_BUF | _IO_UNBUFFERED))
 	f->_IO_write_end = f->_IO_write_ptr;
       f->_flags |= _IO_CURRENTLY_PUTTING;
     }
@@ -437,10 +401,9 @@ _IO_old_file_overflow (f, ch)
 
 int
 attribute_compat_text_section
-_IO_old_file_sync (fp)
-     _IO_FILE *fp;
+_IO_old_file_sync (FILE *fp)
 {
-  _IO_ssize_t delta;
+  ssize_t delta;
   int retval = 0;
 
   /*    char* ptr = cur_ptr(); */
@@ -453,13 +416,11 @@ _IO_old_file_sync (fp)
       if (_IO_in_backup (fp))
 	delta -= eGptr () - Gbase ();
 #endif
-      _IO_off_t new_pos = _IO_SYSSEEK (fp, delta, 1);
-      if (new_pos != (_IO_off_t) EOF)
+      off_t new_pos = _IO_SYSSEEK (fp, delta, 1);
+      if (new_pos != (off_t) EOF)
 	fp->_IO_read_end = fp->_IO_read_ptr;
-#ifdef ESPIPE
       else if (errno == ESPIPE)
 	; /* Ignore error from unseekable devices. */
-#endif
       else
 	retval = EOF;
     }
@@ -470,16 +431,12 @@ _IO_old_file_sync (fp)
   return retval;
 }
 
-_IO_off64_t
+off64_t
 attribute_compat_text_section
-_IO_old_file_seekoff (fp, offset, dir, mode)
-     _IO_FILE *fp;
-     _IO_off64_t offset;
-     int dir;
-     int mode;
+_IO_old_file_seekoff (FILE *fp, off64_t offset, int dir, int mode)
 {
-  _IO_off_t result;
-  _IO_off64_t delta, new_offset;
+  off_t result;
+  off64_t delta, new_offset;
   long count;
   /* POSIX.1 8.2.3.7 says that after a call the fflush() the file
      offset of the underlying file must be exact.  */
@@ -551,14 +508,10 @@ _IO_old_file_seekoff (fp, offset, dir, mode)
       && !_IO_in_backup (fp))
     {
       /* Offset relative to start of main get area. */
-      _IO_off_t rel_offset = (offset - fp->_old_offset
-			      + (fp->_IO_read_end - fp->_IO_read_base));
+      off_t rel_offset = (offset - fp->_old_offset
+                          + (fp->_IO_read_end - fp->_IO_read_base));
       if (rel_offset >= 0)
 	{
-#if 0
-	  if (_IO_in_backup (fp))
-	    _IO_switch_to_main_get_area (fp);
-#endif
 	  if (rel_offset <= fp->_IO_read_end - fp->_IO_read_base)
 	    {
 	      _IO_setg (fp, fp->_IO_buf_base, fp->_IO_buf_base + rel_offset,
@@ -657,17 +610,14 @@ resync:
   return offset;
 }
 
-_IO_ssize_t
+ssize_t
 attribute_compat_text_section
-_IO_old_file_write (f, data, n)
-     _IO_FILE *f;
-     const void *data;
-     _IO_ssize_t n;
+_IO_old_file_write (FILE *f, const void *data, ssize_t n)
 {
-  _IO_ssize_t to_do = n;
+  ssize_t to_do = n;
   while (to_do > 0)
     {
-      _IO_ssize_t count = write (f->_fileno, data, to_do);
+      ssize_t count = __write (f->_fileno, data, to_do);
       if (count == EOF)
 	{
 	  f->_flags |= _IO_ERR_SEEN;
@@ -682,17 +632,14 @@ _IO_old_file_write (f, data, n)
   return n;
 }
 
-_IO_size_t
+size_t
 attribute_compat_text_section
-_IO_old_file_xsputn (f, data, n)
-     _IO_FILE *f;
-     const void *data;
-     _IO_size_t n;
+_IO_old_file_xsputn (FILE *f, const void *data, size_t n)
 {
   const char *s = (char *) data;
-  _IO_size_t to_do = n;
+  size_t to_do = n;
   int must_flush = 0;
-  _IO_size_t count = 0;
+  size_t count = 0;
 
   if (n <= 0)
     return 0;
@@ -728,12 +675,7 @@ _IO_old_file_xsputn (f, data, n)
 	count = to_do;
       if (count > 20)
 	{
-#ifdef _LIBC
 	  f->_IO_write_ptr = __mempcpy (f->_IO_write_ptr, s, count);
-#else
-	  memcpy (f->_IO_write_ptr, s, count);
-	  f->_IO_write_ptr += count;
-#endif
 	  s += count;
 	}
       else
@@ -748,7 +690,7 @@ _IO_old_file_xsputn (f, data, n)
     }
   if (to_do + must_flush > 0)
     {
-      _IO_size_t block_size, do_write;
+      size_t block_size, do_write;
       /* Next flush the (full) buffer. */
       if (__overflow (f, EOF) == EOF)
 	return to_do == 0 ? EOF : n - to_do;
@@ -776,7 +718,7 @@ _IO_old_file_xsputn (f, data, n)
 }
 
 
-const struct _IO_jump_t _IO_old_file_jumps =
+const struct _IO_jump_t _IO_old_file_jumps libio_vtable =
 {
   JUMP_INIT_DUMMY,
   JUMP_INIT(finish, _IO_old_file_finish),

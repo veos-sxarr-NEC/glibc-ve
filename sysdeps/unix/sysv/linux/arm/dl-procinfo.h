@@ -1,5 +1,5 @@
 /* Linux/ARM version of processor capability information handling macros.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Philip Blundell <philb@gnu.org>, 2001.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DL_PROCINFO_H
 #define _DL_PROCINFO_H	1
@@ -23,7 +23,7 @@
 #include <ldsodefs.h>
 #include <sysdep.h>
 
-#define _DL_HWCAP_COUNT 37
+#define _DL_HWCAP_COUNT 27
 
 /* Low 22 bits are allocated in HWCAP.  */
 #define _DL_HWCAP_LAST		21
@@ -67,7 +67,7 @@ _dl_procinfo (unsigned int type, unsigned long int word)
 	break;
       }
     default:
-      /* This should not happen.  */
+      /* Fallback to generic output mechanism.  */
       return -1;
     }
   _dl_printf ("\n");

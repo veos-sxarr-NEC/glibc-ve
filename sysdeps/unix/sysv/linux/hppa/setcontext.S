@@ -1,5 +1,5 @@
 /* Install given context.
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Helge Deller <deller@gmx.de>, 2008.
 
@@ -15,18 +15,24 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <libc-symbols.h>
 
 #include "ucontext_i.h"
 
 
 ENTRY(__setcontext)
 	/* Prologue */
+	stw	%r2, -20(%sp)
+	.cfi_offset 2, -20
 	stwm	%r3, 64(%sp)
+	.cfi_def_cfa_offset -64
+	.cfi_offset 3, 0
 #ifdef PIC
 	stw	%r19, -32(%sp)
+	.cfi_offset 19, 32
 #endif
 
 	/* Save ucp.  */
@@ -37,7 +43,7 @@ ENTRY(__setcontext)
 	/* sigprocmask(SIG_BLOCK, &ucp->uc_sigmask, NULL);  */
 	copy	%r0, %r24
 	ldo	oSIGMASK(%r3), %r25
-	bl	sigprocmask, %r2
+	bl	__sigprocmask, %r2
 	ldi	SIG_SETMASK, %r26
 
 	comib,<>,n 0,%ret0,.Lerror
@@ -139,15 +145,15 @@ ENTRY(__setcontext)
 	nop
 
 	/* No further context available. Exit now.  */
-	bl	_exit, %r2
-	ldi	-1, %r26
+	bl	HIDDEN_JUMPTARGET(exit), %r2
+	ldi	0, %r26
 
 
 .Lerror:
 	/* Epilogue */
 	ldw	-84(%r30), %r2
 #ifdef PIC
-	ldw	-96(%r30), %r19
+	ldw	-32(%r30), %r19
 #endif
 	bv	%r0(%r2)
 	ldwm	-64(%r30), %r3

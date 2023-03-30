@@ -1,5 +1,5 @@
 /* Hash table for TLS descriptors.
-   Copyright (C) 2005-2015 Free Software Foundation, Inc.
+   Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
 
@@ -15,10 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef TLSDESCHTAB_H
 # define TLSDESCHTAB_H 1
+
+#include <atomic.h>
 
 # ifdef SHARED
 
@@ -42,7 +44,7 @@ eq_tlsdesc (void *p, void *q)
   return tdp->tlsinfo.ti_offset == tdq->tlsinfo.ti_offset;
 }
 
-inline static int
+inline static size_t
 map_generation (struct link_map *map)
 {
   size_t idx = map->l_tls_modid;
@@ -58,7 +60,7 @@ map_generation (struct link_map *map)
 	     we can assume that, if the generation count is zero, we
 	     still haven't determined the generation count for this
 	     module.  */
-	  if (listp->slotinfo[idx].gen)
+	  if (listp->slotinfo[idx].map == map && listp->slotinfo[idx].gen)
 	    return listp->slotinfo[idx].gen;
 	  else
 	    break;
@@ -77,7 +79,6 @@ map_generation (struct link_map *map)
 }
 
 void *
-internal_function
 _dl_make_tlsdesc_dynamic (struct link_map *map, size_t ti_offset)
 {
   struct hashtab *ht;
@@ -136,24 +137,26 @@ _dl_make_tlsdesc_dynamic (struct link_map *map, size_t ti_offset)
    avoid introducing such dependencies.  */
 
 static int
+__attribute__ ((unused))
 _dl_tlsdesc_resolve_early_return_p (struct tlsdesc volatile *td, void *caller)
 {
-  if (caller != td->entry)
+  if (caller != atomic_load_relaxed (&td->entry))
     return 1;
 
   __rtld_lock_lock_recursive (GL(dl_load_lock));
-  if (caller != td->entry)
+  if (caller != atomic_load_relaxed (&td->entry))
     {
       __rtld_lock_unlock_recursive (GL(dl_load_lock));
       return 1;
     }
 
-  td->entry = _dl_tlsdesc_resolve_hold;
+  atomic_store_relaxed (&td->entry, _dl_tlsdesc_resolve_hold);
 
   return 0;
 }
 
 static void
+__attribute__ ((unused))
 _dl_tlsdesc_wake_up_held_fixups (void)
 {
   __rtld_lock_unlock_recursive (GL(dl_load_lock));

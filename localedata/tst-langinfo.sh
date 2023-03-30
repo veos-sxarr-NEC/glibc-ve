@@ -1,6 +1,6 @@
-#! /bin/sh
+#!/bin/sh
 # Test nl_langinfo.
-# Copyright (C) 2000-2015 Free Software Foundation, Inc.
+# Copyright (C) 2000-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 set -e
 
@@ -121,8 +121,8 @@ en_US.ANSI_X3.4-1968 T_FMT       "%r"
 en_US.ANSI_X3.4-1968 T_FMT_AMPM  "%I:%M:%S %p"
 en_US.ANSI_X3.4-1968 RADIXCHAR   .
 en_US.ANSI_X3.4-1968 THOUSEP     ,
-en_US.ANSI_X3.4-1968 YESEXPR     ^[yY].*
-en_US.ANSI_X3.4-1968 NOEXPR      ^[nN].*
+en_US.ANSI_X3.4-1968 YESEXPR     ^[+1yY]
+en_US.ANSI_X3.4-1968 NOEXPR      ^[-0nN]
 en_US.ISO-8859-1     ABMON_1     Jan
 en_US.ISO-8859-1     ABMON_2     Feb
 en_US.ISO-8859-1     ABMON_3     Mar
@@ -155,8 +155,9 @@ en_US.ISO-8859-1     T_FMT       "%r"
 en_US.ISO-8859-1     T_FMT_AMPM  "%I:%M:%S %p"
 en_US.ISO-8859-1     RADIXCHAR   .
 en_US.ISO-8859-1     THOUSEP     ,
-en_US.ISO-8859-1     YESEXPR     ^[yY].*
-en_US.ISO-8859-1     NOEXPR      ^[nN].*
+en_US.ISO-8859-1     YESEXPR     ^[+1yY]
+en_US.ISO-8859-1     NOEXPR      ^[-0nN]
+en_US.UTF-8	     CURRENCY_SYMBOL	$
 de_DE.ISO-8859-1     ABDAY_1     So
 de_DE.ISO-8859-1     ABDAY_2     Mo
 de_DE.ISO-8859-1     ABDAY_3     Di
@@ -200,8 +201,8 @@ de_DE.ISO-8859-1     D_FMT       "%d.%m.%Y"
 de_DE.ISO-8859-1     T_FMT       "%T"
 de_DE.ISO-8859-1     RADIXCHAR   ,
 de_DE.ISO-8859-1     THOUSEP     .
-de_DE.ISO-8859-1     YESEXPR     ^[jJyY].*
-de_DE.ISO-8859-1     NOEXPR      ^[nN].*
+de_DE.ISO-8859-1     YESEXPR     ^[+1jJyY]
+de_DE.ISO-8859-1     NOEXPR      ^[-0nN]
 de_DE.UTF-8          ABDAY_1     So
 de_DE.UTF-8          ABDAY_2     Mo
 de_DE.UTF-8          ABDAY_3     Di
@@ -245,8 +246,9 @@ de_DE.UTF-8          D_FMT       "%d.%m.%Y"
 de_DE.UTF-8          T_FMT       "%T"
 de_DE.UTF-8          RADIXCHAR   ,
 de_DE.UTF-8          THOUSEP     .
-de_DE.UTF-8          YESEXPR     ^[jJyY].*
-de_DE.UTF-8          NOEXPR      ^[nN].*
+de_DE.UTF-8          YESEXPR     ^[+1jJyY]
+de_DE.UTF-8          NOEXPR      ^[-0nN]
+de_DE.UTF-8          CURRENCY_SYMBOL    â‚¬
 fr_FR.ISO-8859-1     ABDAY_1     dim.
 fr_FR.ISO-8859-1     ABDAY_2     lun.
 fr_FR.ISO-8859-1     ABDAY_3     mar.
@@ -289,9 +291,10 @@ fr_FR.ISO-8859-1     D_T_FMT     "%a %d %b %Y %T %Z"
 fr_FR.ISO-8859-1     D_FMT       "%d/%m/%Y"
 fr_FR.ISO-8859-1     T_FMT       "%T"
 fr_FR.ISO-8859-1     RADIXCHAR   ,
-fr_FR.ISO-8859-1     THOUSEP     " "
-fr_FR.ISO-8859-1     YESEXPR     ^[oOyY].*
-fr_FR.ISO-8859-1     NOEXPR      ^[nN].*
+fr_FR.ISO-8859-1     THOUSEP     " "
+fr_FR.ISO-8859-1     YESEXPR     ^[+1oOyY]
+fr_FR.ISO-8859-1     NOEXPR      ^[-0nN]
+fr_FR.UTF-8          CURRENCY_SYMBOL    â‚¬
 ja_JP.EUC-JP         ABDAY_1     Æü
 ja_JP.EUC-JP         ABDAY_2     ·î
 ja_JP.EUC-JP         ABDAY_3     ²Ð
@@ -335,11 +338,12 @@ ja_JP.EUC-JP         ERA_D_FMT   "%EY%m·î%dÆü"
 ja_JP.EUC-JP         ERA_D_T_FMT "%EY%m·î%dÆü %H»þ%MÊ¬%SÉÃ"
 ja_JP.EUC-JP         RADIXCHAR   .
 ja_JP.EUC-JP         THOUSEP     ,
-ja_JP.EUC-JP         YESEXPR     ^([yY£ù£Ù]|¤Ï¤¤|¥Ï¥¤)
-ja_JP.EUC-JP         NOEXPR      ^([nN£î£Î]|¤¤¤¤¤¨|¥¤¥¤¥¨)
+ja_JP.EUC-JP         YESEXPR     ^([+1yY£ù£Ù]|¤Ï¤¤|¥Ï¥¤)
+ja_JP.EUC-JP         NOEXPR      ^([-0nN£î£Î]|¤¤¤¤¤¨|¥¤¥¤¥¨)
 # Is CRNCYSTR supposed to be the national or international sign?
 # ja_JP.EUC-JP         CRNCYSTR    JPY
 ja_JP.EUC-JP         CODESET     EUC-JP
+ja_JP.UTF-8          CURRENCY_SYMBOL    ï¿¥
 EOF
 ${tst_langinfo_before_env} \
 ${run_program_env} \

@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Richard Henderson (rth@tamu.edu).
 
@@ -14,18 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
 
 #include <asm/errno.h>
-#include <asm/unistd.h>
 #include <tcb-offsets.h>
 #include <sysdep.h>
-
-#define CLONE_VM	0x00000100
-#define CLONE_THREAD	0x00010000
 
 /* int clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg,
 	     pid_t *ptid, void *tls, pid_t *ctid); */
@@ -49,7 +45,6 @@ ENTRY (__clone)
 	   expects.  */
 	sub	%o1, 96, %o1
 	mov	%i3, %g3
-	mov	%i2, %g4
 
 	/* ptid */
 	mov	%i4,%o2
@@ -80,24 +75,14 @@ END(__clone)
 
 	.type	__thread_start,@function
 __thread_start:
-	sethi	%hi(CLONE_THREAD), %l0
-	andcc	%g4, %l0, %g0
-	bne	1f
-	 andcc	%g4, CLONE_VM, %g0
-	bne,a	2f
-	 mov	-1,%o0
-	set	__NR_getpid,%g1
-	ta	0x10
-2:
-	st	%o0,[%g7 + PID]
-	st	%o0,[%g7 + TID]
-1:
 	mov	%g0, %fp	/* terminate backtrace */
 	call	%g2
 	 mov	%g3,%o0
-	call	HIDDEN_JUMPTARGET(_exit),0
+	set	__NR_exit, %g1
+	ta	0x10
 	 nop
 
 	.size	__thread_start, .-__thread_start
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

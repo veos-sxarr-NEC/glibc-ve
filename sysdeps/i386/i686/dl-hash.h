@@ -1,5 +1,5 @@
 /* Compute hash alue for given string according to ELF standard.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DL_HASH_H
 #define _DL_HASH_H	1
@@ -26,6 +26,7 @@
    would be much slower than the generic C implementation.  So don't
    use it.  */
 static unsigned int
+__attribute__ ((unused))
 _dl_elf_hash (const char *name)
 {
   unsigned int result;

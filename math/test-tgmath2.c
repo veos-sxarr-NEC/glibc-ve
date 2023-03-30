@@ -1,5 +1,5 @@
 /* Test compilation of tgmath macros.
-   Copyright (C) 2007-2015 Free Software Foundation, Inc.
+   Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2007.
 
@@ -15,11 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef HAVE_MAIN
 #undef __NO_MATH_INLINES
 #define __NO_MATH_INLINES 1
+#include <float.h>
 #include <math.h>
 #include <complex.h>
 #include <stdio.h>
@@ -30,7 +31,7 @@
 
 typedef complex float cfloat;
 typedef complex double cdouble;
-#ifndef NO_LONG_DOUBLE
+#if LDBL_MANT_DIG > DBL_MANT_DIG
 typedef long double ldouble;
 typedef complex long double cldouble;
 #else
@@ -62,7 +63,7 @@ enum
     Tcfloat,
     Tdouble,
     Tcdouble,
-#ifndef NO_LONG_DOUBLE
+#if LDBL_MANT_DIG > DBL_MANT_DIG
     Tldouble,
     Tcldouble,
 #else
@@ -88,12 +89,6 @@ enum
   };
 int count;
 int counts[Tlast][C_last];
-
-int
-test (const int Vint4, const long long int Vllong4)
-{
-  int result = 0;
-  int quo = 0;
 
 #define FAIL(str) \
   do								\
@@ -138,6 +133,11 @@ test (const int Vint4, const long long int Vllong4)
   while (0)
 #define TEST(expr, type, fn) TEST2(expr, type, type, fn)
 
+int
+test_cos (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
   TEST (cos (vfloat1), float, cos);
   TEST (cos (vdouble1), double, cos);
   TEST (cos (vldouble1), ldouble, cos);
@@ -154,6 +154,14 @@ test (const int Vint4, const long long int Vllong4)
   TEST (cos (Vcfloat1), cfloat, cos);
   TEST (cos (Vcdouble1), cdouble, cos);
   TEST (cos (Vcldouble1), cldouble, cos);
+
+  return result;
+}
+
+int
+test_fabs (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
 
   TEST (fabs (vfloat1), float, fabs);
   TEST (fabs (vdouble1), double, fabs);
@@ -180,6 +188,13 @@ test (const int Vint4, const long long int Vllong4)
   TEST (fabs (Vcdouble1), double, cabs);
   TEST (fabs (Vcldouble1), ldouble, cabs);
 
+  return result;
+}
+
+int
+test_conj (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
   TEST (conj (vfloat1), cfloat, conj);
   TEST (conj (vdouble1), cdouble, conj);
   TEST (conj (vldouble1), cldouble, conj);
@@ -197,6 +212,14 @@ test (const int Vint4, const long long int Vllong4)
   TEST (conj (Vcdouble1), cdouble, conj);
   TEST (conj (Vcldouble1), cldouble, conj);
 
+  return result;
+}
+
+int
+test_expm1 (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
   TEST (expm1 (vfloat1), float, expm1);
   TEST (expm1 (vdouble1), double, expm1);
   TEST (expm1 (vldouble1), ldouble, expm1);
@@ -208,6 +231,13 @@ test (const int Vint4, const long long int Vllong4)
   TEST (expm1 (Vint1), double, expm1);
   TEST (expm1 (Vllong1), double, expm1);
 
+  return result;
+}
+
+int
+test_lrint (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
   TEST2 (lrint (vfloat1), float, long int, lrint);
   TEST2 (lrint (vdouble1), double, long int, lrint);
   TEST2 (lrint (vldouble1), ldouble, long int, lrint);
@@ -219,6 +249,14 @@ test (const int Vint4, const long long int Vllong4)
   TEST2 (lrint (Vint1), double, long int, lrint);
   TEST2 (lrint (Vllong1), double, long int, lrint);
 
+  return result;
+}
+
+int
+test_ldexp (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
   TEST (ldexp (vfloat1, 6), float, ldexp);
   TEST (ldexp (vdouble1, 6), double, ldexp);
   TEST (ldexp (vldouble1, 6), ldouble, ldexp);
@@ -229,6 +267,9 @@ test (const int Vint4, const long long int Vllong4)
   TEST (ldexp (Vldouble1, 6), ldouble, ldexp);
   TEST (ldexp (Vint1, 6), double, ldexp);
   TEST (ldexp (Vllong1, 6), double, ldexp);
+
+  return result;
+}
 
 #define FIRST(x, y) (y, x)
 #define SECOND(x, y) (x, y)
@@ -307,25 +348,82 @@ test (const int Vint4, const long long int Vllong4)
   NON_LDBL_CTEST (fn, FIRST, Vcdouble2, cdouble, fnt); \
   NON_LDBL_CTEST (fn, SECOND, Vcdouble2, cdouble, fnt);
 
+int
+test_atan2 (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
   BINARY_TEST (atan2, atan2);
+
+  return result;
+}
+
+int
+test_remquo (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+  int quo = 0;
 
 #define my_remquo(x, y) remquo (x, y, &quo)
   BINARY_TEST (my_remquo, remquo);
 #undef my_remquo
 
+  return result;
+}
+
+int
+test_pow (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
   BINARY_CTEST (pow, pow);
 
-  /* Testing all arguments of fma would be just too expensive,
-     so test just some.  */
+  return result;
+}
+
+/* Testing all arguments of fma would be just too expensive,
+   so test just some.  */
+
+int
+test_fma_1 (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
 #define my_fma(x, y) fma (x, y, vfloat3)
   BINARY_TEST (my_fma, fma);
 #undef my_fma
+
+  return result;
+}
+
+int
+test_fma_2 (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
 #define my_fma(x, y) fma (x, vfloat3, y)
   BINARY_TEST (my_fma, fma);
 #undef my_fma
+
+  return result;
+}
+
+int
+test_fma_3 (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
+
 #define my_fma(x, y) fma (Vfloat3, x, y)
   BINARY_TEST (my_fma, fma);
 #undef my_fma
+
+  return result;
+}
+
+int
+test_fma_4 (const int Vint4, const long long int Vllong4)
+{
+  int result = 0;
   TEST (fma (vdouble1, Vdouble2, vllong3), double, fma);
   TEST (fma (vint1, Vint2, vint3), double, fma);
   TEST (fma (Vldouble1, vldouble2, Vldouble3), ldouble, fma);
@@ -334,10 +432,26 @@ test (const int Vint4, const long long int Vllong4)
   return result;
 }
 
-int
-main (void)
+static int
+do_test (void)
 {
-  return test (vint1, vllong1);
+  int result;
+
+  result = test_cos (vint1, vllong1);
+  result |= test_fabs (vint1, vllong1);
+  result |= test_conj (vint1, vllong1);
+  result |= test_expm1 (vint1, vllong1);
+  result |= test_lrint (vint1, vllong1);
+  result |= test_ldexp (vint1, vllong1);
+  result |= test_atan2 (vint1, vllong1);
+  result |= test_remquo (vint1, vllong1);
+  result |= test_pow (vint1, vllong1);
+  result |= test_fma_1 (vint1, vllong1);
+  result |= test_fma_2 (vint1, vllong1);
+  result |= test_fma_3 (vint1, vllong1);
+  result |= test_fma_4 (vint1, vllong1);
+
+  return result;
 }
 
 /* Now generate the three functions.  */
@@ -357,7 +471,7 @@ main (void)
 #define C Tcfloat
 #include "test-tgmath2.c"
 
-#ifndef NO_LONG_DOUBLE
+#if LDBL_MANT_DIG > DBL_MANT_DIG
 #define F(name) name##l
 #define TYPE ldouble
 #define CTYPE cldouble
@@ -365,6 +479,9 @@ main (void)
 #define C Tcldouble
 #include "test-tgmath2.c"
 #endif
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
 
 #else
 

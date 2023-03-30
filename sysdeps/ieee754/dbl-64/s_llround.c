@@ -1,5 +1,5 @@
 /* Round double value to long long int.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,18 +15,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <fenv.h>
+#include <limits.h>
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-double.h>
+#include <fix-fp-int-convert-overflow.h>
 
 
 long long int
 __llround (double x)
 {
   int32_t j0;
-  u_int32_t i1, i0;
+  uint32_t i1, i0;
   long long int result;
   int sign;
 
@@ -53,7 +57,7 @@ __llround (double x)
 	result = (((long long int) i0 << 32) | i1) << (j0 - 52);
       else
 	{
-	  u_int32_t j = i1 + (0x80000000 >> (j0 - 20));
+	  uint32_t j = i1 + (0x80000000 >> (j0 - 20));
 	  if (j < i1)
 	    ++i0;
 
@@ -65,16 +69,20 @@ __llround (double x)
     }
   else
     {
-      /* The number is too large.  It is left implementation defined
-         what happens.  */
+#ifdef FE_INVALID
+      /* The number is too large.  Unless it rounds to LLONG_MIN,
+	 FE_INVALID must be raised and the return value is
+	 unspecified.  */
+      if (FIX_DBL_LLONG_CONVERT_OVERFLOW && x != (double) LLONG_MIN)
+	{
+	  feraiseexcept (FE_INVALID);
+	  return sign == 1 ? LLONG_MAX : LLONG_MIN;
+	}
+#endif
       return (long long int) x;
     }
 
   return sign * result;
 }
 
-weak_alias (__llround, llround)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__llround, __llroundl)
-weak_alias (__llround, llroundl)
-#endif
+libm_alias_double (__llround, llround)

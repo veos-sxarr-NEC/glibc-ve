@@ -1,6 +1,6 @@
 /* mpn_add_n -- Add two limb vectors of equal, non-zero length.
 
-Copyright (C) 1992-2015 Free Software Foundation, Inc.
+Copyright (C) 1992-2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -16,21 +16,13 @@ License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, see
-<http://www.gnu.org/licenses/>.  */
+<https://www.gnu.org/licenses/>.  */
 
 #include <gmp.h>
 #include "gmp-impl.h"
 
 mp_limb_t
-#if __STDC__
 mpn_add_n (mp_ptr res_ptr, mp_srcptr s1_ptr, mp_srcptr s2_ptr, mp_size_t size)
-#else
-mpn_add_n (res_ptr, s1_ptr, s2_ptr, size)
-     register mp_ptr res_ptr;
-     register mp_srcptr s1_ptr;
-     register mp_srcptr s2_ptr;
-     mp_size_t size;
-#endif
 {
   register mp_limb_t x, y, cy;
   register mp_size_t j;

@@ -1,5 +1,5 @@
-/* Map in a shared object's segments.  Generic version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Map in a shared object's segments.  VE version.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <dl-load.h>
 
@@ -62,7 +62,7 @@ _dl_map_segments (struct link_map *l, int fd,
            - MAP_BASE_ADDR (l));
 
       /* Remember which part of the address space this object uses.  */
-      l->l_map_start = (ElfW(Addr)) __mmap ((void *) mappref, maplength,
+      l->l_map_start = (ElfW(Addr)) __mmap_ve ((void *) mappref, maplength,
                                             c->prot,
                                             flag|MAP_COPY|MAP_FILE,
                                             fd, c->mapoff);
@@ -95,7 +95,7 @@ _dl_map_segments (struct link_map *l, int fd,
     {
       if (c->mapend > c->mapstart
           /* Map the segment contents from the file.  */
-          && (__mmap ((void *) (l->l_addr + c->mapstart),
+          && (__mmap_ve ((void *) (l->l_addr + c->mapstart),
                       c->mapend - c->mapstart, c->prot,
                       flag|MAP_COPY|MAP_FILE|MAP_ADDR_64GB_FIXED,
                       fd, c->mapoff)
@@ -142,7 +142,7 @@ _dl_map_segments (struct link_map *l, int fd,
             {
               /* Map the remaining zero pages in from the zero fill FD.  */
               caddr_t mapat;
-              mapat = __mmap ((caddr_t) zeropage, zeroend - zeropage,
+              mapat = __mmap_ve ((caddr_t) zeropage, zeroend - zeropage,
                               c->prot,flag|MAP_ANON|MAP_PRIVATE|
                               MAP_ADDR_64GB_FIXED, -1, 0);
               if (__glibc_unlikely (mapat == MAP_FAILED))

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,16 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthreadP.h>
 
 
 int
-__pthread_mutexattr_settype (attr, kind)
-     pthread_mutexattr_t *attr;
-     int kind;
+__pthread_mutexattr_settype (pthread_mutexattr_t *attr, int kind)
 {
   struct pthread_mutexattr *iattr;
 
@@ -42,4 +40,5 @@ __pthread_mutexattr_settype (attr, kind)
   return 0;
 }
 weak_alias (__pthread_mutexattr_settype, pthread_mutexattr_setkind_np)
-strong_alias (__pthread_mutexattr_settype, pthread_mutexattr_settype)
+weak_alias (__pthread_mutexattr_settype, pthread_mutexattr_settype)
+hidden_def (__pthread_mutexattr_settype)

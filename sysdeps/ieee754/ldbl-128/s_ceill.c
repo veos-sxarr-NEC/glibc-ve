@@ -13,7 +13,7 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
+#if defined (LIBM_SCCS) && ! defined (lint)
 static char rcsid[] = "$NetBSD: $";
 #endif
 
@@ -22,54 +22,80 @@ static char rcsid[] = "$NetBSD: $";
  * Return x rounded toward -inf to integral value
  * Method:
  *	Bit twiddling.
- * Exception:
- *	Inexact flag raised if x not equal to ceil(x).
  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
+#include <math-use-builtins.h>
 
-static const long double huge = 1.0e4930L;
-
-long double __ceill(long double x)
+_Float128
+__ceill (_Float128 x)
 {
-	int64_t i0,i1,j0;
-	u_int64_t i,j;
-	GET_LDOUBLE_WORDS64(i0,i1,x);
-	j0 = ((i0>>48)&0x7fff)-0x3fff;
-	if(j0<48) {
-	    if(j0<0) { 	/* raise inexact if x != 0 */
-		if(huge+x>0.0) {/* return 0*sign(x) if |x|<1 */
-		    if(i0<0) {i0=0x8000000000000000ULL;i1=0;}
-		    else if((i0|i1)!=0) { i0=0x3fff000000000000ULL;i1=0;}
-		}
-	    } else {
-		i = (0x0000ffffffffffffULL)>>j0;
-		if(((i0&i)|i1)==0) return x; /* x is integral */
-		if(huge+x>0.0) {	/* raise inexact flag */
-		    if(i0>0) i0 += (0x0001000000000000LL)>>j0;
-		    i0 &= (~i); i1=0;
-		}
+#if USE_CEILL_BUILTIN
+  return __builtin_ceill (x);
+#else
+  /* Use generic implementation.  */
+  int64_t i0, i1, j0;
+  uint64_t i, j;
+  GET_LDOUBLE_WORDS64 (i0, i1, x);
+  j0 = ((i0 >> 48) & 0x7fff) - 0x3fff;
+  if (j0 < 48)
+    {
+      if (j0 < 0)
+	{
+	  /* return 0 * sign (x) if |x| < 1  */
+	  if (i0 < 0)
+	    {
+	      i0 = 0x8000000000000000ULL;
+	      i1 = 0;
 	    }
-	} else if (j0>111) {
-	    if(j0==0x4000) return x+x;	/* inf or NaN */
-	    else return x;		/* x is integral */
-	} else {
-	    i = -1ULL>>(j0-48);
-	    if((i1&i)==0) return x;	/* x is integral */
-	    if(huge+x>0.0) { 		/* raise inexact flag */
-		if(i0>0) {
-		    if(j0==48) i0+=1;
-		    else {
-			j = i1+(1LL<<(112-j0));
-			if(j<i1) i0 +=1 ; 	/* got a carry */
-			i1=j;
-		    }
-		}
-		i1 &= (~i);
+	  else if ((i0 | i1) != 0)
+	    {
+	      i0 = 0x3fff000000000000ULL;
+	      i1 = 0;
 	    }
 	}
-	SET_LDOUBLE_WORDS64(x,i0,i1);
-	return x;
+      else
+	{
+	  i = (0x0000ffffffffffffULL) >> j0;
+	  if (((i0 & i) | i1) == 0)
+	    return x;		/* x is integral  */
+	  if (i0 > 0)
+	    i0 += (0x0001000000000000LL) >> j0;
+	  i0 &= (~i);
+	  i1 = 0;
+	}
+    }
+  else if (j0 > 111)
+    {
+      if (j0 == 0x4000)
+	return x + x;		/* inf or NaN  */
+      else
+	return x;		/* x is integral  */
+    }
+  else
+    {
+      i = -1ULL >> (j0 - 48);
+      if ((i1 & i) == 0)
+	return x;		/* x is integral  */
+      if (i0 > 0)
+	{
+	  if (j0 == 48)
+	    i0 += 1;
+	  else
+	    {
+	      j = i1 + (1LL << (112 - j0));
+	      if (j < i1)
+		i0 += 1;	/* got a carry  */
+	      i1 = j;
+	    }
+	}
+      i1 &= (~i);
+    }
+  SET_LDOUBLE_WORDS64 (x, i0, i1);
+  return x;
+#endif /* ! USE_CEILL_BUILTIN  */
 }
-weak_alias (__ceill, ceill)
+libm_alias_ldouble (__ceil, ceil)

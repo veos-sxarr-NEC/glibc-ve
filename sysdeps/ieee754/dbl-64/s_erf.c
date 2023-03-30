@@ -115,7 +115,11 @@ static char rcsid[] = "$NetBSD: s_erf.c,v 1.8 1995/05/10 20:47:05 jtc Exp $";
 #include <errno.h>
 #include <float.h>
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-double.h>
+#include <fix-int-fp-convert-zero.h>
 
 static const double
   tiny = 1e-300,
@@ -200,7 +204,7 @@ __erf (double x)
   ix = hx & 0x7fffffff;
   if (ix >= 0x7ff00000)                 /* erf(nan)=nan */
     {
-      i = ((u_int32_t) hx >> 31) << 1;
+      i = ((uint32_t) hx >> 31) << 1;
       return (double) (1 - i) + one / x; /* erf(+-inf)=+-1 */
     }
 
@@ -213,11 +217,7 @@ __erf (double x)
 	    {
 	      /* Avoid spurious underflow.  */
 	      double ret = 0.0625 * (16.0 * x + (16.0 * efx) * x);
-	      if (fabs (ret) < DBL_MIN)
-		{
-		  double force_underflow = ret * ret;
-		  math_force_eval (force_underflow);
-		}
+	      math_check_force_underflow (ret);
 	      return ret;
 	    }
 	  return x + efx * x;
@@ -297,11 +297,7 @@ __erf (double x)
   else
     return r / x - one;
 }
-weak_alias (__erf, erf)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__erf, __erfl)
-weak_alias (__erf, erfl)
-#endif
+libm_alias_double (__erf, erf)
 
 double
 __erfc (double x)
@@ -312,7 +308,10 @@ __erfc (double x)
   ix = hx & 0x7fffffff;
   if (ix >= 0x7ff00000)                         /* erfc(nan)=nan */
     {                                           /* erfc(+-inf)=0,2 */
-      return (double) (((u_int32_t) hx >> 31) << 1) + one / x;
+      double ret = (double) (((uint32_t) hx >> 31) << 1) + one / x;
+      if (FIX_INT_FP_CONVERT_ZERO && ret == 0.0)
+	return 0.0;
+      return ret;
     }
 
   if (ix < 0x3feb0000)                  /* |x|<0.84375 */
@@ -402,10 +401,7 @@ __erfc (double x)
 	  __ieee754_exp ((z - x) * (z + x) + R / S);
       if (hx > 0)
 	{
-#if FLT_EVAL_METHOD != 0
-	  volatile
-#endif
-	  double ret = r / x;
+	  double ret = math_narrow_eval (r / x);
 	  if (ret == 0)
 	    __set_errno (ERANGE);
 	  return ret;
@@ -424,8 +420,4 @@ __erfc (double x)
 	return two - tiny;
     }
 }
-weak_alias (__erfc, erfc)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__erfc, __erfcl)
-weak_alias (__erfc, erfcl)
-#endif
+libm_alias_double (__erfc, erfc)

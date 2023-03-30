@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /*
   Testing of some network related lookup functions.
@@ -23,14 +23,12 @@
   - /etc/hosts
   - /etc/networks
   - /etc/protocols
-  - /etc/rpc
   The tests try to be fairly generic and simple so that they work on
   every possible setup (and might therefore not detect some possible
   errors).
 */
 
 #include <netdb.h>
-#include <rpc/netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +39,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include "nss.h"
+
+#include <support/support.h>
 
 /*
   The following define is necessary for glibc 2.0.6
@@ -179,7 +179,7 @@ test_hosts (void)
   while (gethostname (name, namelen) < 0 && errno == ENAMETOOLONG)
     {
       namelen += 2;		/* tiny increments to test a lot */
-      name = realloc (name, namelen);
+      name = xrealloc (name, namelen);
     }
   if (gethostname (name, namelen) == 0)
     {
@@ -192,7 +192,7 @@ test_hosts (void)
     }
 
   ip.s_addr = htonl (INADDR_LOOPBACK);
-  hptr1 = gethostbyaddr ((char *) &ip, sizeof(ip), AF_INET);
+  hptr1 = gethostbyaddr ((char *) &ip, sizeof (ip), AF_INET);
   if (hptr1 != NULL)
     {
       printf ("official name of 127.0.0.1: %s\n", hptr1->h_name);
@@ -234,7 +234,7 @@ static void
 test_network (void)
 {
   struct netent *nptr;
-  u_int32_t ip;
+  uint32_t ip;
 
   /*
      This test needs the following line in /etc/networks:
@@ -300,43 +300,6 @@ test_protocols (void)
 }
 
 
-static void
-output_rpcent (const char *call, struct rpcent *rptr)
-{
-  char **pptr;
-
-  if (rptr == NULL)
-    printf ("Call: %s returned NULL\n", call);
-  else
-    {
-      printf ("Call: %s, returned: r_name: %s, r_number: %d\n",
-		call, rptr->r_name, rptr->r_number);
-      for (pptr = rptr->r_aliases; *pptr != NULL; pptr++)
-	printf ("  alias: %s\n", *pptr);
-    }
-}
-
-static void
-test_rpc (void)
-{
-  struct rpcent *rptr;
-
-  rptr = getrpcbyname ("portmap");
-  output_rpcent ("getrpcyname (\"portmap\")", rptr);
-
-  rptr = getrpcbynumber (100000);
-  output_rpcent ("getrpcbynumber (100000)", rptr);
-
-  setrpcent (0);
-  do
-    {
-      rptr = getrpcent ();
-      output_rpcent ("getrpcent ()", rptr);
-    }
-  while (rptr != NULL);
-  endrpcent ();
-}
-
 /* Override /etc/nsswitch.conf for this program.  This is mainly
    useful for developers. */
 static void  __attribute__ ((unused))
@@ -351,7 +314,6 @@ setdb (const char *dbname)
 	__nss_configure_lookup ("networks", dbname);
       }
   __nss_configure_lookup ("protocols", dbname);
-  __nss_configure_lookup ("rpc", dbname);
   __nss_configure_lookup ("services", dbname);
 }
 
@@ -366,7 +328,6 @@ do_test (void)
   test_hosts ();
   test_network ();
   test_protocols ();
-  test_rpc ();
   test_services ();
 
   if (error_count)
@@ -377,5 +338,4 @@ do_test (void)
   return (error_count != 0);
 }
 
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

@@ -16,10 +16,6 @@
  * SOFTWARE.
  */
 
-#if !defined(_LIBC) && !defined(lint)
-static const char rcsid[] = "$BINDId: ns_ttl.c,v 8.8 1999/10/13 16:39:36 vixie Exp $";
-#endif
-
 /* Import. */
 
 #include <arpa/nameser.h>
@@ -117,9 +113,13 @@ ns_parse_ttl(const char *src, u_long *dst) {
 			ch = toupper(ch);
 		switch (ch) {
 		case 'W':  tmp *= 7;
+		  /* Fall through.  */
 		case 'D':  tmp *= 24;
+		  /* Fall through.  */
 		case 'H':  tmp *= 60;
+		  /* Fall through.  */
 		case 'M':  tmp *= 60;
+		  /* Fall through.  */
 		case 'S':  break;
 		default:   goto einval;
 		}

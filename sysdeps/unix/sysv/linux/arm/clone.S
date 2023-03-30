@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Pat Beirne <patb@corelcomputer.com>
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -23,9 +23,6 @@
 #include <tcb-offsets.h>
 #define _ERRNO_H	1
 #include <bits/errno.h>
-
-#define CLONE_VM      0x00000100
-#define CLONE_THREAD  0x00010000
 
 /* int clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg,
 	     pid_t *ptid, struct user_desc *tls, pid_t *ctid); */
@@ -70,27 +67,16 @@ PSEUDO_END (__clone)
 1:
 	.fnstart
 	.cantunwind
-	tst	ip, #CLONE_THREAD
-	bne	3f
-	GET_TLS (lr)
-	mov	r1, r0
-	tst	ip, #CLONE_VM
-	ldr	r7, =SYS_ify(getpid)
-	ite	ne
-	movne	r0, #-1
-	swieq	0x0
-	NEGOFF_ADJ_BASE (r1, TID_OFFSET)
-	str	r0, NEGOFF_OFF1 (r1, TID_OFFSET)
-	str	r0, NEGOFF_OFF2 (r1, PID_OFFSET, TID_OFFSET)
-3:
 	@ pick the function arg and call address off the stack and execute
 	ldr	r0, [sp, #4]
 	ldr 	ip, [sp], #8
 	BLX (ip)
 
 	@ and we are done, passing the return value through r0
-	b	PLTJMP(HIDDEN_JUMPTARGET(_exit))
+	ldr	r7, =SYS_ify(exit)
+	swi	0x0
 
 	.fnend
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

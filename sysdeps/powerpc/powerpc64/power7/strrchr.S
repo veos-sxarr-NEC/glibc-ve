@@ -1,5 +1,5 @@
 /* Optimized strrchr implementation for PowerPC64/POWER7 using cmpb insn.
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
 /* int [r3] strrchr (char *s [r3], int c [r4])  */
+
+#ifndef STRRCHR
+# define STRRCHR strrchr
+#endif
+
 	.machine  power7
-ENTRY (strrchr)
+ENTRY_TOCLESS (STRRCHR)
 	CALL_MCOUNT 2
 	dcbt	0,r3
 	clrrdi	r8,r3,3	      /* Align the address to doubleword boundary.  */
@@ -250,6 +255,6 @@ L(done_null):
 	srdi	r0,r0,3	      /* Convert trailing zeros to bytes.  */
 	add	r3,r8,r0      /* Return address of the matching null byte.  */
 	blr
-END (strrchr)
+END (STRRCHR)
 weak_alias (strrchr, rindex)
 libc_hidden_builtin_def (strrchr)

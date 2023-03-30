@@ -1,5 +1,5 @@
 /* Test and measure memmove functions.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Jakub Jelinek <jakub@redhat.com>, 1999.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
 #ifdef TEST_BCOPY
@@ -24,6 +24,7 @@
 # define TEST_NAME "memmove"
 #endif
 #include "test-string.h"
+#include <support/test-driver.h>
 
 char *simple_memmove (char *, const char *, size_t);
 
@@ -68,6 +69,7 @@ static void
 do_one_test (impl_t *impl, char *dst, char *src, const char *orig_src,
 	     size_t len)
 {
+  /* This also clears the destination buffer set by the previous run.  */
   memcpy (src, orig_src, len);
 #ifdef TEST_BCOPY
   CALL (impl, src, dst, len);
@@ -244,6 +246,60 @@ do_random_tests (void)
     }
 }
 
+static void
+do_test2 (void)
+{
+  size_t size = 0x20000000;
+  uint32_t * large_buf;
+
+  large_buf = mmap ((void*) 0x70000000, size, PROT_READ | PROT_WRITE,
+		    MAP_PRIVATE | MAP_ANON, -1, 0);
+
+  if (large_buf == MAP_FAILED)
+    error (EXIT_UNSUPPORTED, errno, "Large mmap failed");
+
+  if ((uintptr_t) large_buf > 0x80000000 - 128
+      || 0x80000000 - (uintptr_t) large_buf > 0x20000000)
+    {
+      error (0, 0, "Large mmap allocated improperly");
+      ret = EXIT_UNSUPPORTED;
+      munmap ((void *) large_buf, size);
+      return;
+    }
+
+  size_t bytes_move = 0x80000000 - (uintptr_t) large_buf;
+  size_t arr_size = bytes_move / sizeof (uint32_t);
+  size_t i;
+
+  FOR_EACH_IMPL (impl, 0)
+    {
+      for (i = 0; i < arr_size; i++)
+        large_buf[i] = (uint32_t) i;
+
+      uint32_t * dst = &large_buf[33];
+
+#ifdef TEST_BCOPY
+      CALL (impl, (char *) large_buf, (char *) dst, bytes_move);
+#else
+      CALL (impl, (char *) dst, (char *) large_buf, bytes_move);
+#endif
+
+      for (i = 0; i < arr_size; i++)
+	{
+	  if (dst[i] != (uint32_t) i)
+	    {
+	      error (0, 0,
+		     "Wrong result in function %s dst \"%p\" src \"%p\" offset \"%zd\"",
+		     impl->name, dst, large_buf, i);
+	      ret = 1;
+	      break;
+	    }
+	}
+    }
+
+  munmap ((void *) large_buf, size);
+}
+
 int
 test_main (void)
 {
@@ -283,7 +339,10 @@ test_main (void)
     }
 
   do_random_tests ();
+
+  do_test2 ();
+
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

@@ -1,5 +1,5 @@
 /* ix87 specific implementation of arcsinh.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,9 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <machine/asm.h>
+#include <libm-alias-finite.h>
 
 	.section .rodata.cst8,"aM",@progbits,8
 
@@ -91,10 +92,11 @@ ENTRY(__ieee754_acosh)
 	fyl2x				// log(2*x+1/(x+sqrt(x^2-1)))
 	ret
 
-	// x < 1 => NaN
+	// x < 1 (or -NaN) => NaN
 	.align ALIGNARG(4)
-5:	fldz
+5:	fldl	4(%esp)
+	fsub	%st
 	fdiv	%st, %st(0)
 	ret
 END(__ieee754_acosh)
-strong_alias (__ieee754_acosh, __acosh_finite)
+libm_alias_finite (__ieee754_acosh, __acosh)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include "pthreadP.h"
@@ -22,8 +22,7 @@
 
 
 int
-pthread_key_delete (key)
-     pthread_key_t key;
+__pthread_key_delete (pthread_key_t key)
 {
   int result = EINVAL;
 
@@ -40,3 +39,4 @@ pthread_key_delete (key)
 
   return result;
 }
+weak_alias (__pthread_key_delete, pthread_key_delete)

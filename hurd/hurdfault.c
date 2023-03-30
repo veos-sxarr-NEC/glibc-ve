@@ -1,5 +1,5 @@
 /* Handle faults in the signal thread.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <hurd.h>
 #include <hurd/signal.h>
@@ -52,8 +52,8 @@ _hurdsig_fault_catch_exception_raise (mach_port_t port,
   int signo;
   struct hurd_signal_detail d;
 
-  if (port != forward_sigexc ||
-      thread != _hurd_msgport_thread || task != __mach_task_self ())
+  if (port != forward_sigexc
+      || thread != _hurd_msgport_thread || task != __mach_task_self ())
     return EPERM;		/* Strange bogosity.  */
 
   d.exc = exception;
@@ -204,6 +204,7 @@ _hurdsig_fault_init (void)
   /* This state will be restored when we fault.
      It runs the function above.  */
   memset (&state, 0, sizeof state);
+  MACHINE_THREAD_STATE_FIX_NEW (&state);
   MACHINE_THREAD_STATE_SET_PC (&state, faulted);
   MACHINE_THREAD_STATE_SET_SP (&state, faultstack, sizeof faultstack);
 

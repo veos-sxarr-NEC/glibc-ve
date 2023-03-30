@@ -1,5 +1,5 @@
 /* sem_wait -- wait on a semaphore.  Generic futex-using version.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Paul Mackerras <paulus@au.ibm.com>, 2003.
 
@@ -15,17 +15,32 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <lowlevellock.h>	/* lll_futex* used by the old code.  */
 #include "sem_waitcommon.c"
 
 int
 __new_sem_wait (sem_t *sem)
 {
+  /* We need to check whether we need to act upon a cancellation request here
+     because POSIX specifies that cancellation points "shall occur" in
+     sem_wait and sem_timedwait, which also means that they need to check
+     this regardless whether they block or not (unlike "may occur"
+     functions).  See the POSIX Rationale for this requirement: Section
+     "Thread Cancellation Overview" [1] and austin group issue #1076 [2]
+     for thoughs on why this may be a suboptimal design.
+
+     [1] http://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xsh_chap02.html
+     [2] http://austingroupbugs.net/view.php?id=1076 for thoughts on why this
+   */
+  __pthread_testcancel ();
+
   if (__new_sem_wait_fast ((struct new_sem *) sem, 0) == 0)
     return 0;
   else
-    return __new_sem_wait_slow((struct new_sem *) sem, NULL);
+    return __new_sem_wait_slow ((struct new_sem *) sem,
+				CLOCK_REALTIME, NULL);
 }
 versioned_symbol (libpthread, __new_sem_wait, sem_wait, GLIBC_2_1);
 
@@ -42,14 +57,8 @@ __old_sem_wait (sem_t *sem)
       if (atomic_decrement_if_positive (futex) > 0)
 	return 0;
 
-      /* Enable asynchronous cancellation.  Required by the standard.  */
-      int oldtype = __pthread_enable_asynccancel ();
-
       /* Always assume the semaphore is shared.  */
-      err = lll_futex_wait (futex, 0, LLL_SHARED);
-
-      /* Disable asynchronous cancellation.  */
-      __pthread_disable_asynccancel (oldtype);
+      err = lll_futex_wait_cancel (futex, 0, LLL_SHARED);
     }
   while (err == 0 || err == -EWOULDBLOCK);
 

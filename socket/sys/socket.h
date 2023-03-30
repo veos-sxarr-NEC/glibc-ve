@@ -1,5 +1,5 @@
 /* Declarations of socket constants, types, and functions.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef	_SYS_SOCKET_H
 #define	_SYS_SOCKET_H	1
@@ -24,14 +24,9 @@
 
 __BEGIN_DECLS
 
-#include <sys/uio.h>
+#include <bits/types/struct_iovec.h>
 #define	__need_size_t
 #include <stddef.h>
-#ifdef __USE_GNU
-/* Get the __sigset_t definition.  */
-# include <bits/sigset.h>
-#endif
-
 
 /* This operating system-specific header file defines the SOCK_*, PF_*,
    AF_*, MSG_*, SOL_*, and SO_* constants, and the `struct sockaddr',
@@ -39,13 +34,7 @@ __BEGIN_DECLS
 #include <bits/socket.h>
 
 #ifdef __USE_MISC
-/* This is the 4.3 BSD `struct sockaddr' format, which is used as wire
-   format in the grotty old 4.3 `talk' protocol.  */
-struct osockaddr
-  {
-    unsigned short int sa_family;
-    unsigned char sa_data[14];
-  };
+# include <bits/types/struct_osockaddr.h>
 #endif
 
 /* The following constants should be used for the second parameter of
@@ -74,8 +63,8 @@ enum
 # define __CONST_SOCKADDR_ARG	const struct sockaddr *
 #else
 #ifdef __ve__
-# define __SOCKADDR_ARG		struct sockaddr *__restrict
-# define __CONST_SOCKADDR_ARG	const struct sockaddr *
+# define __SOCKADDR_ARG                struct sockaddr *__restrict
+# define __CONST_SOCKADDR_ARG  const struct sockaddr *
 #else
 /* Add more `struct sockaddr_AF' types here as necessary.
    These are all the ones I found on NetBSD and Linux.  */
@@ -271,7 +260,7 @@ extern int shutdown (int __fd, int __how) __THROW;
 
 
 #ifdef __USE_XOPEN2K
-/* Determine wheter socket is at a out-of-band mark.  */
+/* Determine whether socket is at a out-of-band mark.  */
 extern int sockatmark (int __fd) __THROW;
 #endif
 

@@ -1,5 +1,5 @@
 /* Definitions for POSIX memory map interface.  Linux/SPARC version.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SYS_MMAN_H
 # error "Never use <bits/mman.h> directly; include <sys/mman.h> instead."
@@ -36,12 +36,18 @@
 # define MAP_NONBLOCK	0x10000		/* Do not block on IO.  */
 # define MAP_STACK	0x20000		/* Allocation is for a stack.  */
 # define MAP_HUGETLB	0x40000		/* Create huge page mapping.  */
+# define MAP_SYNC	0x80000		/* Perform synchronous page
+					   faults for the mapping.  */
+# define MAP_FIXED_NOREPLACE 0x100000	/* MAP_FIXED but do not unmap
+					   underlying mapping.  */
 #endif
 
 /* Flags for `mlockall'.  */
 #define MCL_CURRENT	0x2000		/* Lock all currently mapped pages.  */
 #define MCL_FUTURE	0x4000		/* Lock all additions to address
 					   space.  */
+#define MCL_ONFAULT	0x8000		/* Lock all pages that are
+					   faulted in.  */
 /* Include generic Linux declarations.  */
 #include <bits/mman-linux.h>
 

@@ -1,4 +1,4 @@
-# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Makefile for installing locale data source files.
 
@@ -27,17 +27,99 @@ charmaps := $(wildcard charmaps/[A-I]*) $(wildcard charmaps/[J-Z]*)
 # List with all available character set descriptions.
 locales := $(wildcard locales/*)
 
+
 subdir-dirs = tests-mbwc
 vpath %.c tests-mbwc
 vpath %.h tests-mbwc
 
 
 test-srcs := collate-test xfrm-test tst-fmon tst-rpmatch tst-trans \
-	     tst-ctype tst-langinfo tst-langinfo-static tst-numeric
-test-input := de_DE.ISO-8859-1 en_US.ISO-8859-1 da_DK.ISO-8859-1 \
-	      hr_HR.ISO-8859-2 sv_SE.ISO-8859-1 tr_TR.UTF-8 fr_FR.UTF-8 \
-	      si_LK.UTF-8
-test-input-data = $(addsuffix .in, $(basename $(test-input)))
+	     tst-ctype tst-langinfo-newlocale tst-langinfo-setlocale \
+	     tst-langinfo-newlocale-static tst-langinfo-setlocale-static \
+	     tst-numeric
+# List of test input files (list sorted alphabetically):
+test-input := \
+	am_ET.UTF-8 \
+	az_AZ.UTF-8 \
+	be_BY.UTF-8 \
+	ber_DZ.UTF-8 \
+	ber_MA.UTF-8 \
+	bg_BG.UTF-8 \
+	br_FR.UTF-8 \
+	bs_BA.UTF-8 \
+	cmn_TW.UTF-8 \
+	crh_UA.UTF-8 \
+	cs_CZ.UTF-8 \
+	csb_PL.UTF-8 \
+	cv_RU.UTF-8 \
+	cy_GB.UTF-8 \
+	da_DK.ISO-8859-1 \
+	de_DE.ISO-8859-1 \
+	dsb_DE.UTF-8 \
+	dz_BT.UTF-8 \
+	en_US.ISO-8859-1 \
+	en_US.UTF-8 \
+	eo.UTF-8 \
+	es_ES.UTF-8 \
+	et_EE.UTF-8 \
+	fa_IR.UTF-8 \
+	fi_FI.UTF-8 \
+	fil_PH.UTF-8 \
+	fr_CA.UTF-8 \
+	fr_FR.UTF-8 \
+	fur_IT.UTF-8 \
+	gez_ER.UTF-8@abegede \
+	ha_NG.UTF-8 \
+	hr_HR.ISO-8859-2 \
+	hr_HR.UTF-8 \
+	hsb_DE.UTF-8 \
+	hu_HU.UTF-8 \
+	ig_NG.UTF-8 \
+	ik_CA.UTF-8 \
+	is_IS.UTF-8 \
+	kk_KZ.UTF-8 \
+	ku_TR.UTF-8 \
+	ky_KG.UTF-8 \
+	ln_CD.UTF-8 \
+	lt_LT.UTF-8 \
+	lv_LV.UTF-8 \
+	mi_NZ.UTF-8 \
+	ml_IN.UTF-8 \
+	mn_MN.UTF-8 \
+	mr_IN.UTF-8 \
+	mt_MT.UTF-8 \
+	nan_TW.UTF-8@latin \
+	nb_NO.UTF-8 \
+	om_KE.UTF-8 \
+	os_RU.UTF-8 \
+	pl_PL.UTF-8 \
+	ps_AF.UTF-8 \
+	ro_RO.UTF-8 \
+	ru_RU.UTF-8 \
+	sah_RU.UTF-8 \
+	sc_IT.UTF-8 \
+	se_NO.UTF-8 \
+	si_LK.UTF-8 \
+	sq_AL.UTF-8 \
+	sr_RS.UTF-8 \
+	sv_SE.ISO-8859-1 \
+	sv_SE.UTF-8 \
+	szl_PL.UTF-8 \
+	tg_TJ.UTF-8 \
+	tk_TM.UTF-8 \
+	tr_TR.UTF-8 \
+	tt_RU.UTF-8 \
+	tt_RU.UTF-8@iqtelif \
+	ug_CN.UTF-8 \
+	uk_UA.UTF-8 \
+	uz_UZ.UTF-8 \
+	vi_VN.UTF-8 \
+	yi_US.UTF-8 \
+	yo_NG.UTF-8 \
+	zh_CN.UTF-8 \
+	$(NULL)
+
+test-input-data = $(addsuffix .in, $(test-input))
 test-output := $(foreach s, .out .xout, \
 			 $(addsuffix $s, $(basename $(test-input))))
 ld-test-names := test1 test2 test3 test4 test5 test6 test7
@@ -74,7 +156,7 @@ tests = $(locale_test_suite) tst-digits tst-setlocale bug-iconv-trans \
 	tst-leaks tst-mbswcs1 tst-mbswcs2 tst-mbswcs3 tst-mbswcs4 tst-mbswcs5 \
 	tst-mbswcs6 tst-xlocale1 tst-xlocale2 bug-usesetlocale \
 	tst-strfmon1 tst-sscanf bug-setlocale1 tst-setlocale2 tst-setlocale3 \
-	tst-wctype
+	tst-wctype tst-iconv-math-trans
 tests-static = bug-setlocale1-static
 tests += $(tests-static)
 ifeq (yes,$(build-shared))
@@ -85,59 +167,154 @@ endif
 endif
 
 # Files to install.
+ifeq ($(INSTALL_UNCOMPRESSED),yes)
+# This option is for testing inside the testroot container, as the
+# container does not include a working gunzip program.
+install-others := $(addprefix $(inst_i18ndir)/, \
+			      $(charmaps) \
+			      $(locales))
+else
 install-others := $(addprefix $(inst_i18ndir)/, \
 			      $(addsuffix .gz, $(charmaps)) \
 			      $(locales))
+endif
 
 tests: $(objdir)/iconvdata/gconv-modules
 
-tests-static += tst-langinfo-static
+tests-static += tst-langinfo-newlocale-static tst-langinfo-setlocale-static
 
 ifeq ($(run-built-tests),yes)
 tests-special += $(objpfx)sort-test.out $(objpfx)tst-fmon.out \
 		 $(objpfx)tst-locale.out $(objpfx)tst-rpmatch.out \
 		 $(objpfx)tst-trans.out $(objpfx)tst-ctype.out \
-		 $(objpfx)tst-langinfo.out $(objpfx)tst-langinfo-static.out \
+		 $(objpfx)tst-langinfo-newlocale.out \
+		 $(objpfx)tst-langinfo-setlocale.out \
+		 $(objpfx)tst-langinfo-newlocale-static.out \
+		 $(objpfx)tst-langinfo-setlocale-static.out \
 		 $(objpfx)tst-numeric.out
-# We have to generate locales
-LOCALES := de_DE.ISO-8859-1 de_DE.UTF-8 en_US.ANSI_X3.4-1968 \
-	   en_US.ISO-8859-1 en_US.UTF-8 ja_JP.EUC-JP da_DK.ISO-8859-1 \
-	   hr_HR.ISO-8859-2 sv_SE.ISO-8859-1 ja_JP.SJIS fr_FR.ISO-8859-1 \
-	   nb_NO.ISO-8859-1 nn_NO.ISO-8859-1 tr_TR.UTF-8 cs_CZ.UTF-8 \
-	   zh_TW.EUC-TW fa_IR.UTF-8 fr_FR.UTF-8 ja_JP.UTF-8 si_LK.UTF-8 \
-	   tr_TR.ISO-8859-9 en_GB.UTF-8
-LOCALE_SRCS := $(shell echo "$(LOCALES)"|sed 's/\([^ .]*\)[^ ]*/\1/g')
-CHARMAPS := $(shell echo "$(LOCALES)" | \
-		    sed -e 's/[^ .]*[.]\([^ ]*\)/\1/g' -e s/SJIS/SHIFT_JIS/g)
-CTYPE_FILES = $(addsuffix /LC_CTYPE,$(LOCALES))
-tests-special += $(addprefix $(objpfx),$(CTYPE_FILES))
+# We have to generate locales (list sorted alphabetically)
+LOCALES := \
+	am_ET.UTF-8 \
+	az_AZ.UTF-8 \
+	be_BY.UTF-8 \
+	ber_DZ.UTF-8 \
+	ber_MA.UTF-8 \
+	bg_BG.UTF-8 \
+	br_FR.UTF-8 \
+	bs_BA.UTF-8 \
+	cmn_TW.UTF-8 \
+	crh_UA.UTF-8 \
+	cs_CZ.UTF-8 \
+	csb_PL.UTF-8 \
+	cv_RU.UTF-8 \
+	cy_GB.UTF-8 \
+	da_DK.ISO-8859-1 \
+	de_DE.ISO-8859-1 \
+	de_DE.UTF-8 \
+	dsb_DE.UTF-8 \
+	dz_BT.UTF-8 \
+	en_GB.UTF-8 \
+	en_US.ANSI_X3.4-1968 \
+	en_US.ISO-8859-1\
+	en_US.UTF-8 \
+	eo.UTF-8 \
+	es_ES.UTF-8 \
+	et_EE.UTF-8 \
+	fa_IR.UTF-8 \
+	fi_FI.UTF-8 \
+	fil_PH.UTF-8 \
+	fr_CA.UTF-8 \
+	fr_FR.ISO-8859-1 \
+	fr_FR.UTF-8 \
+	fur_IT.UTF-8 \
+	gez_ER.UTF-8@abegede \
+	ha_NG.UTF-8 \
+	hr_HR.ISO-8859-2 \
+	hr_HR.UTF-8 \
+	hsb_DE.UTF-8 \
+	hu_HU.UTF-8 \
+	ig_NG.UTF-8 \
+	ik_CA.UTF-8 \
+	is_IS.UTF-8 \
+	ja_JP.EUC-JP \
+	ja_JP.SJIS \
+	ja_JP.UTF-8 \
+	kk_KZ.UTF-8 \
+	ku_TR.UTF-8 \
+	ky_KG.UTF-8 \
+	ln_CD.UTF-8 \
+	lt_LT.UTF-8 \
+	lv_LV.UTF-8 \
+	mi_NZ.UTF-8 \
+	ml_IN.UTF-8 \
+	mn_MN.UTF-8 \
+	mr_IN.UTF-8 \
+	mt_MT.UTF-8 \
+	nan_TW.UTF-8@latin \
+	nb_NO.ISO-8859-1 \
+	nb_NO.UTF-8 \
+	nl_NL.UTF-8 \
+	nn_NO.ISO-8859-1 \
+	om_KE.UTF-8 \
+	os_RU.UTF-8 \
+	pl_PL.UTF-8 \
+	ps_AF.UTF-8 \
+	ro_RO.UTF-8 \
+	ru_RU.UTF-8 \
+	sah_RU.UTF-8 \
+	sc_IT.UTF-8 \
+	se_NO.UTF-8 \
+	si_LK.UTF-8 \
+	sq_AL.UTF-8 \
+	sr_RS.UTF-8 \
+	sv_SE.ISO-8859-1 \
+	sv_SE.UTF-8 \
+	szl_PL.UTF-8 \
+	tg_TJ.UTF-8 \
+	tk_TM.UTF-8 \
+	tr_TR.ISO-8859-9 \
+	tr_TR.UTF-8 \
+	tt_RU.UTF-8 \
+	tt_RU.UTF-8@iqtelif \
+	ug_CN.UTF-8 \
+	uk_UA.UTF-8 \
+	uz_UZ.UTF-8 \
+	vi_VN.UTF-8 \
+	yi_US.UTF-8 \
+	yo_NG.UTF-8 \
+	zh_CN.UTF-8 \
+	zh_TW.EUC-TW \
+	$(NULL)
+
+include ../gen-locales.mk
+
+$(objpfx)tst-iconv-math-trans.out: $(gen-locales)
 endif
 
 include ../Rules
 
+ifeq ($(INSTALL_UNCOMPRESSED),yes)
+# Install the charmap files as-is.  This option is for testing inside
+# the testroot container, as the container does not include a working
+# gunzip program.
+$(inst_i18ndir)/charmaps/%: charmaps/% $(+force)
+	$(make-target-directory)
+	rm -f $@
+	$(INSTALL_DATA) $< $@
+else
 # Install the charmap files in gzipped format.
 $(inst_i18ndir)/charmaps/%.gz: charmaps/% $(+force)
 	$(make-target-directory)
 	rm -f $(@:.gz=) $@
 	$(INSTALL_DATA) $< $(@:.gz=)
 	gzip -9n $(@:.gz=)
+endif
 
 # Install the locale source files in the appropriate directory.
 $(inst_i18ndir)/locales/%: locales/% $(+force); $(do-install)
 
-
 ifeq ($(run-built-tests),yes)
 generated-dirs += $(LOCALES)
-
-# Dependency for the locale files.  We actually make it depend only on
-# one of the files.
-$(addprefix $(objpfx),$(CTYPE_FILES)): %: \
-  gen-locale.sh $(common-objpfx)locale/localedef Makefile \
-  $(addprefix charmaps/,$(CHARMAPS)) $(addprefix locales/,$(LOCALE_SRCS))
-	@$(SHELL) gen-locale.sh $(common-objpfx) \
-		  '$(built-program-cmd-before-env)' '$(run-program-env)' \
-		  '$(built-program-cmd-after-env)' $@; \
-	$(evaluate-test)
 
 $(addsuffix .out,$(addprefix $(objpfx),$(tests))): %: \
   $(addprefix $(objpfx),$(CTYPE_FILES))
@@ -168,67 +345,107 @@ $(objpfx)tst-locale.out: tst-locale.sh $(common-objpfx)locale/localedef \
 	$(SHELL) $< $(common-objpfx) '$(built-program-cmd-before-env)' \
 		 '$(run-program-env)' '$(built-program-file)' > $@; \
 	$(evaluate-test)
-
 $(objpfx)tst-rpmatch.out: tst-rpmatch.sh $(objpfx)tst-rpmatch \
-			$(objpfx)tst-fmon.out \
-			$(addprefix $(objpfx),$(CTYPE_FILES))
-			$(SHELL) $< $(common-objpfx) '$(built-program-cmd-before-env) $(run-program-env) $(built-program-file)' > $@; \
+			  $(objpfx)tst-fmon.out \
+			  $(addprefix $(objpfx),$(CTYPE_FILES))
+	$(SHELL) $< $(common-objpfx) '$(built-program-cmd-before-env) $(run-program-env) $(built-program-file)' > $@; \
 	$(evaluate-test)
-
 $(objpfx)tst-trans.out: tst-trans.sh $(objpfx)tst-trans \
 			$(addprefix $(objpfx),$(CTYPE_FILES))
 	$(SHELL) $< $(common-objpfx) '$(run-program-prefix-before-env)' \
 		 '$(run-program-env)' '$(run-program-prefix-after-env)' \
 		 '$(test-program-prefix-before-env)' \
-		 '$(test-program-prefix-after-env)'; \
+		 '$(test-program-prefix-after-env)' > $@; \
 	$(evaluate-test)
 $(objpfx)tst-ctype.out: tst-ctype.sh $(objpfx)tst-ctype \
 			$(objpfx)sort-test.out \
 			$(addprefix $(objpfx),$(CTYPE_FILES))
 	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
-		 '$(run-program-env)' '$(test-program-cmd-after-env)'; \
+		 '$(run-program-env)' '$(test-program-cmd-after-env)' > $@; \
 	$(evaluate-test)
-$(objpfx)tst-langinfo.out: tst-langinfo.sh $(objpfx)tst-langinfo \
+$(objpfx)tst-langinfo-newlocale.out: tst-langinfo.sh \
+			$(objpfx)tst-langinfo-newlocale \
 			$(objpfx)sort-test.out \
 			$(addprefix $(objpfx),$(CTYPE_FILES))
 	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
 		 '$(run-program-env)' '$(test-program-cmd-after-env)' > $@; \
 	$(evaluate-test)
-$(objpfx)tst-langinfo-static.out: tst-langinfo.sh $(objpfx)tst-langinfo-static \
+$(objpfx)tst-langinfo-newlocale-static.out: tst-langinfo.sh \
+			$(objpfx)tst-langinfo-newlocale-static \
 			$(objpfx)sort-test.out \
 			$(addprefix $(objpfx),$(CTYPE_FILES))
 	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
 		 '$(run-program-env)' '$(test-program-cmd-after-env)' > $@; \
 	$(evaluate-test)
+# Static use of newlocale is known not to work. See Bug 23164.
+test-xfail-tst-langinfo-newlocale-static = yes
+
+$(objpfx)tst-langinfo-setlocale.out: tst-langinfo.sh \
+			$(objpfx)tst-langinfo-setlocale \
+			$(objpfx)sort-test.out \
+			$(addprefix $(objpfx),$(CTYPE_FILES))
+	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
+		 '$(run-program-env)' '$(test-program-cmd-after-env)' > $@; \
+	$(evaluate-test)
+$(objpfx)tst-langinfo-setlocale-static.out: tst-langinfo.sh \
+			$(objpfx)tst-langinfo-setlocale-static \
+			$(objpfx)sort-test.out \
+			$(addprefix $(objpfx),$(CTYPE_FILES))
+	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
+		 '$(run-program-env)' '$(test-program-cmd-after-env)' > $@; \
+	$(evaluate-test)
+
 $(objpfx)tst-digits.out: $(objpfx)tst-locale.out
 $(objpfx)tst-mbswcs6.out: $(addprefix $(objpfx),$(CTYPE_FILES))
 endif
 
 include SUPPORTED
 
-INSTALL-SUPPORTED-LOCALES=$(addprefix install-, $(SUPPORTED-LOCALES))
+INSTALL-SUPPORTED-LOCALE-ARCHIVE=$(addprefix install-archive-, $(SUPPORTED-LOCALES))
+INSTALL-SUPPORTED-LOCALE-FILES=$(addprefix install-files-, $(SUPPORTED-LOCALES))
 
 # Sometimes the whole collection of locale files should be installed.
 LOCALEDEF=VE_I18NPATH=. VE_GCONV_PATH=$(common-objpfx)iconvdata LC_ALL=C \
 $(common-objpfx)locale/localedef
-install-locales: $(INSTALL-SUPPORTED-LOCALES)
+install-locales: install-locale-archive
+
+# Create and install the locale-archive file.
+install-locale-archive: $(INSTALL-SUPPORTED-LOCALE-ARCHIVE)
+# Create and install the locales individually (no archive).
+install-locale-files: $(INSTALL-SUPPORTED-LOCALE-FILES)
 
 install-locales-dir:
-	$(..)./scripts/mkinstalldirs $(inst_localedir)
+	$(..)./scripts/mkinstalldirs $(inst_complocaledir)
 
-$(INSTALL-SUPPORTED-LOCALES): install-locales-dir
-	@locale=`echo $@ | sed -e 's/^install-//'`; \
+# The SHIFT_JIS and SHIFT_JISX0213 character maps are not ASCII compatible,
+# therefore we have to use --no-warnings=ascii to disable the ASCII check.
+# See localedata/gen-locale.sh for the same logic.
+define build-one-locale
+	locale=`echo $@ | sed -e 's/^install-[a-z]*-//'`; \
 	charset=`echo $$locale | sed -e 's,.*/,,'`; \
 	locale=`echo $$locale | sed -e 's,/[^/]*,,'`; \
+	if [ "$$charset" = 'SHIFT_JIS' ] \
+	   || [ "$$charset" = 'SHIFT_JISX0213' ]; then \
+	   flags="$$flags --no-warnings=ascii"; \
+	fi; \
 	echo -n `echo $$locale | sed 's/\([^.\@]*\).*/\1/'`; \
 	echo -n ".$$charset"; \
 	echo -n `echo $$locale | sed 's/\([^\@]*\)\(\@.*\)*/\2/'`; \
 	echo -n '...'; \
 	input=`echo $$locale | sed 's/\([^.]*\)[^@]*\(.*\)/\1\2/'`; \
-	$(LOCALEDEF) --alias-file=../intl/locale.alias \
-		     -i locales/$$input -c -f charmaps/$$charset \
-		     $(addprefix --prefix=,$(install_root)) $$locale; \
-	echo ' done'; \
+	$(LOCALEDEF) $$flags --alias-file=../intl/locale.alias \
+		     -i locales/$$input -f charmaps/$$charset \
+		     $(addprefix --prefix=,$(install_root)) $$locale \
+	&& echo ' done';
+endef
+
+$(INSTALL-SUPPORTED-LOCALE-ARCHIVE): install-locales-dir
+	@flags="-c"; \
+	$(build-one-locale)
+
+$(INSTALL-SUPPORTED-LOCALE-FILES): install-locales-dir
+	@flags="-c --no-archive --no-hard-links"; \
+	$(build-one-locale)
 
 tst-setlocale-ENV = LC_ALL=ja_JP.EUC-JP
 tst-wctype-ENV = LC_ALL=ja_JP.EUC-JP
@@ -238,8 +455,8 @@ $(objpfx)mtrace-tst-leaks.out: $(objpfx)tst-leaks.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-leaks.mtrace > $@; \
 	$(evaluate-test)
 
-bug-setlocale1-ARGS = -- $(host-test-program-cmd)
-bug-setlocale1-static-ARGS = $(bug-setlocale1-ARGS)
+bug-setlocale1-ENV-only = LOCPATH=$(objpfx) LC_CTYPE=de_DE.UTF-8
+bug-setlocale1-static-ENV-only = $(bug-setlocale1-ENV-only)
 
 $(objdir)/iconvdata/gconv-modules:
 	$(MAKE) -C ../iconvdata subdir=iconvdata $@

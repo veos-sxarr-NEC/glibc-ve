@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gmail.com>, 2011.
 
@@ -14,22 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <fenv.h>
 #include <math.h>
 #include <math_private.h>
-
+#include <libm-alias-finite.h>
 
 static float
 __attribute__ ((noinline))
 invalid_fn (float x, float fn)
 {
-  if (__rintf (fn) != fn)
-    {
-      feraiseexcept (FE_INVALID);
-      return __nan ("");
-    }
+  if (rintf (fn) != fn)
+    return (fn - fn) / (fn - fn);
   else if (fn > 65000.0f)
     return __scalbnf (x, 65000);
   else
@@ -40,11 +36,11 @@ invalid_fn (float x, float fn)
 float
 __ieee754_scalbf (float x, float fn)
 {
-  if (__glibc_unlikely (__isnanf (x)))
+  if (__glibc_unlikely (isnan (x)))
     return x * fn;
-  if (__glibc_unlikely (!__finitef (fn)))
+  if (__glibc_unlikely (!isfinite (fn)))
     {
-      if (__isnanf (fn) || fn > 0.0f)
+      if (isnan (fn) || fn > 0.0f)
 	return x * fn;
       if (x == 0.0f)
 	return x;
@@ -55,4 +51,4 @@ __ieee754_scalbf (float x, float fn)
 
   return __scalbnf (x, (int) fn);
 }
-strong_alias (__ieee754_scalbf, __scalbf_finite)
+libm_alias_finite (__ieee754_scalbf, __scalbf)

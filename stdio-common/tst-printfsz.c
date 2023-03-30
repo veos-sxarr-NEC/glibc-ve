@@ -2,13 +2,13 @@
 #include <printf.h>
 #include <stdio.h>
 #include <string.h>
-#include <libc-internal.h>
+#include <libc-diag.h>
 
 #define V       12345678.12345678
 
 
-int
-main (int argc, char *argv[])
+static int
+do_test (void)
 {
   char buf[1024];
   int result = 0;
@@ -76,3 +76,6 @@ main (int argc, char *argv[])
 
   return result;
 }
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"

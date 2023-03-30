@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -152,7 +152,6 @@ get_elem (void)
 
 
 struct requestlist *
-internal_function
 __gai_find_request (const struct gaicb *gaicbp)
 {
   struct requestlist *runp;
@@ -169,7 +168,6 @@ __gai_find_request (const struct gaicb *gaicbp)
 
 
 int
-internal_function
 __gai_remove_request (struct gaicb *gaicbp)
 {
   struct requestlist *runp;
@@ -212,7 +210,6 @@ static void *handle_requests (void *arg);
 /* The main function of the async I/O handling.  It enqueues requests
    and if necessary starts and handles threads.  */
 struct requestlist *
-internal_function
 __gai_enqueue_request (struct gaicb *gaicbp)
 {
   struct requestlist *newp;
@@ -264,8 +261,11 @@ __gai_enqueue_request (struct gaicb *gaicbp)
 	      /* We cannot create a thread in the moment and there is
 		 also no thread running.  This is a problem.  `errno' is
 		 set to EAGAIN if this is only a temporary problem.  */
-	      assert (lastp->next == newp);
-	      lastp->next = NULL;
+	      assert (requests == newp || lastp->next == newp);
+	      if (lastp != NULL)
+		lastp->next = NULL;
+	      else
+		requests = NULL;
 	      requests_tail = lastp;
 
 	      newp->next = freelist;
@@ -357,13 +357,13 @@ handle_requests (void *arg)
 	 something to arrive in it. */
       if (runp == NULL && optim.gai_idle_time >= 0)
 	{
-	  struct timeval now;
+	  struct timespec now;
 	  struct timespec wakeup_time;
 
 	  ++idle_thread_count;
-	  gettimeofday (&now, NULL);
+          __clock_gettime (CLOCK_REALTIME, &now);
 	  wakeup_time.tv_sec = now.tv_sec + optim.gai_idle_time;
-	  wakeup_time.tv_nsec = now.tv_usec * 1000;
+	  wakeup_time.tv_nsec = now.tv_nsec;
 	  if (wakeup_time.tv_nsec >= 1000000000)
 	    {
 	      wakeup_time.tv_nsec -= 1000000000;

@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,22 +28,21 @@
 #include "stdio.h"
 
 int
-_IO_feof (fp)
-     _IO_FILE* fp;
+_IO_feof (FILE *fp)
 {
   int result;
   CHECK_FILE (fp, EOF);
+  if (!_IO_need_lock (fp))
+    return _IO_feof_unlocked (fp);
   _IO_flockfile (fp);
   result = _IO_feof_unlocked (fp);
   _IO_funlockfile (fp);
   return result;
 }
 
-#ifdef weak_alias
 weak_alias (_IO_feof, feof)
 
 #ifndef _IO_MTSAFE_IO
 #undef feof_unlocked
 weak_alias (_IO_feof, feof_unlocked)
-#endif
 #endif

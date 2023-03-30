@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef _SYS_SHM_H
 # error "Never include <bits/shm.h> directly; use <sys/shm.h> instead."
 #endif
 
 #include <bits/types.h>
+#include <bits/wordsize.h>
+#include <bits/shmlba.h>
+#include <bits/shm-pad.h>
 
 /* Permission flag for shmget.  */
 #define SHM_R		0400		/* or S_IRUGO from <linux/stat.h> */
@@ -38,29 +41,44 @@
 
 __BEGIN_DECLS
 
-/* Segment low boundary address multiple.  */
-#define SHMLBA		(__getpagesize ())
-extern int __getpagesize (void) __THROW __attribute__ ((__const__));
-
 #define SHM_2MB        0x400000
 #define SHM_64MB       0x800000
 
 /* Type to count number of attaches.  */
 typedef __syscall_ulong_t shmatt_t;
 
+#if __SHM_PAD_BEFORE_TIME
+# define __SHM_PAD_TIME(NAME, RES)				\
+  unsigned long int __glibc_reserved ## RES; __time_t NAME
+#elif __SHM_PAD_AFTER_TIME
+# define __SHM_PAD_TIME(NAME, RES)				\
+  __time_t NAME; unsigned long int __glibc_reserved ## RES
+#else
+# define __SHM_PAD_TIME(NAME, RES)		\
+  __time_t NAME
+#endif
+
 /* Data structure describing a shared memory segment.  */
 struct shmid_ds
   {
     struct ipc_perm shm_perm;		/* operation permission struct */
+#if !__SHM_SEGSZ_AFTER_TIME
     size_t shm_segsz;			/* size of segment in bytes */
-    __time_t shm_atime;			/* time of last shmat() */
-    __time_t shm_dtime;			/* time of last shmdt() */
-    __time_t shm_ctime;			/* time of last change by shmctl() */
+#endif
+    __SHM_PAD_TIME (shm_atime, 1);	/* time of last shmat() */
+    __SHM_PAD_TIME (shm_dtime, 2);	/* time of last shmdt() */
+    __SHM_PAD_TIME (shm_ctime, 3);	/* time of last change by shmctl() */
+#if __SHM_PAD_BETWEEN_TIME_AND_SEGSZ
+    unsigned long int __glibc_reserved4;
+#endif
+#if __SHM_SEGSZ_AFTER_TIME
+    size_t shm_segsz;			/* size of segment in bytes */
+#endif
     __pid_t shm_cpid;			/* pid of creator */
     __pid_t shm_lpid;			/* pid of last shmop */
     shmatt_t shm_nattch;		/* number of current attaches */
-    __syscall_ulong_t __glibc_reserved4;
     __syscall_ulong_t __glibc_reserved5;
+    __syscall_ulong_t __glibc_reserved6;
   };
 
 #ifdef __USE_MISC
@@ -68,6 +86,7 @@ struct shmid_ds
 /* ipcs ctl commands */
 # define SHM_STAT 	13
 # define SHM_INFO 	14
+# define SHM_STAT_ANY	15
 
 /* shm_mode upper byte flags */
 # define SHM_DEST	01000	/* segment will be destroyed on last detach */

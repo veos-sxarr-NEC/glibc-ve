@@ -1,4 +1,4 @@
-# Copyright (C) 1998-2015 Free Software Foundation, Inc.
+# Copyright (C) 1998-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for nscd portion of the library.
@@ -73,19 +73,16 @@ LDLIBS-nscd = $(selinux-LIBS)
 
 include ../Rules
 
-CFLAGS-nscd_getpw_r.c = -fexceptions
-CFLAGS-nscd_getgr_r.c = -fexceptions
-CFLAGS-nscd_gethst_r.c = -fexceptions
-CFLAGS-nscd_getai.c = -fexceptions
-CFLAGS-nscd_initgroups.c = -fexceptions
+CFLAGS-nscd_getpw_r.c += -fexceptions
+CFLAGS-nscd_getgr_r.c += -fexceptions
+CFLAGS-nscd_gethst_r.c += -fexceptions
+CFLAGS-nscd_getai.c += -fexceptions
+CFLAGS-nscd_initgroups.c += -fexceptions
 
 CPPFLAGS-nscd += -D_FORTIFY_SOURCE=2
 
 ifeq (yesyes,$(have-fpie)$(build-shared))
 CFLAGS-nscd += $(pie-ccflag)
-endif
-ifeq (yes,$(have-ssp))
-CFLAGS-nscd += -fstack-protector
 endif
 
 ifeq (yesyes,$(have-fpie)$(build-shared))
@@ -95,12 +92,12 @@ endif
 # Set libof-nscd.
 cpp-srcs-left := $(nscd-modules)
 lib := nscd
-include $(patsubst %,$(..)cppflags-iterator.mk,$(cpp-srcs-left))
+include $(patsubst %,$(..)libof-iterator.mk,$(cpp-srcs-left))
 
 $(objpfx)nscd: $(nscd-modules:%=$(objpfx)%.o)
 
 ifeq ($(build-shared),yes)
-$(objpfx)nscd: $(shared-thread-library) $(common-objpfx)nis/libnsl.so
+$(objpfx)nscd: $(shared-thread-library)
 else
-$(objpfx)nscd: $(static-thread-library) $(common-objpfx)nis/libnsl.a
+$(objpfx)nscd: $(static-thread-library)
 endif

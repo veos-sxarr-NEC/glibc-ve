@@ -1,5 +1,5 @@
 /* Return arc hyperbole sine of complex float value.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define __casinhf __casinhf_not_defined
 #define casinhf casinhf_not_defined
@@ -24,14 +24,18 @@
 
 #undef __casinhf
 #undef casinhf
-#define __casinhf internal_casinhf
 
 static _Complex float internal_casinhf (_Complex float x);
 
-#include <math/s_casinhf.c>
-#include "cfloat-compat.h"
+#define M_DECL_FUNC(f) internal_casinhf
+#include <math-type-macros-float.h>
 
-#undef __casinhf
+/* Disable any aliasing from base template.  */
+#undef declare_mgen_alias
+#define declare_mgen_alias(__to, __from)
+
+#include <math/s_casinh_template.c>
+#include "cfloat-compat.h"
 
 c1_cfloat_rettype
 __c1_casinhf (c1_cfloat_decl (x))
@@ -47,4 +51,4 @@ __c2_casinhf (c2_cfloat_decl (x))
   return c2_cfloat_return (r);
 }
 
-cfloat_versions (casinhf);
+cfloat_versions (casinh);

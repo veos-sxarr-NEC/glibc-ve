@@ -1,5 +1,5 @@
 /* Measure STRCHR functions.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
 #ifndef WIDE
@@ -22,42 +22,41 @@
 #  define TEST_NAME "strchrnul"
 # else
 #  define TEST_NAME "strchr"
-# endif
+# endif /* !USE_FOR_STRCHRNUL */
 #else
-# define TEST_NAME "wcschr"
-#endif
+# ifdef USE_FOR_STRCHRNUL
+#  define TEST_NAME "wcschrnul"
+# else
+#  define TEST_NAME "wcschr"
+# endif /* !USE_FOR_STRCHRNUL */
+#endif /* WIDE */
 #include "bench-string.h"
+
+#define BIG_CHAR MAX_CHAR
 
 #ifndef WIDE
 # ifdef USE_FOR_STRCHRNUL
+#  undef STRCHR
 #  define STRCHR strchrnul
-#  define stupid_STRCHR stupid_STRCHRNUL
 #  define simple_STRCHR simple_STRCHRNUL
-# else
-#  define STRCHR strchr
-# endif
-# define STRLEN strlen
-# define CHAR char
-# define BIG_CHAR CHAR_MAX
+# endif /* !USE_FOR_STRCHRNUL */
 # define MIDDLE_CHAR 127
 # define SMALL_CHAR 23
-# define UCHAR unsigned char
 #else
-# include <wchar.h>
-# define STRCHR wcschr
-# define STRLEN wcslen
-# define CHAR wchar_t
-# define BIG_CHAR WCHAR_MAX
+# ifdef USE_FOR_STRCHRNUL
+#  undef STRCHR
+#  define STRCHR wcschrnul
+#  define simple_STRCHR simple_WCSCHRNUL
+# endif /* !USE_FOR_STRCHRNUL */
 # define MIDDLE_CHAR 1121
 # define SMALL_CHAR 851
-# define UCHAR wchar_t
-#endif
+#endif /* WIDE */
 
 #ifdef USE_FOR_STRCHRNUL
 # define NULLRET(endptr) endptr
 #else
 # define NULLRET(endptr) NULL
-#endif
+#endif /* !USE_FOR_STRCHRNUL */
 
 
 typedef CHAR *(*proto_t) (const CHAR *, int);
@@ -71,25 +70,13 @@ simple_STRCHR (const CHAR *s, int c)
   return (CHAR *) s;
 }
 
-CHAR *
-stupid_STRCHR (const CHAR *s, int c)
-{
-  size_t n = STRLEN (s) + 1;
-
-  while (n--)
-    if (*s++ == (CHAR) c)
-      return (CHAR *) s - 1;
-  return NULLRET ((CHAR *) s - 1);
-}
-
-IMPL (stupid_STRCHR, 0)
 IMPL (simple_STRCHR, 0)
 IMPL (STRCHR, 1)
 
 static void
 do_one_test (impl_t *impl, const CHAR *s, int c, const CHAR *exp_res)
 {
-  size_t i, iters = INNER_LOOP_ITERS;
+  size_t i, iters = INNER_LOOP_ITERS_LARGE;
   timing_t start, stop, cur;
 
   TIMING_NOW (start);
@@ -197,4 +184,4 @@ test_main (void)
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

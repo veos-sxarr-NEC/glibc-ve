@@ -1,5 +1,5 @@
 /* Thread-local storage handling in the ELF dynamic linker.  VE version.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
+
+#ifndef _VE_DL_TLS_H
+#define _VE_DL_TLS_H
 
 #include <stdint.h>
 
@@ -29,5 +32,4 @@ typedef struct dl_tls_index
 
 extern void *__tls_get_addr (tls_index *ti);
 
-/* Value used for dtv entries for which the allocation is delayed.  */
-#define TLS_DTV_UNALLOCATED	((void *) -1l)
+#endif /* _VE_DL_TLS_H */

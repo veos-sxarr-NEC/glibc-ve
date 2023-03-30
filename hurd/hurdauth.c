@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <hurd.h>
 #include <hurd/msg_server.h>
@@ -52,8 +52,8 @@ _S_msg_add_auth (mach_port_t me,
       int i, j, k;
       vm_size_t offset;
 
-      urp = vm_allocate (mach_task_self (), (vm_address_t *) newlistp,
-			 nexist + nnew * sizeof (uid_t), 1);
+      urp = __vm_allocate (mach_task_self (), (vm_address_t *) newlistp,
+			   nexist + nnew * sizeof (uid_t), 1);
       if (urp)
 	return urp;
 
@@ -75,10 +75,10 @@ _S_msg_add_auth (mach_port_t me,
       offset = (round_page (nexist + nnew * sizeof (uid_t))
 		- round_page (j * sizeof (uid_t)));
       if (offset)
-	vm_deallocate (mach_task_self (),
-		       (vm_address_t) (*newlistp
-				       + (nexist + nnew * sizeof (uid_t))),
-		       offset);
+	__vm_deallocate (mach_task_self (),
+		         (vm_address_t) (*newlistp
+				         + (nexist + nnew * sizeof (uid_t))),
+		         offset);
       *newlistlen = j;
       return 0;
     }
@@ -136,8 +136,8 @@ _S_msg_add_auth (mach_port_t me,
 
 #define freeup(array, len) \
   if (array) \
-    vm_deallocate (mach_task_self (), (vm_address_t) array, \
-		   len * sizeof (uid_t));
+    __vm_deallocate (mach_task_self (), (vm_address_t) array, \
+		     len * sizeof (uid_t));
 
   freeup (genuids, ngenuids);
   freeup (auxuids, nauxuids);

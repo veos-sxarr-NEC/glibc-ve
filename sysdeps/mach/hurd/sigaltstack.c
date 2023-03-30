@@ -1,4 +1,4 @@
-/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <hurd.h>
@@ -22,24 +22,23 @@
 /* Run signals handlers on the stack specified by SS (if not NULL).
    If OSS is not NULL, it is filled in with the old signal stack status.  */
 int
-__sigaltstack (argss, oss)
-     const struct sigaltstack *argss;
-     struct sigaltstack *oss;
+__sigaltstack (const stack_t *argss, stack_t *oss)
 {
   struct hurd_sigstate *s;
-  struct sigaltstack ss, old;
+  stack_t ss, old;
 
   /* Fault before taking any locks.  */
   if (argss != NULL)
     ss = *argss;
   if (oss != NULL)
-    *(volatile struct sigaltstack *) oss = *oss;
+    *(volatile stack_t *) oss = *oss;
 
   s = _hurd_self_sigstate ();
   __spin_lock (&s->lock);
 
-  if (argss != NULL &&
-      (ss.ss_flags & SS_DISABLE) && (s->sigaltstack.ss_flags & SS_ONSTACK))
+  if (argss != NULL
+      && (ss.ss_flags & SS_DISABLE)
+      && (s->sigaltstack.ss_flags & SS_ONSTACK))
     {
       /* Can't disable a stack that is in use.  */
       __spin_unlock (&s->lock);
@@ -59,4 +58,5 @@ __sigaltstack (argss, oss)
 
   return 0;
 }
+libc_hidden_def (__sigaltstack)
 weak_alias (__sigaltstack, sigaltstack)

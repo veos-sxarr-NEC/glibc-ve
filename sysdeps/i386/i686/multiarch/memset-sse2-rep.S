@@ -1,5 +1,5 @@
 /* memset with SSE2 and REP string.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if IS_IN (libc)
 
@@ -44,7 +44,7 @@
 # define SETRTNVAL	movl DEST(%esp), %eax
 #endif
 
-#ifdef SHARED
+#ifdef PIC
 # define ENTRANCE	PUSH (%ebx);
 # define RETURN_END	POP (%ebx); ret
 # define RETURN		RETURN_END; CFI_PUSH (%ebx)
@@ -63,7 +63,7 @@
     add		(%ebx,%ecx,4), %ebx;				\
     add		%ecx, %edx;					\
     /* We loaded the jump table and adjusted EDX. Go.  */	\
-    jmp		*%ebx
+    _CET_NOTRACK jmp *%ebx
 #else
 # define ENTRANCE
 # define RETURN_END	ret
@@ -75,7 +75,7 @@
    absolute offsets.  */
 # define BRANCH_TO_JMPTBL_ENTRY(TABLE)				\
     add		%ecx, %edx;					\
-    jmp		*TABLE(,%ecx,4)
+    _CET_NOTRACK jmp *TABLE(,%ecx,4)
 #endif
 
 	.section .text.sse2,"ax",@progbits
@@ -262,7 +262,7 @@ L(128bytesormore):
 	PUSH (%ebx)
 	mov	$DATA_CACHE_SIZE, %ebx
 #else
-# ifdef SHARED
+# ifdef PIC
 	SETUP_PIC_REG(bx)
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
 	mov	__x86_data_cache_size@GOTOFF(%ebx), %ebx
@@ -274,7 +274,7 @@ L(128bytesormore):
 	mov	%ebx, %edi
 	shr	$4, %ebx
 	sub	%ebx, %edi
-#if defined DATA_CACHE_SIZE || !defined SHARED
+#if defined DATA_CACHE_SIZE || !defined PIC
 	POP (%ebx)
 #endif
 /*

@@ -1,5 +1,5 @@
 /* `sln' program to create symbolic links between files.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,11 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
+   <https://www.gnu.org/licenses/>.  */
 
 #include <error.h>
 #include <errno.h>
@@ -36,10 +32,6 @@
 #include "../version.h"
 
 #define PACKAGE _libc_intl_domainname
-
-#if !defined S_ISDIR && defined S_IFDIR
-#define	S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
-#endif
 
 static int makesymlink (const char *src, const char *dest);
 static int makesymlinks (const char *file);
@@ -87,12 +79,8 @@ usage (void)
 }
 
 static int
-makesymlinks (file)
-     const char *file;
+makesymlinks (const char *file)
 {
-#ifndef PATH_MAX
-#define PATH_MAX 4095
-#endif
   char *buffer = NULL;
   size_t bufferlen = 0;
   int ret;
@@ -163,15 +151,13 @@ makesymlinks (file)
 }
 
 static int
-makesymlink (src, dest)
-     const char *src;
-     const char *dest;
+makesymlink (const char *src, const char *dest)
 {
-  struct stat stats;
+  struct stat64 stats;
   const char *error;
 
   /* Destination must not be a directory. */
-  if (lstat (dest, &stats) == 0)
+  if (lstat64 (dest, &stats) == 0)
     {
       if (S_ISDIR (stats.st_mode))
 	{
@@ -193,11 +179,7 @@ makesymlink (src, dest)
       return -1;
     }
 
-#ifdef S_ISLNK
   if (symlink (src, dest) == 0)
-#else
-  if (link (src, dest) == 0)
-#endif
     {
       /* Destination must exist by now. */
       if (access (dest, F_OK))

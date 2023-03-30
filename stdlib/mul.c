@@ -1,6 +1,6 @@
 /* mpn_mul -- Multiply two natural numbers.
 
-Copyright (C) 1991-2015 Free Software Foundation, Inc.
+Copyright (C) 1991-2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -16,7 +16,7 @@ License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, see
-<http://www.gnu.org/licenses/>.  */
+<https://www.gnu.org/licenses/>.  */
 
 #include <gmp.h>
 #include "gmp-impl.h"
@@ -42,18 +42,9 @@ along with the GNU MP Library; see the file COPYING.LIB.  If not, see
 #endif
 
 mp_limb_t
-#if __STDC__
 mpn_mul (mp_ptr prodp,
 	 mp_srcptr up, mp_size_t usize,
 	 mp_srcptr vp, mp_size_t vsize)
-#else
-mpn_mul (prodp, up, usize, vp, vsize)
-     mp_ptr prodp;
-     mp_srcptr up;
-     mp_size_t usize;
-     mp_srcptr vp;
-     mp_size_t vsize;
-#endif
 {
   mp_ptr prod_endp = prodp + usize + vsize - 1;
   mp_limb_t cy;

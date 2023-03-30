@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,25 +13,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
-#define __need_NULL
-#include <stddef.h>
+#include <sigsetops.h>
 
 /* Combine sets LEFT and RIGHT by logical AND and place result in DEST.  */
 int
-sigandset (dest, left, right)
-     sigset_t *dest;
-     const sigset_t *left;
-     const sigset_t *right;
+sigandset (sigset_t *dest, const sigset_t *left, const sigset_t *right)
 {
-  if (dest == NULL || left == NULL || right == NULL)
+  if (!dest || !left || !right)
     {
       __set_errno (EINVAL);
       return -1;
     }
 
-  return __sigandset (dest, left, right);
+  __sigandset (dest, left, right);
+  return 0;
 }

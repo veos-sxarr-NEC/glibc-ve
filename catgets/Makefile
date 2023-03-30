@@ -1,4 +1,4 @@
-# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Makefile for catgets.
@@ -34,9 +34,11 @@ test-srcs = test-gencat
 ifeq ($(run-built-tests),yes)
 tests-special += $(objpfx)de/libc.cat $(objpfx)test1.cat $(objpfx)test2.cat \
 		 $(objpfx)sample.SJIS.cat $(objpfx)test-gencat.out
+tests-special += $(objpfx)tst-catgets-mem.out
 endif
 
 gencat-modules	= xmalloc
+others-extras   = $(gencat-modules)
 
 # To find xmalloc.c
 vpath %.c ../locale/programs
@@ -46,13 +48,15 @@ include ../Rules
 
 $(objpfx)gencat: $(gencat-modules:%=$(objpfx)%.o)
 
-catgets-CPPFLAGS := -DNLSPATH='"$(msgcatdir)/%L/%N:$(msgcatdir)/%L/LC_MESSAGES/%N:$(msgcatdir)/%l/%N:$(msgcatdir)/%l/LC_MESSAGES/%N:"'
+catgets-CPPFLAGS := -DNLSPATH='"$(localedir)/%L/%N:$(localedir)/%L/LC_MESSAGES/%N:$(localedir)/%l/%N:$(localedir)/%l/LC_MESSAGES/%N:"'
 
 generated += de.msg test1.cat test1.h test2.cat test2.h sample.SJIS.cat \
 	     test-gencat.h
+generated += tst-catgets.mtrace tst-catgets-mem.out
+
 generated-dirs += de
 
-tst-catgets-ENV = NLSPATH="$(objpfx)%l/%N.cat" LANG=de
+tst-catgets-ENV = NLSPATH="$(objpfx)%l/%N.cat" LANG=de VE_MALLOC_TRACE=$(objpfx)tst-catgets.mtrace
 
 ifeq ($(run-built-tests),yes)
 # This test just checks whether the program produces any error or not.
@@ -80,10 +84,14 @@ $(objpfx)de.msg: xopen-msg.awk $(..)po/de.po
 $(objpfx)test-gencat.out: test-gencat.sh $(objpfx)test-gencat \
 			  $(objpfx)sample.SJIS.cat
 	$(SHELL) $< $(common-objpfx) '$(test-program-cmd-before-env)' \
-		 '$(run-program-env)' '$(built-program-file)';\
+		 '$(run-program-env)' '$(built-program-file)'; \
 	$(evaluate-test)
 
 $(objpfx)sample.SJIS.cat: sample.SJIS $(objpfx)gencat
 	$(objpfx)gencat -H $(objpfx)test-gencat.h < $(word 1,$^) > $@; \
+	$(evaluate-test)
+
+$(objpfx)tst-catgets-mem.out: $(objpfx)tst-catgets.out
+	$(common-objpfx)malloc/mtrace $(objpfx)tst-catgets.mtrace > $@; \
 	$(evaluate-test)
 endif

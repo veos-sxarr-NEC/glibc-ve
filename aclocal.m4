@@ -121,6 +121,8 @@ OBJDUMP=`$CC -print-prog-name=objdump`
 AC_SUBST(OBJDUMP)
 OBJCOPY=`$CC -print-prog-name=objcopy`
 AC_SUBST(OBJCOPY)
+GPROF=`$CC -print-prog-name=gprof`
+AC_SUBST(GPROF)
 
 # Determine whether we are using GNU binutils.
 AC_CACHE_CHECK(whether $AS is GNU as, libc_cv_prog_as_gnu,
@@ -141,7 +143,7 @@ int _start (void) { return 0; }
 int __start (void) { return 0; }
 $1
 EOF
-AS_IF([AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS -o conftest
+AS_IF([AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS $no_ssp -o conftest
 		       conftest.c -static -nostartfiles -nostdlib
 		       1>&AS_MESSAGE_LOG_FD])],
       [$2], [$3])
@@ -226,7 +228,7 @@ if test x"$gnu_ld" = x"yes"; then
     cat > conftest.c <<EOF
 int _start (void) { return 42; }
 EOF
-    if AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS
+    if AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS $no_ssp
 				$2 -nostdlib -nostartfiles
 				-fPIC -shared -o conftest.so conftest.c
 				1>&AS_MESSAGE_LOG_FD])
@@ -268,7 +270,7 @@ libc_compiler_builtin_inlined=no
 cat > conftest.c <<EOF
 int _start (void) { $2 return 0; }
 EOF
-if ! AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS
+if ! AC_TRY_COMMAND([${CC-cc} $CFLAGS $CPPFLAGS $LDFLAGS $no_ssp
 		     $3 -nostdlib -nostartfiles
 		     -S conftest.c -o - | fgrep "$1"
 		     1>&AS_MESSAGE_LOG_FD])
@@ -291,12 +293,12 @@ AC_DEFUN([LIBC_SLIBDIR_RTLDDIR],
 [test -n "$libc_cv_slibdir" ||
 case "$prefix" in
 /usr | /usr/)
-  libc_cv_slibdir=/$1
-  libc_cv_rtlddir=/$2
+  libc_cv_slibdir='/$1'
+  libc_cv_rtlddir='/$2'
   if test "$libdir" = '${exec_prefix}/lib'; then
     libdir='${exec_prefix}/$1';
     # Locale data can be shared between 32-bit and 64-bit libraries.
-    libc_cv_localedir='${exec_prefix}/lib/locale'
+    libc_cv_complocaledir='${exec_prefix}/lib/locale'
   fi
   ;;
 esac])

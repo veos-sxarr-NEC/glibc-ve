@@ -1,5 +1,5 @@
 /* Test that values of pathconf and fpathconf are consistent for a file.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 
 static void prepare (void);
@@ -41,12 +42,7 @@ prepare (void)
   static const char dir_name[] = "/tst-pathconf.XXXXXX";
 
   size_t dirbuflen = test_dir_len + sizeof (dir_name);
-  dirbuf = malloc (dirbuflen);
-  if (dirbuf == NULL)
-    {
-      puts ("Out of memory");
-      exit (1);
-    }
+  dirbuf = xmalloc (dirbuflen);
 
   snprintf (dirbuf, dirbuflen, "%s%s", test_dir, dir_name);
   if (mkdtemp (dirbuf) == NULL)
@@ -73,7 +69,7 @@ do_test (void)
   static const char *fifo_name = "some-fifo";
 
   size_t filenamelen = strlen (dirbuf) + strlen (fifo_name) + 2;
-  char *filename = malloc (filenamelen);
+  char *filename = xmalloc (filenamelen);
 
   snprintf (filename, filenamelen, "%s/%s", dirbuf, fifo_name);
 
@@ -163,12 +159,6 @@ out_nofifo:
   if (unlink (filename) != 0)
     {
       printf ("Could not remove fifo (%s)\n", strerror (errno));
-      ret = 1;
-    }
-
-  if (rmdir (dirbuf) != 0)
-    {
-      printf ("Could not remove directory (%s)\n", strerror (errno));
       ret = 1;
     }
 

@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if !defined _SYS_STAT_H && !defined _FCNTL_H
 # error "Never include <bits/stat.h> directly; use <sys/stat.h> instead."
@@ -50,7 +50,7 @@ struct stat
         __blksize_t     st_blksize; /* Optimal block size for I/O.  */
         int             __pad3;
         __blkcnt_t      st_blocks;  /* Number 512-byte blocks allocated.  */
-#ifdef __USE_MISC
+#ifdef __USE_XOPEN2K8
         /* Nanosecond resolution timestamps are stored in a format
          * equivalent to 'struct timespec'. This is the type used
          * whenever possible but the Unix namespace rules do not allow the
@@ -135,7 +135,7 @@ struct stat64
         __blksize_t             st_blksize; /* Optimal block size for I/O.  */
         int                     __pad3;
         __blkcnt64_t            st_blocks;  /* Number 512-byte blocks allocated.  */
-#ifdef __USE_MISC
+#ifdef __USE_XOPEN2K8
         /* Nanosecond resolution timestamps are stored in a format
          * equivalent to 'struct timespec'. This is the type used
          * whenever possible but the Unix namespace rules do not allow the

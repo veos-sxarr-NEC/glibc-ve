@@ -13,7 +13,7 @@ element {struct termios} tcflag_t c_iflag
 element {struct termios} tcflag_t c_oflag
 element {struct termios} tcflag_t c_cflag
 element {struct termios} tcflag_t c_lflag
-element {struct termios} cc_t c_cc[NCCS]
+element {struct termios} cc_t c_cc [NCCS]
 
 constant NCCS
 
@@ -144,7 +144,7 @@ function int tcdrain (int)
 function int tcflow (int, int)
 function int tcflush (int, int)
 function int tcgetattr (int, struct termios*)
-#ifndef POSIX
+#if !defined POSIX && !defined XPG4
 function pid_t tcgetsid (int)
 #endif
 function int tcsendbreak (int, int)

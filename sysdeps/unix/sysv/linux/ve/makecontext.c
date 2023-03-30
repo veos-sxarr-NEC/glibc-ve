@@ -63,9 +63,9 @@ __makecontext (ucontext_t *ucp, void (*func) (void), int argc, ...)
 		   + ucp->uc_stack.ss_size - REG_SAVE_AREA - (argc*8));
   /* sp -= (argc > 6 ? argc - 6 : 0) + 1;*/
   /* Align stack and make space for trampoline address.  */
-  sp = (uint64_t *) ((((uintptr_t) sp) & -8L) - 16);
+  sp = (uint64_t *) ((((uintptr_t) sp) & -16L) - 16);
 
-  fp = (uint64_t *) (((uintptr_t) sp + REG_SAVE_AREA + (argc*8)) & -8L);
+  fp = (uint64_t *) (((uintptr_t) sp + REG_SAVE_AREA + (argc*8)) & -16L);
  /* idx_uc_link = (argci > 6 ? argc - 6 : 0) + 1; */
 
   /* Setup context ucp.  */

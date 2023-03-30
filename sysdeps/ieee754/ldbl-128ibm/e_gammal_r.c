@@ -1,5 +1,5 @@
 /* Implementation of gamma function according to ISO C.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997 and
 		  Jakub Jelinek <jj@ultra.linux.cz, 1999.
@@ -16,11 +16,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
 #include <float.h>
+#include <libm-alias-finite.h>
 
 /* Coefficients B_2k / 2k(2k-1) of x^-(2k-1) inside exp in Stirling's
    approximation to gamma function.  */
@@ -66,7 +69,7 @@ gammal_positive (long double x, int *exp2_adj)
     {
       /* Adjust into the range for using exp (lgamma).  */
       *exp2_adj = 0;
-      long double n = __ceill (x - 1.5L);
+      long double n = ceill (x - 1.5L);
       long double x_adj = x - n;
       long double eps;
       long double prod = __gamma_productl (x_adj, 0, n, &eps);
@@ -83,7 +86,7 @@ gammal_positive (long double x, int *exp2_adj)
 	{
 	  /* Adjust into the range for applying Stirling's
 	     approximation.  */
-	  long double n = __ceill (23.0L - x);
+	  long double n = ceill (23.0L - x);
 	  x_adj = x + n;
 	  x_eps = (x - (x_adj - n));
 	  prod = __gamma_productl (x_adj - n, x_eps, n, &eps);
@@ -93,7 +96,7 @@ gammal_positive (long double x, int *exp2_adj)
 	 starting by computing pow (X_ADJ, X_ADJ) with a power of 2
 	 factored out.  */
       long double exp_adj = -eps;
-      long double x_adj_int = __roundl (x_adj);
+      long double x_adj_int = roundl (x_adj);
       long double x_adj_frac = x_adj - x_adj_int;
       int x_adj_log2;
       long double x_adj_mant = __frexpl (x_adj, &x_adj_log2);
@@ -106,9 +109,9 @@ gammal_positive (long double x, int *exp2_adj)
       long double ret = (__ieee754_powl (x_adj_mant, x_adj)
 			 * __ieee754_exp2l (x_adj_log2 * x_adj_frac)
 			 * __ieee754_expl (-x_adj)
-			 * __ieee754_sqrtl (2 * M_PIl / x_adj)
+			 * sqrtl (2 * M_PIl / x_adj)
 			 / prod);
-      exp_adj += x_eps * __ieee754_logl (x);
+      exp_adj += x_eps * __ieee754_logl (x_adj);
       long double bsum = gamma_coeff[NCOEFF - 1];
       long double x_adj2 = x_adj * x_adj;
       for (size_t i = 1; i <= NCOEFF - 1; i++)
@@ -123,6 +126,7 @@ __ieee754_gammal_r (long double x, int *signgamp)
 {
   int64_t hx;
   double xhi;
+  long double ret;
 
   xhi = ldbl_high (x);
   EXTRACT_WORDS64 (hx, xhi);
@@ -133,7 +137,7 @@ __ieee754_gammal_r (long double x, int *signgamp)
       *signgamp = 0;
       return 1.0 / x;
     }
-  if (hx < 0 && (u_int64_t) hx < 0xfff0000000000000ULL && __rintl (x) == x)
+  if (hx < 0 && (uint64_t) hx < 0xfff0000000000000ULL && rintl (x) == x)
     {
       /* Return value for integer x < 0 is NaN with invalid exception.  */
       *signgamp = 0;
@@ -159,35 +163,59 @@ __ieee754_gammal_r (long double x, int *signgamp)
       *signgamp = 0;
       return LDBL_MAX * LDBL_MAX;
     }
-  else if (x > 0.0L)
-    {
-      *signgamp = 0;
-      int exp2_adj;
-      long double ret = gammal_positive (x, &exp2_adj);
-      return __scalbnl (ret, exp2_adj);
-    }
-  else if (x >= -0x1p-110L)
-    {
-      *signgamp = 0;
-      return 1.0f / x;
-    }
   else
     {
-      long double tx = __truncl (x);
-      *signgamp = (tx == 2.0L * __truncl (tx / 2.0L)) ? -1 : 1;
-      if (x <= -191.0L)
-	/* Underflow.  */
-	return LDBL_MIN * LDBL_MIN;
-      long double frac = tx - x;
-      if (frac > 0.5L)
-	frac = 1.0L - frac;
-      long double sinpix = (frac <= 0.25L
-			    ? __sinl (M_PIl * frac)
-			    : __cosl (M_PIl * (0.5L - frac)));
-      int exp2_adj;
-      long double ret = M_PIl / (-x * sinpix
-				 * gammal_positive (-x, &exp2_adj));
-      return __scalbnl (ret, -exp2_adj);
+      SET_RESTORE_ROUNDL (FE_TONEAREST);
+      if (x > 0.0L)
+	{
+	  *signgamp = 0;
+	  int exp2_adj;
+	  ret = gammal_positive (x, &exp2_adj);
+	  ret = __scalbnl (ret, exp2_adj);
+	}
+      else if (x >= -0x1p-110L)
+	{
+	  *signgamp = 0;
+	  ret = 1.0L / x;
+	}
+      else
+	{
+	  long double tx = truncl (x);
+	  *signgamp = (tx == 2.0L * truncl (tx / 2.0L)) ? -1 : 1;
+	  if (x <= -191.0L)
+	    /* Underflow.  */
+	    ret = LDBL_MIN * LDBL_MIN;
+	  else
+	    {
+	      long double frac = tx - x;
+	      if (frac > 0.5L)
+		frac = 1.0L - frac;
+	      long double sinpix = (frac <= 0.25L
+				    ? __sinl (M_PIl * frac)
+				    : __cosl (M_PIl * (0.5L - frac)));
+	      int exp2_adj;
+	      ret = M_PIl / (-x * sinpix
+			     * gammal_positive (-x, &exp2_adj));
+	      ret = __scalbnl (ret, -exp2_adj);
+	      math_check_force_underflow_nonneg (ret);
+	    }
+	}
     }
+  if (isinf (ret) && x != 0)
+    {
+      if (*signgamp < 0)
+	return -(-copysignl (LDBL_MAX, ret) * LDBL_MAX);
+      else
+	return copysignl (LDBL_MAX, ret) * LDBL_MAX;
+    }
+  else if (ret == 0)
+    {
+      if (*signgamp < 0)
+	return -(-copysignl (LDBL_MIN, ret) * LDBL_MIN);
+      else
+	return copysignl (LDBL_MIN, ret) * LDBL_MIN;
+    }
+  else
+    return ret;
 }
-strong_alias (__ieee754_gammal_r, __gammal_r_finite)
+libm_alias_finite (__ieee754_gammal_r, __gammal_r)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -23,7 +23,11 @@
 int
 __setreuid (uid_t ruid, uid_t euid)
 {
+#ifdef __NR_setreuid32
+  return INLINE_SETXID_SYSCALL (setreuid32, 2, ruid, euid);
+#else
   return INLINE_SETXID_SYSCALL (setreuid, 2, ruid, euid);
+#endif
 }
 #ifndef __setreuid
 weak_alias (__setreuid, setreuid)

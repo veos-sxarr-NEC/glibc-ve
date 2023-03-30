@@ -1,7 +1,7 @@
 /*
  * IBM Accurate Mathematical Library
  * written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2001-2020 Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,7 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 /*********************************************************************/
 /* MODULE_NAME: uroot.c                                              */
@@ -33,6 +33,7 @@
 /*********************************************************************/
 
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 typedef union {int64_t i[2]; long double x; double d[2]; } mynumber;
 
@@ -91,14 +92,12 @@ long double __ieee754_sqrtl(long double x)
     return c.x * i;
   }
   else {
-    if (k>=INT64_C(0x7ff0000000000000)) {
-      if (a.i[0] == INT64_C(0xfff0000000000000))
-	return (big1-big1)/(big-big); /* sqrt (-Inf) = NaN.  */
-      return x; /* sqrt (NaN) = NaN, sqrt (+Inf) = +Inf.  */
-    }
+    if (k>=INT64_C(0x7ff0000000000000))
+      /* sqrt (-Inf) = NaN, sqrt (NaN) = NaN, sqrt (+Inf) = +Inf.  */
+      return x * x + x;
     if (x == 0) return x;
     if (x < 0) return (big1-big1)/(big-big);
     return tm256*__ieee754_sqrtl(x*t512);
   }
 }
-strong_alias (__ieee754_sqrtl, __sqrtl_finite)
+libm_alias_finite (__ieee754_sqrtl, __sqrtl)

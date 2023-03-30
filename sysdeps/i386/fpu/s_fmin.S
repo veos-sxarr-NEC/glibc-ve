@@ -1,5 +1,5 @@
 /* Compute minimum of two numbers, regarding NaN as missing argument.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,9 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <libm-alias-double.h>
 
 	.text
 ENTRY(__fmin)
@@ -40,4 +41,4 @@ ENTRY(__fmin)
 
 	ret
 END(__fmin)
-weak_alias (__fmin, fmin)
+libm_alias_double (__fmin, fmin)

@@ -1,5 +1,5 @@
 /* Check __ppc_get_timebase() for architecture changes
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Test if __ppc_get_timebase() is compatible with the current processor and if
    it's changing between reads.  A read failure might indicate a Power ISA or
@@ -43,5 +43,4 @@ do_test (void)
   return 1;
 }
 
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

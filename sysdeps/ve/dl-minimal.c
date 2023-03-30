@@ -1,5 +1,5 @@
 /* Minimal replacements for basic facilities used in the dynamic linker.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,11 +14,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <errno.h>
 #include <limits.h>
+#include <stdio.h>
 #include <string.h>
 #include <tls.h>
 #include <unistd.h>
@@ -27,11 +28,14 @@
 #include <sys/types.h>
 #include <ldsodefs.h>
 #include <_itoa.h>
+#include <malloc/malloc-internal.h>
 
 #include <assert.h>
 
-/* Minimal `malloc' allocator for use while loading shared libraries.
-   No block is ever freed.  */
+/* Minimal malloc allocator for used during initial link.  After the
+   initial link, a full malloc implementation is interposed, either
+   the one in libc, or a different one supplied by the user through
+   interposition.  */
 
 #define PAGE2MB 0x200000
 
@@ -40,17 +44,11 @@ static void *alloc_ptr, *alloc_end, *alloc_last_block;
 /* Declarations of global functions.  */
 extern void weak_function free (void *ptr);
 extern void * weak_function realloc (void *ptr, size_t n);
-extern unsigned long int weak_function __strtoul_internal (const char *nptr,
-							   char **endptr,
-							   int base,
-							   int group);
-extern unsigned long int weak_function strtoul (const char *nptr,
-						char **endptr, int base);
 
 
 /* Allocate an aligned memory block.  */
 void * weak_function
-__libc_memalign (size_t align, size_t n)
+malloc (size_t n)
 {
   if (alloc_end == 0)
     {
@@ -64,20 +62,18 @@ __libc_memalign (size_t align, size_t n)
     }
 
   /* Make sure the allocation pointer is ideally aligned.  */
-  alloc_ptr = (void *) 0 + (((alloc_ptr - (void *) 0) + align - 1)
-			    & ~(align - 1));
+  alloc_ptr = (void *) 0 + (((alloc_ptr - (void *) 0) + MALLOC_ALIGNMENT - 1)
+			    & ~(MALLOC_ALIGNMENT - 1));
 
   if (alloc_ptr + n >= alloc_end || n >= -(uintptr_t) alloc_ptr)
     {
-      /* Insufficient space left; allocate another page.  */
+      /* Insufficient space left; allocate another page plus one extra
+	 page to reduce number of mmap calls.  */
       caddr_t page;
       size_t nup = (n + GLRO(dl_pagesize) - 1) & ~(GLRO(dl_pagesize) - 1);
-      if (__glibc_unlikely (nup == 0))
-	{
-	  if (n)
-	    return NULL;
-	  nup = GLRO(dl_pagesize);
-	}
+      if (__glibc_unlikely (nup == 0 && n != 0))
+	return NULL;
+      nup += GLRO(dl_pagesize);
       page = __mmap (0, nup, PROT_READ|PROT_WRITE,
 		     MAP_ANON|MAP_PRIVATE, -1, 0);
       if (page == MAP_FAILED)
@@ -90,12 +86,6 @@ __libc_memalign (size_t align, size_t n)
   alloc_last_block = (void *) alloc_ptr;
   alloc_ptr += n;
   return alloc_last_block;
-}
-
-void * weak_function
-malloc (size_t n)
-{
-  return __libc_memalign (sizeof (double), n);
 }
 
 /* We use this function occasionally since the real implementation may
@@ -197,8 +187,22 @@ __strerror_r (int errnum, char *buf, size_t buflen)
   return msg;
 }
 
-#ifndef NDEBUG
+void
+__libc_fatal (const char *message)
+{
+  _dl_fatal_printf ("%s", message);
+}
+rtld_hidden_def (__libc_fatal)
 
+void
+__attribute__ ((noreturn))
+__chk_fail (void)
+{
+  _exit (127);
+}
+rtld_hidden_def (__chk_fail)
+
+#ifndef NDEBUG
 /* Define (weakly) our own assert failure function which doesn't use stdio.
    If we are linked into the user program (-ldl), the normal __assert_fail
    defn can override this one.  */
@@ -213,7 +217,7 @@ Inconsistency detected by ld.so: %s: %u: %s%sAssertion `%s' failed!\n",
 		    assertion);
 
 }
-rtld_hidden_weak(__assert_fail)
+rtld_hidden_weak (__assert_fail)
 
 void weak_function
 __assert_perror_fail (int errnum,
@@ -229,95 +233,14 @@ Inconsistency detected by ld.so: %s: %u: %s%sUnexpected error: %s.\n",
 }
 rtld_hidden_weak (__assert_perror_fail)
 #endif
-
-unsigned long int weak_function
-__strtoul_internal (const char *nptr, char **endptr, int base, int group)
-{
-  unsigned long int result = 0;
-  long int sign = 1;
-  unsigned max_digit;
-
-  while (*nptr == ' ' || *nptr == '\t')
-    ++nptr;
-
-  if (*nptr == '-')
-    {
-      sign = -1;
-      ++nptr;
-    }
-  else if (*nptr == '+')
-    ++nptr;
-
-  if (*nptr < '0' || *nptr > '9')
-    {
-      if (endptr != NULL)
-	*endptr = (char *) nptr;
-      return 0UL;
-    }
-
-  assert (base == 0);
-  base = 10;
-  max_digit = 9;
-  if (*nptr == '0')
-    {
-      if (nptr[1] == 'x' || nptr[1] == 'X')
-	{
-	  base = 16;
-	  nptr += 2;
-	}
-      else
-	{
-	  base = 8;
-	  max_digit = 7;
-	}
-    }
-
-  while (1)
-    {
-      unsigned long int digval;
-      if (*nptr >= '0' && *nptr <= '0' + max_digit)
-        digval = *nptr - '0';
-      else if (base == 16)
-        {
-	  if (*nptr >= 'a' && *nptr <= 'f')
-	    digval = *nptr - 'a' + 10;
-	  else if (*nptr >= 'A' && *nptr <= 'F')
-	    digval = *nptr - 'A' + 10;
-	  else
-	    break;
-	}
-      else
-        break;
-
-      if (result > ULONG_MAX / base
-	  || (result == ULONG_MAX / base && digval > ULONG_MAX % base))
-	{
-	  errno = ERANGE;
-	  if (endptr != NULL)
-	    *endptr = (char *) nptr;
-	  return ULONG_MAX;
-	}
-      result *= base;
-      result += digval;
-      ++nptr;
-    }
-
-  if (endptr != NULL)
-    *endptr = (char *) nptr;
-  return result * sign;
-}
-
-
+
 #undef _itoa
 /* We always use _itoa instead of _itoa_word in ld.so since the former
    also has to be present and it is never about speed when these
    functions are used.  */
 char *
-_itoa (value, buflim, base, upper_case)
-     unsigned long long int value;
-     char *buflim;
-     unsigned int base;
-     int upper_case;
+_itoa (unsigned long long int value, char *buflim, unsigned int base,
+       int upper_case)
 {
   assert (! upper_case);
 
@@ -328,7 +251,11 @@ _itoa (value, buflim, base, upper_case)
   return buflim;
 }
 
-
+/* The '_itoa_lower_digits' variable in libc.so is able to handle bases
+   up to 36.  We don't need this here.  */
+const char _itoa_lower_digits[16] = "0123456789abcdef";
+rtld_hidden_data_def (_itoa_lower_digits)
+
 /* The following is not a complete strsep implementation.  It cannot
    handle empty delimiter strings.  But this isn't necessary for the
    execution of ld.so.  */
@@ -371,16 +298,3 @@ __strsep (char **stringp, const char *delim)
 }
 weak_alias (__strsep, strsep)
 strong_alias (__strsep, __strsep_g)
-
-void
-__attribute__ ((noreturn))
-__chk_fail (void)
-{
-  _exit (127);
-}
-rtld_hidden_def (__chk_fail)
-
-/* The '_itoa_lower_digits' variable in libc.so is able to handle bases
-   up to 36.  We don't need this here.  */
-const char _itoa_lower_digits[16] = "0123456789abcdef";
-rtld_hidden_data_def (_itoa_lower_digits)

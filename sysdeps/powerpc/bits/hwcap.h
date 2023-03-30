@@ -1,5 +1,5 @@
 /* Defines for bits in AT_HWCAP and AT_HWCAP2.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if !defined(_SYS_AUXV_H) && !defined(_SYSDEPS_SYSDEP_H)
 # error "Never include <bits/hwcap.h> directly; use <sys/auxv.h> instead."
@@ -50,6 +50,7 @@
 #define PPC_FEATURE_ARCH_2_06	    0x00000100 /* ISA 2.06 */
 #define PPC_FEATURE_HAS_VSX	    0x00000080 /* P7 Vector Extension.  */
 #define PPC_FEATURE_PSERIES_PERFMON_COMPAT  0x00000040
+/* Reserved by the kernel.	    0x00000004  Do not use.  */
 #define PPC_FEATURE_TRUE_LE	    0x00000002
 #define PPC_FEATURE_PPC_LE	    0x00000001
 
@@ -64,3 +65,12 @@
 #define PPC_FEATURE2_HAS_TAR       0x04000000 /* Target Address Register */
 #define PPC_FEATURE2_HAS_VEC_CRYPTO  0x02000000  /* Target supports vector
 						    instruction.  */
+#define PPC_FEATURE2_HTM_NOSC	   0x01000000 /* Kernel aborts transaction
+						 when a syscall is made.  */
+#define PPC_FEATURE2_ARCH_3_00	   0x00800000 /* ISA 3.0 */
+#define PPC_FEATURE2_HAS_IEEE128   0x00400000 /* VSX IEEE Binary Float
+						 128-bit */
+#define PPC_FEATURE2_DARN	   0x00200000 /* darn instruction.  */
+#define PPC_FEATURE2_SCV	   0x00100000 /* scv syscall.  */
+#define PPC_FEATURE2_HTM_NO_SUSPEND  0x00080000 /* TM without suspended
+						   state.  */

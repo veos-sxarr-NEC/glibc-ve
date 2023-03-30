@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,16 +28,12 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stddef.h>
-#ifdef _LIBC
-# include <shlib-compat.h>
-#else
-# define _IO_new_fopen fopen
-#endif
+#include <shlib-compat.h>
 
-_IO_FILE *
-__fopen_maybe_mmap (_IO_FILE *fp)
+FILE *
+__fopen_maybe_mmap (FILE *fp)
 {
-#ifdef _G_HAVE_MMAP
+#if _G_HAVE_MMAP
   if ((fp->_flags2 & _IO_FLAGS2_MMAP) && (fp->_flags & _IO_NO_WRITES))
     {
       /* Since this is read-only, we might be able to mmap the contents
@@ -46,9 +42,9 @@ __fopen_maybe_mmap (_IO_FILE *fp)
 	 vanilla file operations and reset the jump table accordingly.  */
 
       if (fp->_mode <= 0)
-	_IO_JUMPS ((struct _IO_FILE_plus *) fp) = &_IO_file_jumps_maybe_mmap;
+	_IO_JUMPS_FILE_plus (fp) = &_IO_file_jumps_maybe_mmap;
       else
-	_IO_JUMPS ((struct _IO_FILE_plus *) fp) = &_IO_wfile_jumps_maybe_mmap;
+	_IO_JUMPS_FILE_plus (fp) = &_IO_wfile_jumps_maybe_mmap;
       fp->_wide_data->_wide_vtable = &_IO_wfile_jumps_maybe_mmap;
     }
 #endif
@@ -56,7 +52,7 @@ __fopen_maybe_mmap (_IO_FILE *fp)
 }
 
 
-_IO_FILE *
+FILE *
 __fopen_internal (const char *filename, const char *mode, int is32)
 {
   struct locked_FILE
@@ -73,17 +69,10 @@ __fopen_internal (const char *filename, const char *mode, int is32)
 #ifdef _IO_MTSAFE_IO
   new_f->fp.file._lock = &new_f->lock;
 #endif
-#if defined _LIBC || defined _GLIBCPP_USE_WCHAR_T
   _IO_no_init (&new_f->fp.file, 0, 0, &new_f->wd, &_IO_wfile_jumps);
-#else
-  _IO_no_init (&new_f->fp.file, 1, 0, NULL, NULL);
-#endif
   _IO_JUMPS (&new_f->fp) = &_IO_file_jumps;
-  _IO_file_init (&new_f->fp);
-#if  !_IO_UNIFIED_JUMPTABLES
-  new_f->fp.vtable = NULL;
-#endif
-  if (_IO_file_fopen ((_IO_FILE *) new_f, filename, mode, is32) != NULL)
+  _IO_new_file_init_internal (&new_f->fp);
+  if (_IO_file_fopen ((FILE *) new_f, filename, mode, is32) != NULL)
     return __fopen_maybe_mmap (&new_f->fp.file);
 
   _IO_un_link (&new_f->fp);
@@ -91,13 +80,12 @@ __fopen_internal (const char *filename, const char *mode, int is32)
   return NULL;
 }
 
-_IO_FILE *
+FILE *
 _IO_new_fopen (const char *filename, const char *mode)
 {
   return __fopen_internal (filename, mode, 1);
 }
 
-#ifdef _LIBC
 strong_alias (_IO_new_fopen, __new_fopen)
 versioned_symbol (libc, _IO_new_fopen, _IO_fopen, GLIBC_2_1);
 versioned_symbol (libc, __new_fopen, fopen, GLIBC_2_1);
@@ -106,4 +94,3 @@ versioned_symbol (libc, __new_fopen, fopen, GLIBC_2_1);
 weak_alias (_IO_new_fopen, _IO_fopen64)
 weak_alias (_IO_new_fopen, fopen64)
 # endif
-#endif

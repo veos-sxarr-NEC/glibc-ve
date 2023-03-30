@@ -5,13 +5,10 @@ shared-only-routines += libc-__read_tp
 endif
 
 ifeq ($(subdir),elf)
-sysdep_routines	     += dl-vdso
 sysdep-rtld-routines += __read_tp
 ifeq ($(build-shared),yes)
 # This is needed for DSO loading from static binaries.
 sysdep-dl-routines += dl-static
-sysdep_routines += dl-static
-sysdep-rtld-routines += dl-static
 endif
 endif
 
@@ -30,8 +27,5 @@ ifeq (,$(filter $(default-abi),$(abi-variants)))
 Unknown ABI, must be one of $(abi-variants)
 endif
 
-abi-lp64-options := -U__AARCH64EB__
 abi-lp64-condition := !defined __AARCH64EB__
-
-abi-lp64_be-options := -D__AARCH64EB__
 abi-lp64_be-condition := defined __AARCH64EB__

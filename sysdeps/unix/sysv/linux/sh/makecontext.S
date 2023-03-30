@@ -1,5 +1,5 @@
 /* Create new context.
-   Copyright (C) 2005-2015 Free Software Foundation, Inc.
+   Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,14 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <abort-instr.h>
 
 #include "ucontext_i.h"
 
-/* void __makecontext (struct ucontext *ucp, void (*func)(), int argc, ...);
+/* void __makecontext (ucontext_t *ucp, void (*func)(), int argc, ...);
   __makecontext sets up a stack and registers for context to run a given
   function.  The registers are set up like this:
     r4-r7: parameters 1 to 4

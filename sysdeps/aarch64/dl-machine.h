@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,16 +14,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h
 
 #define ELF_MACHINE_NAME "aarch64"
 
+#include <sysdep.h>
 #include <tls.h>
 #include <dl-tlsdesc.h>
 #include <dl-irel.h>
+#include <cpu-features.c>
+
+/* Translate a processor specific dynamic tag to the index in l_info array.  */
+#define DT_AARCH64(x) (DT_AARCH64_##x - DT_LOPROC + DT_NUM)
 
 /* Return nonzero iff ELF header is compatible with the running host.  */
 static inline int __attribute__ ((unused))
@@ -49,26 +54,11 @@ elf_machine_load_address (void)
   /* To figure out the load address we use the definition that for any symbol:
      dynamic_addr(symbol) = static_addr(symbol) + load_addr
 
-     The choice of symbol is arbitrary. The static address we obtain
-     by constructing a non GOT reference to the symbol, the dynamic
-     address of the symbol we compute using adrp/add to compute the
-     symbol's address relative to the PC.
-     This depends on 32bit relocations being resolved at link time
-     and that the static address fits in the 32bits.  */
+    _DYNAMIC sysmbol is used here as its link-time address stored in
+    the special unrelocated first GOT entry.  */
 
-  ElfW(Addr) static_addr;
-  ElfW(Addr) dynamic_addr;
-
-  asm ("					\n"
-"	adrp	%1, _dl_start;			\n"
-"	add	%1, %1, #:lo12:_dl_start	\n"
-"	ldr	%w0, 1f				\n"
-"	b	2f				\n"
-"1:						\n"
-"	.word	_dl_start			\n"
-"2:						\n"
-    : "=r" (static_addr),  "=r" (dynamic_addr));
-  return dynamic_addr - static_addr;
+    extern ElfW(Dyn) _DYNAMIC[] attribute_hidden;
+    return (ElfW(Addr)) &_DYNAMIC - elf_machine_dynamic ();
 }
 
 /* Set up the loaded object described by L so its unrelocated PLT
@@ -115,96 +105,117 @@ elf_machine_runtime_setup (struct link_map *l, int lazy, int profile)
 	}
     }
 
-  if (l->l_info[ADDRIDX (DT_TLSDESC_GOT)] && lazy)
-    *(ElfW(Addr)*)(D_PTR (l, l_info[ADDRIDX (DT_TLSDESC_GOT)]) + l->l_addr)
-      = (ElfW(Addr)) &_dl_tlsdesc_resolve_rela;
-
   return lazy;
 }
 
 /* Initial entry point for the dynamic linker. The C function
    _dl_start is the real entry point, its return value is the user
    program's entry point */
+#ifdef __LP64__
+# define RTLD_START RTLD_START_1 ("x", "3", "sp")
+#else
+# define RTLD_START RTLD_START_1 ("w", "2", "wsp")
+#endif
 
-#define RTLD_START asm ("\
-.text								\n\
-.globl _start							\n\
-.type _start, %function						\n\
-.globl _dl_start_user						\n\
-.type _dl_start_user, %function					\n\
-_start:								\n\
-	mov	x0,	sp					\n\
-	bl	_dl_start					\n\
-	// returns user entry point in x0			\n\
-	mov	x21, x0						\n\
-_dl_start_user:							\n\
-	// get the original arg count				\n\
-	ldr	x1, [sp]					\n\
-	// get the argv address					\n\
-	add	x2, sp, #8					\n\
-	// get _dl_skip_args to see if we were			\n\
-	// invoked as an executable				\n\
-	adrp	x4, _dl_skip_args				\n\
-        ldr	w4, [x4, #:lo12:_dl_skip_args]			\n\
-	// do we need to adjust argc/argv			\n\
-        cmp	w4, 0						\n\
-	beq	.L_done_stack_adjust				\n\
-	// subtract _dl_skip_args from original arg count	\n\
-	sub	x1, x1, x4					\n\
-	// store adjusted argc back to stack			\n\
-	str	x1, [sp]					\n\
-	// find the first unskipped argument			\n\
-	mov	x3, x2						\n\
-	add	x4, x2, x4, lsl #3				\n\
-	// shuffle argv down					\n\
-1:	ldr	x5, [x4], #8					\n\
-	str	x5, [x3], #8					\n\
-	cmp	x5, #0						\n\
-	bne	1b						\n\
-	// shuffle envp down					\n\
-1:	ldr	x5, [x4], #8					\n\
-	str	x5, [x3], #8					\n\
-	cmp	x5, #0						\n\
-	bne	1b						\n\
-	// shuffle auxv down					\n\
-1:	ldp	x0, x5, [x4, #16]!				\n\
-	stp	x0, x5, [x3], #16				\n\
-	cmp	x0, #0						\n\
-	bne	1b						\n\
-	// Update _dl_argv					\n\
-	adrp	x3, _dl_argv					\n\
-	str	x2, [x3, #:lo12:_dl_argv]			\n\
-.L_done_stack_adjust:						\n\
-	// compute envp						\n\
-	add	x3, x2, x1, lsl #3				\n\
-	add	x3, x3, #8					\n\
-	adrp	x16, _rtld_local				\n\
-        add	x16, x16, #:lo12:_rtld_local			\n\
-        ldr	x0, [x16]					\n\
-	bl	_dl_init					\n\
-	// load the finalizer function				\n\
-	adrp	x0, _dl_fini					\n\
-	add	x0, x0, #:lo12:_dl_fini				\n\
-	// jump to the user_s entry point			\n\
-	br      x21						\n\
+
+#define RTLD_START_1(PTR, PTR_SIZE_LOG, PTR_SP) asm ("\
+.text									\n\
+.globl _start								\n\
+.type _start, %function							\n\
+.globl _dl_start_user							\n\
+.type _dl_start_user, %function						\n\
+_start:									\n\
+	mov	" PTR "0, " PTR_SP "					\n\
+	bl	_dl_start						\n\
+	// returns user entry point in x0				\n\
+	mov	x21, x0							\n\
+_dl_start_user:								\n\
+	// get the original arg count					\n\
+	ldr	" PTR "1, [sp]						\n\
+	// get the argv address						\n\
+	add	" PTR "2, " PTR_SP ", #(1<<"  PTR_SIZE_LOG ")		\n\
+	// get _dl_skip_args to see if we were				\n\
+	// invoked as an executable					\n\
+	adrp	x4, _dl_skip_args					\n\
+        ldr	w4, [x4, #:lo12:_dl_skip_args]				\n\
+	// do we need to adjust argc/argv				\n\
+        cmp	w4, 0							\n\
+	beq	.L_done_stack_adjust					\n\
+	// subtract _dl_skip_args from original arg count		\n\
+	sub	" PTR "1, " PTR "1, " PTR "4				\n\
+	// store adjusted argc back to stack				\n\
+	str	" PTR "1, [sp]						\n\
+	// find the first unskipped argument				\n\
+	mov	" PTR "3, " PTR "2					\n\
+	add	" PTR "4, " PTR "2, " PTR "4, lsl #" PTR_SIZE_LOG "	\n\
+	// shuffle argv down						\n\
+1:	ldr	" PTR "5, [x4], #(1<<"  PTR_SIZE_LOG ")			\n\
+	str	" PTR "5, [x3], #(1<<"  PTR_SIZE_LOG ")			\n\
+	cmp	" PTR "5, #0						\n\
+	bne	1b							\n\
+	// shuffle envp down						\n\
+1:	ldr	" PTR "5, [x4], #(1<<"  PTR_SIZE_LOG ")			\n\
+	str	" PTR "5, [x3], #(1<<"  PTR_SIZE_LOG ")			\n\
+	cmp	" PTR "5, #0						\n\
+	bne	1b							\n\
+	// shuffle auxv down						\n\
+1:	ldp	" PTR "0, " PTR "5, [x4, #(2<<"  PTR_SIZE_LOG ")]!	\n\
+	stp	" PTR "0, " PTR "5, [x3], #(2<<"  PTR_SIZE_LOG ")	\n\
+	cmp	" PTR "0, #0						\n\
+	bne	1b							\n\
+	// Update _dl_argv						\n\
+	adrp	x3, __GI__dl_argv					\n\
+	str	" PTR "2, [x3, #:lo12:__GI__dl_argv]			\n\
+.L_done_stack_adjust:							\n\
+	// compute envp							\n\
+	add	" PTR "3, " PTR "2, " PTR "1, lsl #" PTR_SIZE_LOG "	\n\
+	add	" PTR "3, " PTR "3, #(1<<"  PTR_SIZE_LOG ")		\n\
+	adrp	x16, _rtld_local					\n\
+        add	" PTR "16, " PTR "16, #:lo12:_rtld_local		\n\
+        ldr	" PTR "0, [x16]						\n\
+	bl	_dl_init						\n\
+	// load the finalizer function					\n\
+	adrp	x0, _dl_fini						\n\
+	add	" PTR "0, " PTR "0, #:lo12:_dl_fini			\n\
+	// jump to the user_s entry point				\n\
+	br      x21							\n\
 ");
 
 #define elf_machine_type_class(type)					\
-  ((((type) == R_AARCH64_JUMP_SLOT ||					\
-     (type) == R_AARCH64_TLS_DTPMOD ||					\
-     (type) == R_AARCH64_TLS_DTPREL ||					\
-     (type) == R_AARCH64_TLS_TPREL ||					\
-     (type) == R_AARCH64_TLSDESC) * ELF_RTYPE_CLASS_PLT)		\
-   | (((type) == R_AARCH64_COPY) * ELF_RTYPE_CLASS_COPY))
+  ((((type) == AARCH64_R(JUMP_SLOT)					\
+     || (type) == AARCH64_R(TLS_DTPMOD)					\
+     || (type) == AARCH64_R(TLS_DTPREL)					\
+     || (type) == AARCH64_R(TLS_TPREL)					\
+     || (type) == AARCH64_R(TLSDESC)) * ELF_RTYPE_CLASS_PLT)		\
+   | (((type) == AARCH64_R(COPY)) * ELF_RTYPE_CLASS_COPY)		\
+   | (((type) == AARCH64_R(GLOB_DAT)) * ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA))
 
-#define ELF_MACHINE_JMP_SLOT	R_AARCH64_JUMP_SLOT
+#define ELF_MACHINE_JMP_SLOT	AARCH64_R(JUMP_SLOT)
 
 /* AArch64 uses RELA not REL */
 #define ELF_MACHINE_NO_REL 1
 #define ELF_MACHINE_NO_RELA 0
 
+#define DL_PLATFORM_INIT dl_platform_init ()
+
+static inline void __attribute__ ((unused))
+dl_platform_init (void)
+{
+  if (GLRO(dl_platform) != NULL && *GLRO(dl_platform) == '\0')
+    /* Avoid an empty string which would disturb us.  */
+    GLRO(dl_platform) = NULL;
+
+#ifdef SHARED
+  /* init_cpu_features has been called early from __libc_start_main in
+     static executable.  */
+  init_cpu_features (&GLRO(dl_aarch64_cpu_features));
+#endif
+}
+
+
 static inline ElfW(Addr)
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const ElfW(Rela) *reloc,
 		       ElfW(Addr) *reloc_addr,
 		       ElfW(Addr) value)
@@ -236,9 +247,9 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 		  void *const reloc_addr_arg, int skip_ifunc)
 {
   ElfW(Addr) *const reloc_addr = reloc_addr_arg;
-  const unsigned int r_type = ELF64_R_TYPE (reloc->r_info);
+  const unsigned int r_type = ELFW (R_TYPE) (reloc->r_info);
 
-  if (__builtin_expect (r_type == R_AARCH64_RELATIVE, 0))
+  if (__builtin_expect (r_type == AARCH64_R(RELATIVE), 0))
       *reloc_addr = map->l_addr + reloc->r_addend;
   else if (__builtin_expect (r_type == R_AARCH64_NONE, 0))
       return;
@@ -246,7 +257,7 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
     {
       const ElfW(Sym) *const refsym = sym;
       struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-      ElfW(Addr) value = sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value;
+      ElfW(Addr) value = SYMBOL_ADDRESS (sym_map, sym, true);
 
       if (sym != NULL
 	  && __glibc_unlikely (ELFW(ST_TYPE) (sym->st_info) == STT_GNU_IFUNC)
@@ -256,7 +267,7 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 
       switch (r_type)
 	{
-	case R_AARCH64_COPY:
+	case AARCH64_R(COPY):
 	  if (sym == NULL)
 	      break;
 
@@ -271,18 +282,21 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 				RTLD_PROGNAME, strtab + refsym->st_name);
 	    }
 	  memcpy (reloc_addr_arg, (void *) value,
-		  MIN (sym->st_size, refsym->st_size));
+		  sym->st_size < refsym->st_size
+		  ? sym->st_size : refsym->st_size);
 	  break;
 
-	case R_AARCH64_RELATIVE:
-	case R_AARCH64_GLOB_DAT:
-	case R_AARCH64_JUMP_SLOT:
-	case R_AARCH64_ABS32:
-	case R_AARCH64_ABS64:
+	case AARCH64_R(RELATIVE):
+	case AARCH64_R(GLOB_DAT):
+	case AARCH64_R(JUMP_SLOT):
+	case AARCH64_R(ABS32):
+#ifdef __LP64__
+	case AARCH64_R(ABS64):
+#endif
 	  *reloc_addr = value + reloc->r_addend;
 	  break;
 
-	case R_AARCH64_TLSDESC:
+	case AARCH64_R(TLSDESC):
 	  {
 	    struct tlsdesc volatile *td =
 	      (struct tlsdesc volatile *)reloc_addr;
@@ -317,7 +331,7 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 	    break;
 	  }
 
-	case R_AARCH64_TLS_DTPMOD:
+	case AARCH64_R(TLS_DTPMOD):
 #ifdef RTLD_BOOTSTRAP
 	  *reloc_addr = 1;
 #else
@@ -328,12 +342,12 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 #endif
 	  break;
 
-	case R_AARCH64_TLS_DTPREL:
+	case AARCH64_R(TLS_DTPREL):
 	  if (sym)
 	    *reloc_addr = sym->st_value + reloc->r_addend;
 	  break;
 
-	case R_AARCH64_TLS_TPREL:
+	case AARCH64_R(TLS_TPREL):
 	  if (sym)
 	    {
 	      CHECK_STATIC_TLS (map, sym_map);
@@ -342,9 +356,10 @@ elf_machine_rela (struct link_map *map, const ElfW(Rela) *reloc,
 	    }
 	  break;
 
-	case R_AARCH64_IRELATIVE:
+	case AARCH64_R(IRELATIVE):
 	  value = map->l_addr + reloc->r_addend;
-	  value = elf_ifunc_invoke (value);
+	  if (__glibc_likely (!skip_ifunc))
+	    value = elf_ifunc_invoke (value);
 	  *reloc_addr = value;
 	  break;
 
@@ -373,25 +388,61 @@ elf_machine_lazy_rel (struct link_map *map,
 		      int skip_ifunc)
 {
   ElfW(Addr) *const reloc_addr = (void *) (l_addr + reloc->r_offset);
-  const unsigned int r_type = ELF64_R_TYPE (reloc->r_info);
+  const unsigned int r_type = ELFW (R_TYPE) (reloc->r_info);
   /* Check for unexpected PLT reloc type.  */
-  if (__builtin_expect (r_type == R_AARCH64_JUMP_SLOT, 1))
+  if (__builtin_expect (r_type == AARCH64_R(JUMP_SLOT), 1))
     {
-      if (__builtin_expect (map->l_mach.plt, 0) == 0)
-	*reloc_addr += l_addr;
-      else
-	*reloc_addr = map->l_mach.plt;
-    }
-  else if (__builtin_expect (r_type == R_AARCH64_TLSDESC, 1))
-    {
-      struct tlsdesc volatile *td =
-	(struct tlsdesc volatile *)reloc_addr;
+      if (map->l_mach.plt == 0)
+	{
+	  /* Prelinking.  */
+	  *reloc_addr += l_addr;
+	  return;
+	}
 
-      td->arg = (void*)reloc;
-      td->entry = (void*)(D_PTR (map, l_info[ADDRIDX (DT_TLSDESC_PLT)])
-			  + map->l_addr);
+      if (__glibc_unlikely (map->l_info[DT_AARCH64 (VARIANT_PCS)] != NULL))
+	{
+	  /* Check the symbol table for variant PCS symbols.  */
+	  const Elf_Symndx symndx = ELFW (R_SYM) (reloc->r_info);
+	  const ElfW (Sym) *symtab =
+	    (const void *)D_PTR (map, l_info[DT_SYMTAB]);
+	  const ElfW (Sym) *sym = &symtab[symndx];
+	  if (__glibc_unlikely (sym->st_other & STO_AARCH64_VARIANT_PCS))
+	    {
+	      /* Avoid lazy resolution of variant PCS symbols.  */
+	      const struct r_found_version *version = NULL;
+	      if (map->l_info[VERSYMIDX (DT_VERSYM)] != NULL)
+		{
+		  const ElfW (Half) *vernum =
+		    (const void *)D_PTR (map, l_info[VERSYMIDX (DT_VERSYM)]);
+		  version = &map->l_versions[vernum[symndx] & 0x7fff];
+		}
+	      elf_machine_rela (map, reloc, sym, version, reloc_addr,
+				skip_ifunc);
+	      return;
+	    }
+	}
+
+      *reloc_addr = map->l_mach.plt;
     }
-  else if (__glibc_unlikely (r_type == R_AARCH64_IRELATIVE))
+  else if (__builtin_expect (r_type == AARCH64_R(TLSDESC), 1))
+    {
+      const Elf_Symndx symndx = ELFW (R_SYM) (reloc->r_info);
+      const ElfW (Sym) *symtab = (const void *)D_PTR (map, l_info[DT_SYMTAB]);
+      const ElfW (Sym) *sym = &symtab[symndx];
+      const struct r_found_version *version = NULL;
+
+      if (map->l_info[VERSYMIDX (DT_VERSYM)] != NULL)
+	{
+	  const ElfW (Half) *vernum =
+	    (const void *)D_PTR (map, l_info[VERSYMIDX (DT_VERSYM)]);
+	  version = &map->l_versions[vernum[symndx] & 0x7fff];
+	}
+
+      /* Always initialize TLS descriptors completely, because lazy
+	 initialization requires synchronization at every TLS access.  */
+      elf_machine_rela (map, reloc, sym, version, reloc_addr, skip_ifunc);
+    }
+  else if (__glibc_unlikely (r_type == AARCH64_R(IRELATIVE)))
     {
       ElfW(Addr) value = map->l_addr + reloc->r_addend;
       if (__glibc_likely (!skip_ifunc))

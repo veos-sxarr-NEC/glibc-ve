@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1996.
 
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -66,7 +66,7 @@ locfile_read (struct localedef_t *result, const struct charmap_t *charmap)
       if (filename != NULL && filename[0] != '/')
 	{
 #ifdef __ve__
-	  char *i18npath = getenv ("VE_I18NPATH");
+          char *i18npath = getenv ("VE_I18NPATH");
 #else
 	  char *i18npath = getenv ("I18NPATH");
 #endif
@@ -706,7 +706,7 @@ write_locale_data (const char *output_path, int catidx, const char *category,
   size_t cnt, step, maxiov;
   int fd;
   char *fname;
-  const char **other_paths;
+  const char **other_paths = NULL;
   uint32_t header[2];
   size_t n_elem;
   struct iovec vec[3];
@@ -800,9 +800,8 @@ write_locale_data (const char *output_path, int catidx, const char *category,
 
       if (fd == -1)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, save_err, _("\
-cannot open output file `%s' for category `%s'"), fname, category));
+	  record_error (0, save_err, _("\
+cannot open output file `%s' for category `%s'"), fname, category);
 	  free (fname);
 	  return;
 	}
@@ -824,18 +823,30 @@ cannot open output file `%s' for category `%s'"), fname, category));
 
       if (writev (fd, &vec[cnt], step) < 0)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, errno, _("\
-failure while writing data for category `%s'"), category));
+	  record_error (0, errno, _("\
+failure while writing data for category `%s'"), category);
 	  break;
 	}
     }
 
   close (fd);
 
-  /* Compare the file with the locale data files for the same category in
-     other locales, and see if we can reuse it, to save disk space.  */
-  other_paths = siblings (output_path);
+  /* Compare the file with the locale data files for the same category
+     in other locales, and see if we can reuse it, to save disk space.
+     If the user specified --no-hard-links to localedef then hard_links
+     is false, other_paths remains NULL and we skip the optimization
+     below.  The use of --no-hard-links is distribution specific since
+     some distros have post-processing hard-link steps and so doing this
+     here is a waste of time.  Worse than a waste of time in rpm-based
+     distributions it can result in build determinism issues from
+     build-to-build since some files may get a hard link in one pass but
+     not in another (if the files happened to be created in parallel).  */
+  if (hard_links)
+    other_paths = siblings (output_path);
+
+  /* If there are other paths, then walk the sibling paths looking for
+     files with the same content so we can hard link and reduce disk
+     space usage.  */
   if (other_paths != NULL)
     {
       struct stat64 fname_stat;
@@ -920,9 +931,8 @@ failure while writing data for category `%s'"), category));
 			      unlink (fname);
 			      if (rename (tmp_fname, fname) < 0)
 				{
-				  if (!be_quiet)
-				    WITH_CUR_LOCALE (error (0, errno, _("\
-cannot create output file `%s' for category `%s'"), fname, category));
+				  record_error (0, errno, _("\
+cannot create output file `%s' for category `%s'"), fname, category);
 				}
 			      free (tmp_fname);
 			      free (other_fname);

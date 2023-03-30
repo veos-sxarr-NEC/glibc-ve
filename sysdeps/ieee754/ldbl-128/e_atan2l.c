@@ -42,21 +42,22 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
-static const long double
-tiny  = 1.0e-4900L,
+static const _Float128
+tiny  = L(1.0e-4900),
 zero  = 0.0,
-pi_o_4  = 7.85398163397448309615660845819875699e-01L, /* 3ffe921fb54442d18469898cc51701b8 */
-pi_o_2  = 1.57079632679489661923132169163975140e+00L, /* 3fff921fb54442d18469898cc51701b8 */
-pi      = 3.14159265358979323846264338327950280e+00L, /* 4000921fb54442d18469898cc51701b8 */
-pi_lo   = 8.67181013012378102479704402604335225e-35L; /* 3f8dcd129024e088a67cc74020bbea64 */
+pi_o_4  = L(7.85398163397448309615660845819875699e-01), /* 3ffe921fb54442d18469898cc51701b8 */
+pi_o_2  = L(1.57079632679489661923132169163975140e+00), /* 3fff921fb54442d18469898cc51701b8 */
+pi      = L(3.14159265358979323846264338327950280e+00), /* 4000921fb54442d18469898cc51701b8 */
+pi_lo   = L(8.67181013012378102479704402604335225e-35); /* 3f8dcd129024e088a67cc74020bbea64 */
 
-long double
-__ieee754_atan2l(long double y, long double x)
+_Float128
+__ieee754_atan2l(_Float128 y, _Float128 x)
 {
-	long double z;
+	_Float128 z;
 	int64_t k,m,hx,hy,ix,iy;
-	u_int64_t lx,ly;
+	uint64_t lx,ly;
 
 	GET_LDOUBLE_WORDS64(hx,lx,x);
 	ix = hx&0x7fffffffffffffffLL;
@@ -86,8 +87,8 @@ __ieee754_atan2l(long double y, long double x)
 		switch(m) {
 		    case 0: return  pi_o_4+tiny;/* atan(+INF,+INF) */
 		    case 1: return -pi_o_4-tiny;/* atan(-INF,+INF) */
-		    case 2: return  3.0L*pi_o_4+tiny;/*atan(+INF,-INF)*/
-		    case 3: return -3.0L*pi_o_4-tiny;/*atan(-INF,-INF)*/
+		    case 2: return  3*pi_o_4+tiny;/*atan(+INF,-INF)*/
+		    case 3: return -3*pi_o_4-tiny;/*atan(-INF,-INF)*/
 		}
 	    } else {
 		switch(m) {
@@ -103,13 +104,13 @@ __ieee754_atan2l(long double y, long double x)
 
     /* compute y/x */
 	k = (iy-ix)>>48;
-	if(k > 120) z=pi_o_2+0.5L*pi_lo;	/* |y/x| >  2**120 */
-	else if(hx<0&&k<-120) z=0.0L;		/* |y|/x < -2**120 */
+	if(k > 120) z=pi_o_2+L(0.5)*pi_lo;	/* |y/x| >  2**120 */
+	else if(hx<0&&k<-120) z=0;		/* |y|/x < -2**120 */
 	else z=__atanl(fabsl(y/x));		/* safe to do y/x */
 	switch (m) {
 	    case 0: return       z  ;	/* atan(+,+) */
 	    case 1: {
-		      u_int64_t zh;
+		      uint64_t zh;
 		      GET_LDOUBLE_MSW64(zh,z);
 		      SET_LDOUBLE_MSW64(z,zh ^ 0x8000000000000000ULL);
 		    }
@@ -119,4 +120,4 @@ __ieee754_atan2l(long double y, long double x)
 		    return  (z-pi_lo)-pi;/* atan(-,-) */
 	}
 }
-strong_alias (__ieee754_atan2l, __atan2l_finite)
+libm_alias_finite (__ieee754_atan2l, __atan2l)

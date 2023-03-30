@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, August 1995.
 
@@ -14,29 +14,20 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
 #include <sys/msg.h>
 #include <ipc_priv.h>
-
 #include <sysdep-cancel.h>
-#include <sys/syscall.h>
 
 int
 __libc_msgsnd (int msqid, const void *msgp, size_t msgsz, int msgflg)
 {
-  if (SINGLE_THREAD_P)
-    return INLINE_SYSCALL (ipc, 5, IPCOP_msgsnd, msqid, msgsz,
-			   msgflg, (void *) msgp);
-
-  int oldtype = LIBC_CANCEL_ASYNC ();
-
-  int result = INLINE_SYSCALL (ipc, 5, IPCOP_msgsnd, msqid, msgsz,
-			       msgflg, (void *) msgp);
-
-  LIBC_CANCEL_RESET (oldtype);
-
-  return result;
+#ifdef __ASSUME_DIRECT_SYSVIPC_SYSCALLS
+  return SYSCALL_CANCEL (msgsnd, msqid, msgp, msgsz, msgflg);
+#else
+  return SYSCALL_CANCEL (ipc, IPCOP_msgsnd, msqid, msgsz, msgflg,
+			 msgp);
+#endif
 }
 weak_alias (__libc_msgsnd, msgsnd)

@@ -1,4 +1,5 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* ABI compatibility for 'longjmp' and 'siglongjmp' symbols in libpthread ABI.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,15 +15,35 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <setjmp.h>
-#include <stdlib.h>
-#include "pthreadP.h"
+#include <shlib-compat.h>
 
-void
-longjmp (jmp_buf env, int val)
+/* libpthread once had its own longjmp (and siglongjmp alias), though there
+   was no apparent reason for it.  There is no use in having a separate
+   symbol in libpthread, but the historical ABI requires it.  For static
+   linking, there is no need to provide anything here--the libc version
+   will be linked in.  For shared library ABI compatibility, there must be
+   longjmp and siglongjmp symbols in libpthread.so.
+
+   With an IFUNC resolver, it would be possible to avoid the indirection,
+   but the IFUNC resolver might run before the __libc_longjmp symbol has
+   been relocated, in which case the IFUNC resolver would not be able to
+   provide the correct address.  */
+
+#if SHLIB_COMPAT (libpthread, GLIBC_2_0, GLIBC_2_22)
+
+static void __attribute__ ((noreturn, used))
+longjmp_compat (jmp_buf env, int val)
 {
   __libc_longjmp (env, val);
 }
-weak_alias (longjmp, siglongjmp)
+
+strong_alias (longjmp_compat, longjmp_alias)
+compat_symbol (libpthread, longjmp_alias, longjmp, GLIBC_2_0);
+
+strong_alias (longjmp_alias, siglongjmp_alias)
+compat_symbol (libpthread, siglongjmp_alias, siglongjmp, GLIBC_2_0);
+
+#endif

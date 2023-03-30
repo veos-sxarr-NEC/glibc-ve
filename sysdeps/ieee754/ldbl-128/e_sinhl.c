@@ -33,7 +33,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __ieee754_sinhl(x)
  * Method :
@@ -53,17 +53,20 @@
  *      only sinhl(0)=0 is exact for finite x.
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
-static const long double one = 1.0, shuge = 1.0e4931L,
-ovf_thresh = 1.1357216553474703894801348310092223067821E4L;
+static const _Float128 one = 1.0, shuge = L(1.0e4931),
+ovf_thresh = L(1.1357216553474703894801348310092223067821E4);
 
-long double
-__ieee754_sinhl (long double x)
+_Float128
+__ieee754_sinhl (_Float128 x)
 {
-  long double t, w, h;
-  u_int32_t jx, ix;
+  _Float128 t, w, h;
+  uint32_t jx, ix;
   ieee854_long_double_shape_type u;
 
   /* Words of |x|. */
@@ -86,8 +89,11 @@ __ieee754_sinhl (long double x)
   if (ix <= 0x40044000)
     {
       if (ix < 0x3fc60000) /* |x| < 2^-57 */
-	if (shuge + x > one)
-	  return x;		/* sinh(tiny) = tiny with inexact */
+	{
+	  math_check_force_underflow (x);
+	  if (shuge + x > one)
+	    return x;		/* sinh(tiny) = tiny with inexact */
+	}
       t = __expm1l (u.value);
       if (ix < 0x3fff0000)
 	return h * (2.0 * t - t * t / (t + one));
@@ -110,4 +116,4 @@ __ieee754_sinhl (long double x)
   /* |x| > overflowthreshold, sinhl(x) overflow */
   return x * shuge;
 }
-strong_alias (__ieee754_sinhl, __sinhl_finite)
+libm_alias_finite (__ieee754_sinhl, __sinhl)

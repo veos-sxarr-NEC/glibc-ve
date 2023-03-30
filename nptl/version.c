@@ -1,5 +1,5 @@
 /* Entry point for libpthread DSO.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -15,21 +15,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <sysdep.h>
 
 
 static const char banner[] =
-#include "banner.h"
-"Copyright (C) 2015 Free Software Foundation, Inc.\n\
+"Native POSIX Threads Library\n\
+Copyright (C) 2020 Free Software Foundation, Inc.\n\
 This is free software; see the source for copying conditions.\n\
 There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A\n\
 PARTICULAR PURPOSE.\n"
-#ifdef HAVE_FORCED_UNWIND
 "Forced unwind support included.\n"
-#endif
 ;
 
 
@@ -38,6 +36,10 @@ __attribute__ ((noreturn))
 void
 __nptl_main (void)
 {
+#ifdef __ve__
+  write (STDOUT_FILENO, banner, sizeof banner - 1);
+#else
   __libc_write (STDOUT_FILENO, banner, sizeof banner - 1);
+#endif
   _exit (0);
 }

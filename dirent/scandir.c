@@ -1,4 +1,4 @@
-/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,36 +13,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-
-/* We need to avoid the header declaration of scandir64, because
-   the types don't match scandir and then the compiler will
-   complain about the mismatch when we do the alias below.  */
-#define scandir64       __renamed_scandir64
+   <https://www.gnu.org/licenses/>.  */
 
 #include <dirent.h>
 
-#undef  scandir64
-
-#include <fcntl.h>
-
-#ifndef SCANDIR
-# define SCANDIR scandir
-# define SCANDIRAT scandirat
-# define DIRENT_TYPE struct dirent
-#endif
-
-
+#if !_DIRENT_MATCHES_DIRENT64
 int
-SCANDIR (dir, namelist, select, cmp)
-     const char *dir;
-     DIRENT_TYPE ***namelist;
-     int (*select) (const DIRENT_TYPE *);
-     int (*cmp) (const DIRENT_TYPE **, const DIRENT_TYPE **);
+scandir (const char *dir, struct dirent ***namelist,
+	 int (*select) (const struct dirent *),
+	 int (*cmp) (const struct dirent **, const struct dirent **))
 {
-  return SCANDIRAT (AT_FDCWD, dir, namelist, select, cmp);
+  return __scandir_tail (__opendir (dir), namelist, select, cmp);
 }
-
-#ifdef _DIRENT_MATCHES_DIRENT64
-weak_alias (scandir, scandir64)
 #endif

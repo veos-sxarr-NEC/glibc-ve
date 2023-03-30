@@ -1,6 +1,6 @@
 /* Modify saved context.
 
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -27,6 +27,7 @@
 
 	.text
 ENTRY(__swapcontext)
+	DELOUSE (0)
 	/* Set the value returned when swapcontext() returns in this context. */
 	str	xzr,      [x0, oX0 +  0 * SZREG]
 
@@ -54,10 +55,10 @@ ENTRY(__swapcontext)
 
 	/* Fill in the FP SIMD context.  */
 	add	x3, x2, #oV0 + 8 * SZVREG
-	stp	 d8,  d9, [x3], #2 * SZVREG
-	stp	d10, d11, [x3], #2 * SZVREG
-	stp	d12, d13, [x3], #2 * SZVREG
-	stp	d14, d15, [x3], #2 * SZVREG
+	stp	 q8,  q9, [x3], #2 * SZVREG
+	stp	q10, q11, [x3], #2 * SZVREG
+	stp	q12, q13, [x3], #2 * SZVREG
+	stp	q14, q15, [x3], #2 * SZVREG
 
 	add	x3, x2, #oFPSR
 

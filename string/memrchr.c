@@ -1,5 +1,5 @@
 /* memrchr -- find the last occurrence of a byte in a memory block
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Based on strlen implementation by Torbjorn Granlund (tege@sics.se),
    with help from Dan Sahlin (dan@sics.se) and
@@ -19,16 +19,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
-
-#undef __ptr_t
-#define __ptr_t void *
 
 #if defined _LIBC
 # include <string.h>
@@ -55,16 +52,13 @@
 #endif
 
 /* Search no more than N bytes of S for C.  */
-__ptr_t
+void *
 #ifndef MEMRCHR
 __memrchr
 #else
 MEMRCHR
 #endif
-     (s, c_in, n)
-     const __ptr_t s;
-     int c_in;
-     size_t n;
+     (const void *s, int c_in, size_t n)
 {
   const unsigned char *char_ptr;
   const unsigned long int *longword_ptr;
@@ -80,7 +74,7 @@ MEMRCHR
 		 & (sizeof (longword) - 1)) != 0;
        --n)
     if (*--char_ptr == c)
-      return (__ptr_t) char_ptr;
+      return (void *) char_ptr;
 
   /* All these elucidatory comments refer to 4-byte longwords,
      but the theory applies equally well to 8-byte longwords.  */
@@ -96,15 +90,8 @@ MEMRCHR
 
      The 1-bits make sure that carries propagate to the next 0-bit.
      The 0-bits provide holes for carries to fall into.  */
-
-  if (sizeof (longword) != 4 && sizeof (longword) != 8)
-    abort ();
-
-#if LONG_MAX <= LONG_MAX_32_BITS
-  magic_bits = 0x7efefeff;
-#else
-  magic_bits = ((unsigned long int) 0x7efefefe << 32) | 0xfefefeff;
-#endif
+  magic_bits = -1;
+  magic_bits = magic_bits / 0xff * 0xfe << 1 >> 1 | 1;
 
   /* Set up a longword, each of whose bytes is C.  */
   charmask = c | (c << 8);
@@ -172,22 +159,22 @@ MEMRCHR
 
 #if LONG_MAX > 2147483647
 	  if (cp[7] == c)
-	    return (__ptr_t) &cp[7];
+	    return (void *) &cp[7];
 	  if (cp[6] == c)
-	    return (__ptr_t) &cp[6];
+	    return (void *) &cp[6];
 	  if (cp[5] == c)
-	    return (__ptr_t) &cp[5];
+	    return (void *) &cp[5];
 	  if (cp[4] == c)
-	    return (__ptr_t) &cp[4];
+	    return (void *) &cp[4];
 #endif
 	  if (cp[3] == c)
-	    return (__ptr_t) &cp[3];
+	    return (void *) &cp[3];
 	  if (cp[2] == c)
-	    return (__ptr_t) &cp[2];
+	    return (void *) &cp[2];
 	  if (cp[1] == c)
-	    return (__ptr_t) &cp[1];
+	    return (void *) &cp[1];
 	  if (cp[0] == c)
-	    return (__ptr_t) cp;
+	    return (void *) cp;
 	}
 
       n -= sizeof (longword);
@@ -198,7 +185,7 @@ MEMRCHR
   while (n-- > 0)
     {
       if (*--char_ptr == c)
-	return (__ptr_t) char_ptr;
+	return (void *) char_ptr;
     }
 
   return 0;

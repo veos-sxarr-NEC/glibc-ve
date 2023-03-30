@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,17 +14,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include "pthreadP.h"
 
 
 int
-__pthread_condattr_init (attr)
-     pthread_condattr_t *attr;
+__pthread_condattr_init (pthread_condattr_t *attr)
 {
-  memset (attr, '\0', sizeof (*attr));
+  ASSERT_TYPE_SIZE (pthread_condattr_t, __SIZEOF_PTHREAD_CONDATTR_T);
+  ASSERT_PTHREAD_INTERNAL_SIZE (pthread_condattr_t,
+				struct pthread_condattr);
+
+  struct pthread_condattr *iattr = (struct pthread_condattr *) attr;
+  /* Default is not pshared and CLOCK_REALTIME.  */
+  iattr-> value = CLOCK_REALTIME << 1;
 
   return 0;
 }

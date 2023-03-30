@@ -1,7 +1,7 @@
 /*
  * IBM Accurate Mathematical Library
  * Written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2001-2020 Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,7 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 /************************************************************************/
@@ -81,8 +81,6 @@ extern const mp_no __mptwo;
 #define  EY  y->e
 #define  EZ  z->e
 
-#define ABS(x)   ((x) <  0  ? -(x) : (x))
-
 #ifndef RADIXI
 # define  RADIXI    0x1.0p-24		/* 2^-24   */
 #endif
@@ -121,36 +119,5 @@ void __dvd (const mp_no *, const mp_no *, mp_no *, int);
 extern void __mpatan (mp_no *, mp_no *, int);
 extern void __mpatan2 (mp_no *, mp_no *, mp_no *, int);
 extern void __mpsqrt (mp_no *, mp_no *, int);
-extern void __mpexp (mp_no *, mp_no *, int);
 extern void __c32 (mp_no *, mp_no *, mp_no *, int);
 extern int __mpranred (double, mp_no *, int);
-
-/* Given a power POW, build a multiprecision number 2^POW.  */
-static inline void
-__pow_mp (int pow, mp_no *y, int p)
-{
-  int i, rem;
-
-  /* The exponent is E such that E is a factor of 2^24.  The remainder (of the
-     form 2^x) goes entirely into the first digit of the mantissa as it is
-     always less than 2^24.  */
-  EY = pow / 24;
-  rem = pow - EY * 24;
-  EY++;
-
-  /* If the remainder is negative, it means that POW was negative since
-     |EY * 24| <= |pow|.  Adjust so that REM is positive and still less than
-     24 because of which, the mantissa digit is less than 2^24.  */
-  if (rem < 0)
-    {
-      EY--;
-      rem += 24;
-    }
-  /* The sign of any 2^x is always positive.  */
-  Y[0] = 1;
-  Y[1] = 1 << rem;
-
-  /* Everything else is 0.  */
-  for (i = 2; i <= p; i++)
-    Y[i] = 0;
-}

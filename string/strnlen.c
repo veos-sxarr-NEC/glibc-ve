@@ -1,5 +1,5 @@
 /* Find the length of STRING, but scan at most MAXLEN characters.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    Contributed by Jakub Jelinek <jakub@redhat.com>.
 
    Based on strlen written by Torbjorn Granlund (tege@sics.se),
@@ -18,7 +18,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <stdlib.h>
@@ -160,6 +160,7 @@ __strnlen (const char *str, size_t maxlen)
   return char_ptr - str;
 }
 #ifndef STRNLEN
+libc_hidden_def (__strnlen)
 weak_alias (__strnlen, strnlen)
 #endif
 libc_hidden_def (strnlen)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -39,8 +39,7 @@
 static void
 check_one_fd (int fd, int mode)
 {
-  /* Note that fcntl() with this parameter is not a cancellation point.  */
-  if (__builtin_expect (__libc_fcntl (fd, F_GETFD), 0) == -1
+  if (__builtin_expect (__fcntl64_nocancel (fd, F_GETFD), 0) == -1
       && errno == EBADF)
     {
       const char *name;
@@ -50,18 +49,18 @@ check_one_fd (int fd, int mode)
       if ((mode & O_ACCMODE) == O_WRONLY)
 	{
 	  name = _PATH_DEV "full";
-	  dev = makedev (DEV_FULL_MAJOR, DEV_FULL_MINOR);
+	  dev = __gnu_dev_makedev (DEV_FULL_MAJOR, DEV_FULL_MINOR);
 	}
       else
 	{
 	  name = _PATH_DEVNULL;
-	  dev = makedev (DEV_NULL_MAJOR, DEV_NULL_MINOR);
+	  dev = __gnu_dev_makedev (DEV_NULL_MAJOR, DEV_NULL_MINOR);
 	}
 
       /* Something is wrong with this descriptor, it's probably not
 	 opened.  Open /dev/null so that the SUID program we are
 	 about to start does not accidentally use this descriptor.  */
-      int nullfd = open_not_cancel (name, mode, 0);
+      int nullfd = __open_nocancel (name, mode, 0);
 
       /* We are very paranoid here.  With all means we try to ensure
 	 that we are actually opening the /dev/null device and nothing
@@ -87,14 +86,10 @@ check_one_fd (int fd, int mode)
 void
 __libc_check_standard_fds (void)
 {
-  /* This is really paranoid but some people actually are.  If /dev/null
-     should happen to be a symlink to somewhere else and not the device
-     commonly known as "/dev/null" we bail out.  We can detect this with
-     the O_NOFOLLOW flag for open() but only on some system.  */
-#ifndef O_NOFOLLOW
-# define O_NOFOLLOW	0
-#endif
-  /* Check all three standard file descriptors.  */
+  /* Check all three standard file descriptors.  The O_NOFOLLOW flag
+     is really paranoid but some people actually are.  If /dev/null
+     should happen to be a symlink to somewhere else and not the
+     device commonly known as "/dev/null" we bail out.  */
   check_one_fd (STDIN_FILENO, O_WRONLY | O_NOFOLLOW);
   check_one_fd (STDOUT_FILENO, O_RDONLY | O_NOFOLLOW);
   check_one_fd (STDERR_FILENO, O_RDONLY | O_NOFOLLOW);

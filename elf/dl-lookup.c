@@ -1,5 +1,5 @@
 /* Look up a symbol in the loaded objects.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <libintl.h>
@@ -25,7 +25,7 @@
 #include <dl-hash.h>
 #include <dl-machine.h>
 #include <sysdep-cancel.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <tls.h>
 #include <atomic.h>
 
@@ -46,23 +46,6 @@ struct sym_val
     struct link_map *m;
   };
 
-
-#define make_string(string, rest...) \
-  ({									      \
-    const char *all[] = { string, ## rest };				      \
-    size_t len, cnt;							      \
-    char *result, *cp;							      \
-									      \
-    len = 1;								      \
-    for (cnt = 0; cnt < sizeof (all) / sizeof (all[0]); ++cnt)		      \
-      len += strlen (all[cnt]);						      \
-									      \
-    cp = result = alloca (len);						      \
-    for (cnt = 0; cnt < sizeof (all) / sizeof (all[0]); ++cnt)		      \
-      cp = __stpcpy (cp, all[cnt]);					      \
-									      \
-    result;								      \
-  })
 
 /* Statistics function.  */
 #ifdef SHARED
@@ -93,6 +76,7 @@ check_match (const char *const undef_name,
   unsigned int stt = ELFW(ST_TYPE) (sym->st_info);
   assert (ELF_RTYPE_CLASS_PLT == 1);
   if (__glibc_unlikely ((sym->st_value == 0 /* No value.  */
+			 && sym->st_shndx != SHN_ABS
 			 && stt != STT_TLS)
 			|| ELF_MACHINE_SYM_NO_MATCH (sym)
 			|| (type_class & (sym->st_shndx == SHN_UNDEF))))
@@ -203,14 +187,37 @@ enter_unique_sym (struct unique_sym *table, size_t size,
   table[idx].map = map;
 }
 
+/* Mark MAP as NODELETE according to the lookup mode in FLAGS.  During
+   initial relocation, NODELETE state is pending only.  */
+static void
+mark_nodelete (struct link_map *map, int flags)
+{
+  if (flags & DL_LOOKUP_FOR_RELOCATE)
+    map->l_nodelete_pending = true;
+  else
+    map->l_nodelete_active = true;
+}
+
+/* Return true if MAP is marked as NODELETE according to the lookup
+   mode in FLAGS> */
+static bool
+is_nodelete (struct link_map *map, int flags)
+{
+  /* Non-pending NODELETE always counts.  Pending NODELETE only counts
+     during initial relocation processing.  */
+  return map->l_nodelete_active
+    || ((flags & DL_LOOKUP_FOR_RELOCATE) && map->l_nodelete_pending);
+}
+
 /* Utility function for do_lookup_x. Lookup an STB_GNU_UNIQUE symbol
    in the unique symbol table, creating a new entry if necessary.
    Return the matching symbol in RESULT.  */
 static void
 do_lookup_unique (const char *undef_name, uint_fast32_t new_hash,
-		  const struct link_map *map, struct sym_val *result,
+		  struct link_map *map, struct sym_val *result,
 		  int type_class, const ElfW(Sym) *sym, const char *strtab,
-		  const ElfW(Sym) *ref, const struct link_map *undef_map)
+		  const ElfW(Sym) *ref, const struct link_map *undef_map,
+		  int flags)
 {
   /* We have to determine whether we already found a symbol with this
      name before.  If not then we have to add it to the search table.
@@ -238,7 +245,7 @@ do_lookup_unique (const char *undef_name, uint_fast32_t new_hash,
 		     copy from the copy addressed through the
 		     relocation.  */
 		  result->s = sym;
-		  result->m = (struct link_map *) map;
+		  result->m = map;
 		}
 	      else
 		{
@@ -326,10 +333,16 @@ do_lookup_unique (const char *undef_name, uint_fast32_t new_hash,
       enter_unique_sym (entries, size,
                         new_hash, strtab + sym->st_name, sym, map);
 
-      if (map->l_type == lt_loaded)
-	/* Make sure we don't unload this object by
-	   setting the appropriate flag.  */
-	((struct link_map *) map)->l_flags_1 |= DF_1_NODELETE;
+      if (map->l_type == lt_loaded && !is_nodelete (map, flags))
+	{
+	  /* Make sure we don't unload this object by
+	     setting the appropriate flag.  */
+	  if (__glibc_unlikely (GLRO (dl_debug_mask) & DL_DEBUG_BINDINGS))
+	    _dl_debug_printf ("\
+marking %s [%lu] as NODELETE due to unique symbol\n",
+			      map->l_name, map->l_ns);
+	  mark_nodelete (map, flags);
+	}
     }
   ++tab->n_elements;
 
@@ -419,7 +432,7 @@ do_lookup_x (const char *undef_name, uint_fast32_t new_hash,
 		  do
 		    if (((*hasharr ^ new_hash) >> 1) == 0)
 		      {
-			symidx = hasharr - map->l_gnu_chain_zero;
+			symidx = ELF_MACHINE_HASH_SYMIDX (map, hasharr);
 			sym = check_match (undef_name, ref, version, flags,
 					   type_class, &symtab[symidx], symidx,
 					   strtab, map, &versioned_sym,
@@ -463,6 +476,63 @@ do_lookup_x (const char *undef_name, uint_fast32_t new_hash,
       if (sym != NULL)
 	{
 	found_it:
+	  /* When UNDEF_MAP is NULL, which indicates we are called from
+	     do_lookup_x on relocation against protected data, we skip
+	     the data definion in the executable from copy reloc.  */
+	  if (ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA
+	      && undef_map == NULL
+	      && map->l_type == lt_executable
+	      && type_class == ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA)
+	    {
+	      const ElfW(Sym) *s;
+	      unsigned int i;
+
+#if ! ELF_MACHINE_NO_RELA
+	      if (map->l_info[DT_RELA] != NULL
+		  && map->l_info[DT_RELASZ] != NULL
+		  && map->l_info[DT_RELASZ]->d_un.d_val != 0)
+		{
+		  const ElfW(Rela) *rela
+		    = (const ElfW(Rela) *) D_PTR (map, l_info[DT_RELA]);
+		  unsigned int rela_count
+		    = map->l_info[DT_RELASZ]->d_un.d_val / sizeof (*rela);
+
+		  for (i = 0; i < rela_count; i++, rela++)
+		    if (elf_machine_type_class (ELFW(R_TYPE) (rela->r_info))
+			== ELF_RTYPE_CLASS_COPY)
+		      {
+			s = &symtab[ELFW(R_SYM) (rela->r_info)];
+			if (!strcmp (strtab + s->st_name, undef_name))
+			  goto skip;
+		      }
+		}
+#endif
+#if ! ELF_MACHINE_NO_REL
+	      if (map->l_info[DT_REL] != NULL
+		  && map->l_info[DT_RELSZ] != NULL
+		  && map->l_info[DT_RELSZ]->d_un.d_val != 0)
+		{
+		  const ElfW(Rel) *rel
+		    = (const ElfW(Rel) *) D_PTR (map, l_info[DT_REL]);
+		  unsigned int rel_count
+		    = map->l_info[DT_RELSZ]->d_un.d_val / sizeof (*rel);
+
+		  for (i = 0; i < rel_count; i++, rel++)
+		    if (elf_machine_type_class (ELFW(R_TYPE) (rel->r_info))
+			== ELF_RTYPE_CLASS_COPY)
+		      {
+			s = &symtab[ELFW(R_SYM) (rel->r_info)];
+			if (!strcmp (strtab + s->st_name, undef_name))
+			  goto skip;
+		      }
+		}
+#endif
+	    }
+
+	  /* Hidden and internal symbols are local, ignore them.  */
+	  if (__glibc_unlikely (dl_symbol_visibility_binds_local_p (sym)))
+	    goto skip;
+
 	  switch (ELFW(ST_BIND) (sym->st_info))
 	    {
 	    case STB_WEAK:
@@ -484,8 +554,9 @@ do_lookup_x (const char *undef_name, uint_fast32_t new_hash,
 	      return 1;
 
 	    case STB_GNU_UNIQUE:;
-	      do_lookup_unique (undef_name, new_hash, map, result, type_class,
-				sym, strtab, ref, undef_map);
+	      do_lookup_unique (undef_name, new_hash, (struct link_map *) map,
+				result, type_class, sym, strtab, ref,
+				undef_map, flags);
 	      return 1;
 
 	    default:
@@ -494,11 +565,8 @@ do_lookup_x (const char *undef_name, uint_fast32_t new_hash,
 	    }
 	}
 
-      /* If this current map is the one mentioned in the verneed entry
-	 and we have not found a weak entry, it is a bug.  */
-      if (symidx == STN_UNDEF && version != NULL && version->filename != NULL
-	  && __glibc_unlikely (_dl_name_match_p (version->filename, map)))
-	return -1;
+skip:
+      ;
     }
   while (++i < n);
 
@@ -519,7 +587,6 @@ dl_new_hash (const char *s)
 
 /* Add extra dependency on MAP to UNDEF_MAP.  */
 static int
-internal_function
 add_dependency (struct link_map *undef_map, struct link_map *map, int flags)
 {
   struct link_map *runp;
@@ -531,9 +598,13 @@ add_dependency (struct link_map *undef_map, struct link_map *map, int flags)
   if (undef_map == map)
     return 0;
 
-  /* Avoid references to objects which cannot be unloaded anyway.  */
+  /* Avoid references to objects which cannot be unloaded anyway.  We
+     do not need to record dependencies if this object goes away
+     during dlopen failure, either.  IFUNC resolvers with relocation
+     dependencies may pick an dependency which can be dlclose'd, but
+     such IFUNC resolvers are undefined anyway.  */
   assert (map->l_type == lt_loaded);
-  if ((map->l_flags_1 & DF_1_NODELETE) != 0)
+  if (is_nodelete (map, flags))
     return 0;
 
   struct link_map_reldeps *l_reldeps
@@ -641,16 +712,28 @@ add_dependency (struct link_map *undef_map, struct link_map *map, int flags)
 
       /* Redo the NODELETE check, as when dl_load_lock wasn't held
 	 yet this could have changed.  */
-      if ((map->l_flags_1 & DF_1_NODELETE) != 0)
+      if (is_nodelete (map, flags))
 	goto out;
 
       /* If the object with the undefined reference cannot be removed ever
 	 just make sure the same is true for the object which contains the
 	 definition.  */
-      if (undef_map->l_type != lt_loaded
-	  || (undef_map->l_flags_1 & DF_1_NODELETE) != 0)
+      if (undef_map->l_type != lt_loaded || is_nodelete (map, flags))
 	{
-	  map->l_flags_1 |= DF_1_NODELETE;
+	  if (__glibc_unlikely (GLRO (dl_debug_mask) & DL_DEBUG_BINDINGS)
+	      && !is_nodelete (map, flags))
+	    {
+	      if (undef_map->l_name[0] == '\0')
+		_dl_debug_printf ("\
+marking %s [%lu] as NODELETE due to reference to main program\n",
+				  map->l_name, map->l_ns);
+	      else
+		_dl_debug_printf ("\
+marking %s [%lu] as NODELETE due to reference to %s [%lu]\n",
+				  map->l_name, map->l_ns,
+				  undef_map->l_name, undef_map->l_ns);
+	    }
+	  mark_nodelete (map, flags);
 	  goto out;
 	}
 
@@ -675,7 +758,15 @@ add_dependency (struct link_map *undef_map, struct link_map *map, int flags)
 		 no fatal problem.  We simply make sure the referenced object
 		 cannot be unloaded.  This is semantically the correct
 		 behavior.  */
-	      map->l_flags_1 |= DF_1_NODELETE;
+	      if (__glibc_unlikely (GLRO (dl_debug_mask) & DL_DEBUG_BINDINGS)
+		  && !is_nodelete (map, flags))
+		_dl_debug_printf ("\
+marking %s [%lu] as NODELETE due to memory allocation failure\n",
+				  map->l_name, map->l_ns);
+	      /* In case of non-lazy binding, we could actually report
+		 the memory allocation error, but for now, we use the
+		 conservative approximation as well.  */
+	      mark_nodelete (map, flags);
 	      goto out;
 	    }
 	  else
@@ -729,7 +820,6 @@ add_dependency (struct link_map *undef_map, struct link_map *map, int flags)
 }
 
 static void
-internal_function
 _dl_debug_bindings (const char *undef_name, struct link_map *undef_map,
 		    const ElfW(Sym) **ref, struct sym_val *value,
 		    const struct r_found_version *version, int type_class,
@@ -743,7 +833,6 @@ _dl_debug_bindings (const char *undef_name, struct link_map *undef_map,
    or in any function which gets called.  If this would happen the audit
    code might create a thread which can throw off all the scope locking.  */
 lookup_t
-internal_function
 _dl_lookup_symbol_x (const char *undef_name, struct link_map *undef_map,
 		     const ElfW(Sym) **ref,
 		     struct r_scope_elem *symbol_scope[],
@@ -757,11 +846,9 @@ _dl_lookup_symbol_x (const char *undef_name, struct link_map *undef_map,
 
   bump_num_relocations ();
 
-  /* No other flag than DL_LOOKUP_ADD_DEPENDENCY or DL_LOOKUP_GSCOPE_LOCK
-     is allowed if we look up a versioned symbol.  */
-  assert (version == NULL
-	  || (flags & ~(DL_LOOKUP_ADD_DEPENDENCY | DL_LOOKUP_GSCOPE_LOCK))
-	     == 0);
+  /* DL_LOOKUP_RETURN_NEWEST does not make sense for versioned
+     lookups.  */
+  assert (version == NULL || !(flags & DL_LOOKUP_RETURN_NEWEST));
 
   size_t i = 0;
   if (__glibc_unlikely (skip_map != NULL))
@@ -771,40 +858,14 @@ _dl_lookup_symbol_x (const char *undef_name, struct link_map *undef_map,
 
   /* Search the relevant loaded objects for a definition.  */
   for (size_t start = i; *scope != NULL; start = 0, ++scope)
-    {
-      int res = do_lookup_x (undef_name, new_hash, &old_hash, *ref,
-			     &current_value, *scope, start, version, flags,
-			     skip_map, type_class, undef_map);
-      if (res > 0)
-	break;
-
-      if (__glibc_unlikely (res < 0) && skip_map == NULL)
-	{
-	  /* Oh, oh.  The file named in the relocation entry does not
-	     contain the needed symbol.  This code is never reached
-	     for unversioned lookups.  */
-	  assert (version != NULL);
-	  const char *reference_name = undef_map ? undef_map->l_name : "";
-
-	  /* XXX We cannot translate the message.  */
-	  _dl_signal_cerror (0, DSO_FILENAME (reference_name),
-			     N_("relocation error"),
-			     make_string ("symbol ", undef_name, ", version ",
-					  version->name,
-					  " not defined in file ",
-					  version->filename,
-					  " with link time reference",
-					  res == -2
-					  ? " (no version symbols)" : ""));
-	  *ref = NULL;
-	  return 0;
-	}
-    }
+    if (do_lookup_x (undef_name, new_hash, &old_hash, *ref,
+		     &current_value, *scope, start, version, flags,
+		     skip_map, type_class, undef_map) != 0)
+      break;
 
   if (__glibc_unlikely (current_value.s == NULL))
     {
       if ((*ref == NULL || ELFW(ST_BIND) ((*ref)->st_info) != STB_WEAK)
-	  && skip_map == NULL
 	  && !(GLRO(dl_debug_mask) & DL_DEBUG_UNUSED))
 	{
 	  /* We could find no value for a strong reference.  */
@@ -812,12 +873,14 @@ _dl_lookup_symbol_x (const char *undef_name, struct link_map *undef_map,
 	  const char *versionstr = version ? ", version " : "";
 	  const char *versionname = (version && version->name
 				     ? version->name : "");
-
+	  struct dl_exception exception;
 	  /* XXX We cannot translate the message.  */
-	  _dl_signal_cerror (0, DSO_FILENAME (reference_name),
-			     N_("symbol lookup error"),
-			     make_string ("undefined symbol: ", undef_name,
-					  versionstr, versionname));
+	  _dl_exception_create_format
+	    (&exception, DSO_FILENAME (reference_name),
+	     "undefined symbol: %s%s%s",
+	     undef_name, versionstr, versionname);
+	  _dl_signal_cexception (0, &exception, N_("symbol lookup error"));
+	  _dl_exception_free (&exception);
 	}
       *ref = NULL;
       return 0;
@@ -844,7 +907,12 @@ _dl_lookup_symbol_x (const char *undef_name, struct link_map *undef_map,
 	  for (scope = symbol_scope; *scope != NULL; i = 0, ++scope)
 	    if (do_lookup_x (undef_name, new_hash, &old_hash, *ref,
 			     &protected_value, *scope, i, version, flags,
-			     skip_map, ELF_RTYPE_CLASS_PLT, NULL) != 0)
+			     skip_map,
+			     (ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA
+			      && ELFW(ST_TYPE) ((*ref)->st_info) == STT_OBJECT
+			      && type_class == ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA)
+			     ? ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA
+			     : ELF_RTYPE_CLASS_PLT, NULL) != 0)
 	      break;
 
 	  if (protected_value.s != NULL && protected_value.m != undef_map)
@@ -889,19 +957,14 @@ _dl_lookup_symbol_x (const char *undef_name, struct link_map *undef_map,
 /* Cache the location of MAP's hash table.  */
 
 void
-internal_function
 _dl_setup_hash (struct link_map *map)
 {
   Elf_Symndx *hash;
 
-  if (__glibc_likely (map->l_info[DT_ADDRTAGIDX (DT_GNU_HASH) + DT_NUM
-				    + DT_THISPROCNUM + DT_VERSIONTAGNUM
-				    + DT_EXTRANUM + DT_VALNUM] != NULL))
+  if (__glibc_likely (map->l_info[ELF_MACHINE_GNU_HASH_ADDRIDX] != NULL))
     {
       Elf32_Word *hash32
-	= (void *) D_PTR (map, l_info[DT_ADDRTAGIDX (DT_GNU_HASH) + DT_NUM
-				      + DT_THISPROCNUM + DT_VERSIONTAGNUM
-				      + DT_EXTRANUM + DT_VALNUM]);
+	= (void *) D_PTR (map, l_info[ELF_MACHINE_GNU_HASH_ADDRIDX]);
       map->l_nbuckets = *hash32++;
       Elf32_Word symbias = *hash32++;
       Elf32_Word bitmask_nwords = *hash32++;
@@ -916,6 +979,10 @@ _dl_setup_hash (struct link_map *map)
       map->l_gnu_buckets = hash32;
       hash32 += map->l_nbuckets;
       map->l_gnu_chain_zero = hash32 - symbias;
+
+      /* Initialize MIPS xhash translation table.  */
+      ELF_MACHINE_XHASH_SETUP (hash32, symbias, map);
+
       return;
     }
 
@@ -933,7 +1000,6 @@ _dl_setup_hash (struct link_map *map)
 
 
 static void
-internal_function
 _dl_debug_bindings (const char *undef_name, struct link_map *undef_map,
 		    const ElfW(Sym) **ref, struct sym_val *value,
 		    const struct r_found_version *version, int type_class,
@@ -957,6 +1023,18 @@ _dl_debug_bindings (const char *undef_name, struct link_map *undef_map,
 #ifdef SHARED
   if (GLRO(dl_debug_mask) & DL_DEBUG_PRELINK)
     {
+/* ELF_RTYPE_CLASS_XXX must match RTYPE_CLASS_XXX used by prelink with
+   LD_TRACE_PRELINKING.  */
+#define RTYPE_CLASS_VALID	8
+#define RTYPE_CLASS_PLT		(8|1)
+#define RTYPE_CLASS_COPY	(8|2)
+#define RTYPE_CLASS_TLS		(8|4)
+#if ELF_RTYPE_CLASS_PLT != 0 && ELF_RTYPE_CLASS_PLT != 1
+# error ELF_RTYPE_CLASS_PLT must be 0 or 1!
+#endif
+#if ELF_RTYPE_CLASS_COPY != 0 && ELF_RTYPE_CLASS_COPY != 2
+# error ELF_RTYPE_CLASS_COPY must be 0 or 2!
+#endif
       int conflict = 0;
       struct sym_val val = { NULL, NULL };
 
@@ -1012,12 +1090,17 @@ _dl_debug_bindings (const char *undef_name, struct link_map *undef_map,
 
       if (value->s)
 	{
+	  /* Keep only ELF_RTYPE_CLASS_PLT and ELF_RTYPE_CLASS_COPY
+	     bits since since prelink only uses them.  */
+	  type_class &= ELF_RTYPE_CLASS_PLT | ELF_RTYPE_CLASS_COPY;
 	  if (__glibc_unlikely (ELFW(ST_TYPE) (value->s->st_info)
 				== STT_TLS))
-	    type_class = 4;
+	    /* Clear the RTYPE_CLASS_VALID bit in RTYPE_CLASS_TLS.  */
+	    type_class = RTYPE_CLASS_TLS & ~RTYPE_CLASS_VALID;
 	  else if (__glibc_unlikely (ELFW(ST_TYPE) (value->s->st_info)
 				     == STT_GNU_IFUNC))
-	    type_class |= 8;
+	    /* Set the RTYPE_CLASS_VALID bit.  */
+	    type_class |= RTYPE_CLASS_VALID;
 	}
 
       if (conflict

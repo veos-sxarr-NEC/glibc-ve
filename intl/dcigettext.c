@@ -1,5 +1,5 @@
 /* Implementation of the internal dcigettext function.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as published by
@@ -12,7 +12,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Tell glibc's <string.h> to provide a prototype for mempcpy().
    This must come before <config.h> because <config.h> may include
@@ -59,6 +59,7 @@ extern int errno;
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #if defined HAVE_UNISTD_H || defined _LIBC
@@ -103,7 +104,7 @@ extern int errno;
 
 /* Handle multi-threaded applications.  */
 #ifdef _LIBC
-# include <bits/libc-lock.h>
+# include <libc-lock.h>
 # define gl_rwlock_define_initialized __libc_rwlock_define_initialized
 # define gl_rwlock_rdlock __libc_rwlock_rdlock
 # define gl_rwlock_wrlock __libc_rwlock_wrlock
@@ -131,6 +132,7 @@ extern int errno;
 /* Rename the non ANSI C functions.  This is required by the standard
    because some ANSI C functions will require linking with this object
    file and the name space must not be polluted.  */
+# define strdup __strdup
 # define getcwd __getcwd
 # ifndef stpcpy
 #  define stpcpy __stpcpy
@@ -187,7 +189,7 @@ static void *mempcpy (void *dest, const void *src, size_t n);
 #endif
 
 #if !defined PATH_MAX && defined _PC_PATH_MAX
-# define PATH_MAX (pathconf ("/", _PC_PATH_MAX) < 1 ? 1024 : pathconf ("/", _PC_PATH_MAX))
+# define PATH_MAX (__pathconf ("/", _PC_PATH_MAX) < 1 ? 1024 : __pathconf ("/", _PC_PATH_MAX))
 #endif
 
 /* Don't include sys/param.h if it already has been.  */
@@ -345,30 +347,25 @@ struct binding *_nl_domain_bindings;
 /* Prototypes for local functions.  */
 static char *plural_lookup (struct loaded_l10nfile *domain,
 			    unsigned long int n,
-			    const char *translation, size_t translation_len)
-     internal_function;
+			    const char *translation, size_t translation_len);
 
 #ifdef IN_LIBGLOCALE
 static const char *guess_category_value (int category,
 					 const char *categoryname,
-					 const char *localename)
-     internal_function;
+					 const char *localename);
 #else
 static const char *guess_category_value (int category,
-					 const char *categoryname)
-     internal_function;
+					 const char *categoryname);
 #endif
 
 #ifdef _LIBC
 # include "../locale/localeinfo.h"
-# define category_to_name(category) \
-  _nl_category_names.str + _nl_category_name_idxs[category]
+# define category_to_name(category) _nl_category_names_get (category)
 #else
-static const char *category_to_name (int category) internal_function;
+static const char *category_to_name (int category);
 #endif
 #if (defined _LIBC || HAVE_ICONV) && !defined IN_LIBGLOCALE
-static const char *get_output_charset (struct binding *domainbinding)
-     internal_function;
+static const char *get_output_charset (struct binding *domainbinding);
 #endif
 
 
@@ -494,6 +491,7 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
   const char *categoryname;
   const char *categoryvalue;
   const char *dirname;
+  char *xdirname = NULL;
   char *xdomainname;
   char *single_locale;
   char *retval;
@@ -550,7 +548,7 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
 #ifdef HAVE_PER_THREAD_LOCALE
 # ifndef IN_LIBGLOCALE
 #  ifdef _LIBC
-  localename = strdupa (__current_locale_name (category));
+  localename = __current_locale_name (category);
 #  else
   categoryname = category_to_name (category);
 #   define CATEGORYNAME_INITIALIZED
@@ -623,35 +621,17 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
       if (!IS_ABSOLUTE_PATH (dirname))
 	{
 	  /* We have a relative path.  Make it absolute now.  */
-	  size_t dirname_len = strlen (dirname) + 1;
-	  size_t path_max;
-	  char *resolved_dirname;
-	  char *ret;
-
-	  path_max = (unsigned int) PATH_MAX;
-	  path_max += 2;		/* The getcwd docs say to do this.  */
-
-	  for (;;)
-	    {
-	      resolved_dirname = (char *) alloca (path_max + dirname_len);
-	      ADD_BLOCK (block_list, tmp_dirname);
-
-	      __set_errno (0);
-	      ret = getcwd (resolved_dirname, path_max);
-	      if (ret != NULL || errno != ERANGE)
-		break;
-
-	      path_max += path_max / 2;
-	      path_max += PATH_INCR;
-	    }
-
-	  if (ret == NULL)
-	    /* We cannot get the current working directory.  Don't signal an
-	       error but simply return the default string.  */
+	  char *cwd = getcwd (NULL, 0);
+	  if (cwd == NULL)
+	    /* We cannot get the current working directory.  Don't
+	       signal an error but simply return the default
+	       string.  */
 	    goto return_untranslated;
-
-	  stpcpy (stpcpy (strchr (resolved_dirname, '\0'), "/"), dirname);
-	  dirname = resolved_dirname;
+	  int ret = __asprintf (&xdirname, "%s/%s", cwd, dirname);
+	  free (cwd);
+	  if (ret < 0)
+	    goto return_untranslated;
+	  dirname = xdirname;
 	}
 #ifndef IN_LIBGLOCALE
     }
@@ -766,6 +746,7 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
 	    {
 	      /* Found the translation of MSGID1 in domain DOMAIN:
 		 starting at RETVAL, RETLEN bytes.  */
+	      free (xdirname);
 	      FREE_BLOCKS (block_list);
 	      if (foundp == NULL)
 		{
@@ -849,6 +830,7 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
 
  return_untranslated:
   /* Return the untranslated MSGID.  */
+  free (xdirname);
   FREE_BLOCKS (block_list);
   gl_rwlock_unlock (_nl_state_lock);
 #ifdef _LIBC
@@ -866,6 +848,7 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
 #else
       const char *logfilename = getenv ("GETTEXT_LOG_UNTRANSLATED");
 #endif
+
       if (logfilename != NULL && logfilename[0] != '\0')
 	_nl_log_untranslated (logfilename, domainname, msgid1, msgid2, plural);
     }
@@ -884,7 +867,6 @@ DCIGETTEXT (const char *domainname, const char *msgid1, const char *msgid2,
    in case of a memory allocation failure during conversion (only if
    ENCODING != NULL resp. CONVERT == true).  */
 char *
-internal_function
 #ifdef IN_LIBGLOCALE
 _nl_find_msg (struct loaded_l10nfile *domain_file,
 	      struct binding *domainbinding, const char *encoding,
@@ -1417,7 +1399,6 @@ _nl_find_msg (struct loaded_l10nfile *domain_file,
 
 /* Look up a plural variant.  */
 static char *
-internal_function
 plural_lookup (struct loaded_l10nfile *domain, unsigned long int n,
 	       const char *translation, size_t translation_len)
 {
@@ -1455,7 +1436,6 @@ plural_lookup (struct loaded_l10nfile *domain, unsigned long int n,
 #ifndef _LIBC
 /* Return string representation of locale CATEGORY.  */
 static const char *
-internal_function
 category_to_name (int category)
 {
   const char *retval;
@@ -1516,7 +1496,6 @@ category_to_name (int category)
 /* Guess value of current locale from value of the environment variables
    or system-dependent defaults.  */
 static const char *
-internal_function
 #ifdef IN_LIBGLOCALE
 guess_category_value (int category, const char *categoryname,
 		      const char *locale)
@@ -1611,7 +1590,6 @@ guess_category_value (int category, const char *categoryname)
 #if (defined _LIBC || HAVE_ICONV) && !defined IN_LIBGLOCALE
 /* Returns the output charset.  */
 static const char *
-internal_function
 get_output_charset (struct binding *domainbinding)
 {
   /* The output charset should normally be determined by the locale.  But
@@ -1636,6 +1614,7 @@ get_output_charset (struct binding *domainbinding)
 #else
 	  const char *value = getenv ("OUTPUT_CHARSET");
 #endif
+
 	  if (value != NULL && value[0] != '\0')
 	    {
 	      size_t len = strlen (value) + 1;

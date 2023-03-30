@@ -46,8 +46,7 @@
 extern void __mach_error_map_compat (mach_error_t *);
 
 const char *
-mach_error_type( err )
-	mach_error_t		err;
+mach_error_type(mach_error_t err)
 {
 	int sub, system;
 
@@ -60,6 +59,7 @@ mach_error_type( err )
 	||  sub >= errors[system].max_sub ) return( "(?/?)" );
 	return( errors[system].subsystem[sub].subsys_name );
 }
+libc_hidden_def (mach_error_type)
 
 boolean_t mach_error_full_diag = FALSE;
 
@@ -86,8 +86,7 @@ mach_error_string_int(mach_error_t	err,
 }
 
 const char *
-mach_error_string( err )
-	mach_error_t		err;
+mach_error_string(mach_error_t err)
 {
 	boolean_t diag;
 

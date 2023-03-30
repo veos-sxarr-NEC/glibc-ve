@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -14,17 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <langinfo.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <locale/localeinfo.h>
 #include <wcsmbsload.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 
 
 /* These are the descriptions for the default conversion functions.  */
@@ -148,7 +149,6 @@ __libc_rwlock_define (extern, __libc_setlocale_lock attribute_hidden)
 
 /* Load conversion functions for the currently selected locale.  */
 void
-internal_function
 __wcsmbs_load_conv (struct __locale_data *new_category)
 {
   /* Acquire the lock.  */
@@ -215,7 +215,6 @@ __wcsmbs_load_conv (struct __locale_data *new_category)
 
 /* Clone the current conversion function set.  */
 void
-internal_function
 __wcsmbs_clone_conv (struct gconv_fcts *copy)
 {
   const struct gconv_fcts *orig;
@@ -225,18 +224,30 @@ __wcsmbs_clone_conv (struct gconv_fcts *copy)
   /* Copy the data.  */
   *copy = *orig;
 
-  /* Now increment the usage counters.
-     Note: This assumes copy->*_nsteps == 1.  */
+  /* Now increment the usage counters.  Note: This assumes
+     copy->*_nsteps == 1.  The current locale holds a reference, so it
+     is still there after acquiring the lock.  */
+
+  __libc_lock_lock (__gconv_lock);
+
+  bool overflow = false;
   if (copy->towc->__shlib_handle != NULL)
-    ++copy->towc->__counter;
+    overflow |= __builtin_add_overflow (copy->towc->__counter, 1,
+					&copy->towc->__counter);
   if (copy->tomb->__shlib_handle != NULL)
-    ++copy->tomb->__counter;
+    overflow |= __builtin_add_overflow (copy->tomb->__counter, 1,
+					&copy->tomb->__counter);
+
+  __libc_lock_unlock (__gconv_lock);
+
+  if (overflow)
+    __libc_fatal ("\
+Fatal glibc error: gconv module reference counter overflow\n");
 }
 
 
 /* Get converters for named charset.  */
 int
-internal_function
 __wcsmbs_named_conv (struct gconv_fcts *copy, const char *name)
 {
   copy->towc = __wcsmbs_getfct ("INTERNAL", name, &copy->towc_nsteps);
@@ -253,7 +264,7 @@ __wcsmbs_named_conv (struct gconv_fcts *copy, const char *name)
   return 0;
 }
 
-void internal_function
+void
 _nl_cleanup_ctype (struct __locale_data *locale)
 {
   const struct gconv_fcts *const data = locale->private.ctype;

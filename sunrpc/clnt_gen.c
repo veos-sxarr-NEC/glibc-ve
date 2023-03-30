@@ -35,6 +35,7 @@
 #include <rpc/rpc.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <shlib-compat.h>
 
 /*
  * Generic client creation: takes (hostname, program-number, protocol) and
@@ -45,9 +46,6 @@ CLIENT *
 clnt_create (const char *hostname, u_long prog, u_long vers,
 	     const char *proto)
 {
-  struct hostent hostbuf, *h;
-  size_t hstbuflen;
-  char *hsttmpbuf;
   struct protoent protobuf, *p;
   size_t prtbuflen;
   char *prttmpbuf;
@@ -56,11 +54,10 @@ clnt_create (const char *hostname, u_long prog, u_long vers,
   int sock;
   struct timeval tv;
   CLIENT *client;
-  int herr;
 
   if (strcmp (proto, "unix") == 0)
     {
-      __bzero ((char *)&sun, sizeof (sun));
+      memset ((char *)&sun, 0, sizeof (sun));
       sun.sun_family = AF_UNIX;
       strcpy (sun.sun_path, hostname);
       sock = RPC_ANYSOCK;
@@ -78,37 +75,8 @@ clnt_create (const char *hostname, u_long prog, u_long vers,
       return client;
     }
 
-  hstbuflen = 1024;
-  hsttmpbuf = __alloca (hstbuflen);
-  while (__gethostbyname_r (hostname, &hostbuf, hsttmpbuf, hstbuflen,
-			    &h, &herr) != 0
-	 || h == NULL)
-    if (herr != NETDB_INTERNAL || errno != ERANGE)
-      {
-	get_rpc_createerr().cf_stat = RPC_UNKNOWNHOST;
-	return NULL;
-      }
-    else
-      {
-	/* Enlarge the buffer.  */
-	hstbuflen *= 2;
-	hsttmpbuf = __alloca (hstbuflen);
-      }
-
-  if (h->h_addrtype != AF_INET)
-    {
-      /*
-       * Only support INET for now
-       */
-      struct rpc_createerr *ce = &get_rpc_createerr ();
-      ce->cf_stat = RPC_SYSTEMERROR;
-      ce->cf_error.re_errno = EAFNOSUPPORT;
-      return NULL;
-    }
-  sin.sin_family = h->h_addrtype;
-  sin.sin_port = 0;
-  __bzero (sin.sin_zero, sizeof (sin.sin_zero));
-  memcpy ((char *) &sin.sin_addr, h->h_addr, h->h_length);
+  if (__libc_rpc_gethostbyname (hostname, &sin) != 0)
+    return NULL;
 
   prtbuflen = 1024;
   prttmpbuf = __alloca (prtbuflen);

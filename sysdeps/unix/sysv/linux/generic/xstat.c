@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Chris Metcalf <cmetcalf@tilera.com>, 2011.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Ignore prototype to avoid error if we alias __xstat and __xstat64. */
 #define __xstat64 __xstat64_disable
@@ -41,7 +41,7 @@ __xstat (int vers, const char *name, struct stat *buf)
 
 hidden_def (__xstat)
 weak_alias (__xstat, _xstat);
-#ifdef XSTAT_IS_XSTAT64
+#if XSTAT_IS_XSTAT64
 #undef __xstat64
 strong_alias (__xstat, __xstat64);
 hidden_ver (__xstat, __xstat64)

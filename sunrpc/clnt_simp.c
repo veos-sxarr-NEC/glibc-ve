@@ -40,6 +40,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
+#include <shlib-compat.h>
 
 struct callrpc_private_s
   {
@@ -48,11 +49,7 @@ struct callrpc_private_s
     u_long oldprognum, oldversnum, valid;
     char *oldhost;
   };
-#ifdef _RPC_THREAD_SAFE_
 #define callrpc_private RPC_THREAD_VARIABLE(callrpc_private_s)
-#else
-static struct callrpc_private_s *callrpc_private;
-#endif
 
 int
 callrpc (const char *host, u_long prognum, u_long versnum, u_long procnum,
@@ -61,7 +58,6 @@ callrpc (const char *host, u_long prognum, u_long versnum, u_long procnum,
   struct callrpc_private_s *crp = callrpc_private;
   struct sockaddr_in server_addr;
   enum clnt_stat clnt_stat;
-  struct hostent hostbuf, *hp;
   struct timeval timeout, tottimeout;
 
   if (crp == 0)
@@ -84,10 +80,6 @@ callrpc (const char *host, u_long prognum, u_long versnum, u_long procnum,
     }
   else
     {
-      size_t buflen;
-      char *buffer;
-      int herr;
-
       crp->valid = 0;
       if (crp->socket != RPC_ANYSOCK)
 	{
@@ -100,25 +92,11 @@ callrpc (const char *host, u_long prognum, u_long versnum, u_long procnum,
 	  crp->client = NULL;
 	}
 
-      buflen = 1024;
-      buffer = __alloca (buflen);
-      while (__gethostbyname_r (host, &hostbuf, buffer, buflen,
-				&hp, &herr) != 0
-	     || hp == NULL)
-	if (herr != NETDB_INTERNAL || errno != ERANGE)
-	  return (int) RPC_UNKNOWNHOST;
-	else
-	  {
-	    /* Enlarge the buffer.  */
-	    buflen *= 2;
-	    buffer = __alloca (buflen);
-	  }
+      if (__libc_rpc_gethostbyname (host, &server_addr) != 0)
+	return (int) get_rpc_createerr().cf_stat;
 
       timeout.tv_usec = 0;
       timeout.tv_sec = 5;
-      memcpy ((char *) &server_addr.sin_addr, hp->h_addr, hp->h_length);
-      server_addr.sin_family = AF_INET;
-      server_addr.sin_port = 0;
       if ((crp->client = clntudp_create (&server_addr, (u_long) prognum,
 			  (u_long) versnum, timeout, &crp->socket)) == NULL)
 	return (int) get_rpc_createerr().cf_stat;
@@ -141,7 +119,6 @@ callrpc (const char *host, u_long prognum, u_long versnum, u_long procnum,
 }
 libc_hidden_nolink_sunrpc (callrpc, GLIBC_2_0)
 
-#ifdef _RPC_THREAD_SAFE_
 void
 __rpc_thread_clnt_cleanup (void)
 {
@@ -153,4 +130,3 @@ __rpc_thread_clnt_cleanup (void)
 		free (rcp);
 	}
 }
-#endif /* _RPC_THREAD_SAFE_ */

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <limits.h>
 #include <pthread.h>
@@ -22,6 +22,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+
+static int do_test (void);
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
 
 int
 do_test (void)
@@ -38,7 +43,7 @@ do_test (void)
   for (i = 0; i < max; ++i)
     if (pthread_key_create (&keys[i], NULL) != 0)
       {
-	write (2, "key_create failed\n", 18);
+	write_message ("key_create failed\n");
 	_exit (1);
       }
     else
@@ -82,7 +87,3 @@ do_test (void)
 
   return 0;
 }
-
-
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"

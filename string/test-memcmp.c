@@ -1,5 +1,5 @@
 /* Test and measure memcmp functions.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Jakub Jelinek <jakub@redhat.com>, 1999.
    Added wmemcmp support by Liubov Dmitrieva <liubov.dmitrieva@gmail.com>, 2011.
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
 #ifdef WIDE
@@ -441,11 +441,12 @@ check1 (void)
 
   n = 116;
   for (size_t i = 0; i < n; i++)
-    {
-      exp_result = SIMPLE_MEMCMP (s1 + i, s2 + i, n - i);
-      FOR_EACH_IMPL (impl, 0)
-	check_result (impl, s1 + i, s2 + i, n - i, exp_result);
-    }
+    for (size_t len = 0; len <= n - i; ++len)
+      {
+	exp_result = SIMPLE_MEMCMP (s1 + i, s2 + i, len);
+	FOR_EACH_IMPL (impl, 0)
+	  check_result (impl, s1 + i, s2 + i, len, exp_result);
+      }
 }
 
 /* This test checks that memcmp doesn't overrun buffers.  */
@@ -521,4 +522,5 @@ test_main (void)
   do_random_tests ();
   return ret;
 }
-#include "../test-skeleton.c"
+
+#include <support/test-driver.c>

@@ -1,6 +1,8 @@
 #ifndef _RPC_CLNT_H
 #include <sunrpc/rpc/clnt.h>
 
+# ifndef _ISOMAC
+
 /* Now define the internal interfaces.  */
 extern int _openchild (const char *command, FILE **fto, FILE **ffrom);
 
@@ -26,5 +28,7 @@ libc_hidden_proto (clntudp_create)
 libc_hidden_proto (get_myaddress)
 libc_hidden_proto (clntunix_create)
 libc_hidden_proto (__libc_clntudp_bufcreate)
+libc_hidden_proto (rpc_createerr)
 
+# endif /* !_ISOMAC */
 #endif

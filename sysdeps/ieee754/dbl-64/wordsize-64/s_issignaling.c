@@ -1,5 +1,5 @@
 /* Test for signaling NaN.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,18 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
+#include <nan-high-order-bit.h>
 
 int
 __issignaling (double x)
 {
-  u_int64_t xi;
+  uint64_t xi;
   EXTRACT_WORDS64 (xi, x);
-#ifdef HIGH_ORDER_BIT_IS_SET_FOR_SNAN
-# error untested
+#if HIGH_ORDER_BIT_IS_SET_FOR_SNAN
   /* We only have to care about the high-order bit of x's significand, because
      having it set (sNaN) already makes the significand different from that
      used to designate infinity.  */

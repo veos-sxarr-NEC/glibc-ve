@@ -28,7 +28,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __ieee754_lgammal_r(x, signgamp)
  * Reentrant version of the logarithm of the Gamma function
@@ -93,6 +93,8 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libc-diag.h>
+#include <libm-alias-finite.h>
 
 static const long double
   half = 0.5L,
@@ -207,7 +209,7 @@ sin_pi (long double x)
 {
   long double y, z;
   int n, ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
@@ -220,11 +222,11 @@ sin_pi (long double x)
    * argument reduction, make sure inexact flag not raised if input
    * is an integer
    */
-  z = __floorl (y);
+  z = floorl (y);
   if (z != y)
     {				/* inexact anyway */
       y  *= 0.5;
-      y = 2.0*(y - __floorl(y));		/* y = |x| mod 2.0 */
+      y = 2.0*(y - floorl(y));		/* y = |x| mod 2.0 */
       n = (int) (y*4.0);
     }
   else
@@ -274,7 +276,7 @@ __ieee754_lgammal_r (long double x, int *signgamp)
 {
   long double t, y, z, nadj, p, p1, p2, q, r, w;
   int i, ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   *signgamp = 1;
   GET_LDOUBLE_WORDS (se, i0, i1, x);
@@ -305,6 +307,8 @@ __ieee754_lgammal_r (long double x, int *signgamp)
     }
   if (se & 0x8000)
     {
+      if (x < -2.0L && x > -33.0L)
+	return __lgamma_negl (x, signgamp);
       t = sin_pi (x);
       if (t == zero)
 	return one / fabsl (t);	/* -integer */
@@ -423,8 +427,14 @@ __ieee754_lgammal_r (long double x, int *signgamp)
   else
     /* 2**66 <= x <= inf */
     r = x * (__ieee754_logl (x) - one);
+  /* NADJ is set for negative arguments but not otherwise, resulting
+     in warnings that it may be used uninitialized although in the
+     cases where it is used it has always been set.  */
+  DIAG_PUSH_NEEDS_COMMENT;
+  DIAG_IGNORE_NEEDS_COMMENT (4.9, "-Wmaybe-uninitialized");
   if (se & 0x8000)
     r = nadj - r;
+  DIAG_POP_NEEDS_COMMENT;
   return r;
 }
-strong_alias (__ieee754_lgammal_r, __lgammal_r_finite)
+libm_alias_finite (__ieee754_lgammal_r, __lgammal_r)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Don't rely on this, the interface is currently messed up and may need to
    be broken to be fixed.  */
@@ -21,19 +21,24 @@
 #define _SYS_UCONTEXT_H	1
 
 #include <features.h>
-#include <signal.h>
 
-/* We need the signal context definitions even if they are not used
-   included in <signal.h>.  */
-#include <bits/sigcontext.h>
+#include <bits/types/sigset_t.h>
+#include <bits/types/stack_t.h>
 
 
+#ifdef __USE_MISC
+# define __ctx(fld) fld
+#else
+# define __ctx(fld) __ ## fld
+#endif
+
+#ifdef __USE_MISC
 /* Type for general register.  */
 typedef unsigned long int greg_t;
 
 /* Number of general registers.  */
-#define NGREG	80
-#define NFPREG	32
+# define NGREG	80
+# define NFPREG	32
 
 /* Container for all general registers.  */
 typedef struct gregset
@@ -45,22 +50,33 @@ typedef struct gregset
   } gregset_t;
 
 /* Container for all FPU registers.  */
-typedef struct fpregset
+typedef struct
   {
     double fp_dregs[32];
   } fpregset_t;
+#endif
 
 /* Context to describe whole processor state.  */
-typedef struct sigcontext mcontext_t;
+typedef struct
+  {
+    unsigned long int __ctx(sc_flags);
+    unsigned long int __ctx(sc_gr)[32];
+    unsigned long long int __ctx(sc_fr)[32];
+    unsigned long int __ctx(sc_iasq)[2];
+    unsigned long int __ctx(sc_iaoq)[2];
+    unsigned long int __ctx(sc_sar);
+  } mcontext_t;
 
 /* Userlevel context.  */
-typedef struct ucontext
+typedef struct ucontext_t
   {
-    unsigned long int uc_flags;
-    struct ucontext *uc_link;
+    unsigned long int __ctx(uc_flags);
+    struct ucontext_t *uc_link;
     stack_t uc_stack;
     mcontext_t uc_mcontext;
-    __sigset_t uc_sigmask;
+    sigset_t uc_sigmask;
   } ucontext_t;
+
+#undef __ctx
 
 #endif /* sys/ucontext.h */

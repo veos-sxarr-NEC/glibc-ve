@@ -1,5 +1,5 @@
 /* s390 version of processor capability information handling macros.
-   Copyright (C) 2006-2015 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Martin Schwidefsky <schwidefsky@de.ibm.com>, 2006.
 
@@ -15,15 +15,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DL_PROCINFO_H
 #define _DL_PROCINFO_H	1
 #include <ldsodefs.h>
 
-#define _DL_HWCAP_COUNT 10
+#define _DL_HWCAP_COUNT 19
 
-#define _DL_PLATFORMS_COUNT	5
+#define _DL_PLATFORMS_COUNT	10
 
 /* The kernel provides up to 32 capability bits with elf_hwcap.  */
 #define _DL_FIRST_PLATFORM	32
@@ -50,10 +50,20 @@ enum
   HWCAP_S390_ETF3EH = 1 << 8,
   HWCAP_S390_HIGH_GPRS = 1 << 9,
   HWCAP_S390_TE = 1 << 10,
+  HWCAP_S390_VX = 1 << 11,
+  HWCAP_S390_VXD = 1 << 12,
+  HWCAP_S390_VXE = 1 << 13,
+  HWCAP_S390_GS = 1 << 14,
+  HWCAP_S390_VXRS_EXT2 = 1 << 15,
+  HWCAP_S390_VXRS_PDE = 1 << 16,
+  HWCAP_S390_SORT = 1 << 17,
+  HWCAP_S390_DFLT = 1 << 18,
 };
 
 #define HWCAP_IMPORTANT (HWCAP_S390_ZARCH | HWCAP_S390_LDISP \
-			  | HWCAP_S390_EIMM | HWCAP_S390_DFP)
+			 | HWCAP_S390_EIMM | HWCAP_S390_DFP  \
+			 | HWCAP_S390_VX | HWCAP_S390_VXE    \
+			 | HWCAP_S390_VXRS_EXT2)
 
 /* We cannot provide a general printing function.  */
 #define _dl_procinfo(type, word) -1
@@ -63,13 +73,6 @@ __attribute__ ((unused))
 _dl_hwcap_string (int idx)
 {
   return GLRO(dl_s390_cap_flags)[idx];
-};
-
-static inline const char *
-__attribute__ ((unused))
-_dl_platform_string (int idx)
-{
-  return GLRO(dl_s390_platforms)[idx - _DL_FIRST_PLATFORM];
 };
 
 static inline int

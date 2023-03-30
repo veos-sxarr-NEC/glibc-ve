@@ -28,7 +28,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __ieee754_j1(x), __ieee754_y1(x)
  * Bessel function of the first and second kinds of order zero.
@@ -72,8 +72,11 @@
  */
 
 #include <errno.h>
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static long double pone (long double), qone (long double);
 
@@ -111,7 +114,7 @@ __ieee754_j1l (long double x)
 {
   long double z, c, r, s, ss, cc, u, v, y;
   int32_t ix;
-  u_int32_t se;
+  uint32_t se;
 
   GET_LDOUBLE_EXP (se, x);
   ix = se & 0x7fff;
@@ -136,12 +139,12 @@ __ieee754_j1l (long double x)
        * y1(x) = 1/sqrt(pi) * (P(1,x)*ss + Q(1,x)*cc) / sqrt(x)
        */
       if (__glibc_unlikely (ix > 0x4080))
-	z = (invsqrtpi * cc) / __ieee754_sqrtl (y);
+	z = (invsqrtpi * cc) / sqrtl (y);
       else
 	{
 	  u = pone (y);
 	  v = qone (y);
-	  z = invsqrtpi * (u * cc - v * ss) / __ieee754_sqrtl (y);
+	  z = invsqrtpi * (u * cc - v * ss) / sqrtl (y);
 	}
       if (se & 0x8000)
 	return -z;
@@ -150,8 +153,14 @@ __ieee754_j1l (long double x)
     }
   if (__glibc_unlikely (ix < 0x3fde))       /* |x| < 2^-33 */
     {
-      if (huge + x > one)
-	return 0.5 * x;		/* inexact if x!=0 necessary */
+      if (huge + x > one)		/* inexact if x!=0 necessary */
+	{
+	  long double ret = 0.5 * x;
+	  math_check_force_underflow (ret);
+	  if (ret == 0 && x != 0)
+	    __set_errno (ERANGE);
+	  return ret;
+	}
     }
   z = x * x;
   r = z * (R[0] + z * (R[1]+ z * (R[2] + z * (R[3] + z * R[4]))));
@@ -159,7 +168,7 @@ __ieee754_j1l (long double x)
   r *= x;
   return (x * 0.5 + r / s);
 }
-strong_alias (__ieee754_j1l, __j1l_finite)
+libm_alias_finite (__ieee754_j1l, __j1l)
 
 
 /* Y1(x) = 2/pi * (log(x) * j1(x) - 1/x) + x R(x^2)
@@ -188,7 +197,7 @@ __ieee754_y1l (long double x)
 {
   long double z, s, c, ss, cc, u, v;
   int32_t ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
@@ -224,19 +233,19 @@ __ieee754_y1l (long double x)
        * to compute the worse one.
        */
       if (__glibc_unlikely (ix > 0x4080))
-	z = (invsqrtpi * ss) / __ieee754_sqrtl (x);
+	z = (invsqrtpi * ss) / sqrtl (x);
       else
 	{
 	  u = pone (x);
 	  v = qone (x);
-	  z = invsqrtpi * (u * ss + v * cc) / __ieee754_sqrtl (x);
+	  z = invsqrtpi * (u * ss + v * cc) / sqrtl (x);
 	}
       return z;
     }
   if (__glibc_unlikely (ix <= 0x3fbe))
     {				/* x < 2**-65 */
       z = -tpi / x;
-      if (__isinfl (z))
+      if (isinf (z))
 	__set_errno (ERANGE);
       return z;
     }
@@ -246,7 +255,7 @@ __ieee754_y1l (long double x)
   return (x * (u / v) +
 	  tpi * (__ieee754_j1l (x) * __ieee754_logl (x) - one / x));
 }
-strong_alias (__ieee754_y1l, __y1l_finite)
+libm_alias_finite (__ieee754_y1l, __y1l)
 
 
 /* For x >= 8, the asymptotic expansions of pone is
@@ -355,10 +364,11 @@ pone (long double x)
   const long double *p, *q;
   long double z, r, s;
   int32_t ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
+  /* ix >= 0x4000 for all calls to this function.  */
   if (ix >= 0x4002) /* x >= 8 */
     {
       p = pr8;
@@ -377,7 +387,7 @@ pone (long double x)
 	  p = pr3;
 	  q = ps3;
 	}
-      else if (ix >= 0x4000)	/* x better be >= 2 */
+      else	/* x >= 2 */
 	{
 	  p = pr2;
 	  q = ps2;
@@ -499,12 +509,13 @@ static long double
 qone (long double x)
 {
   const long double *p, *q;
-  static long double s, r, z;
+  long double s, r, z;
   int32_t ix;
-  u_int32_t se, i0, i1;
+  uint32_t se, i0, i1;
 
   GET_LDOUBLE_WORDS (se, i0, i1, x);
   ix = se & 0x7fff;
+  /* ix >= 0x4000 for all calls to this function.  */
   if (ix >= 0x4002)		/* x >= 8 */
     {
       p = qr8;
@@ -523,7 +534,7 @@ qone (long double x)
 	  p = qr3;
 	  q = qs3;
 	}
-      else if (ix >= 0x4000)	/* x better be >= 2 */
+      else	/* x >= 2 */
 	{
 	  p = qr2;
 	  q = qs2;

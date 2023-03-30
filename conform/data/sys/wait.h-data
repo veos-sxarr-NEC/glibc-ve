@@ -7,8 +7,9 @@ constant WNOHANG
 constant WUNTRACED
 
 macro WEXITSTATUS
-# if !defined POSIX && !defined POSIX2008
-macro WIFCONTINUED
+# if !defined XPG4 && !defined POSIX && !defined POSIX2008
+// Bug 23091: hurd: missing waitid support.
+xfail[i386-gnu]-macro WIFCONTINUED
 # endif
 macro WIFEXITED
 macro WIFSIGNALED
@@ -16,17 +17,18 @@ macro WIFSTOPPED
 macro WSTOPSIG
 macro WTERMSIG
 
-# ifndef POSIX
-constant WEXITED
-constant WSTOPPED
+// Bug 23091: hurd: missing waitid support.
+# if !defined XPG4 && !defined POSIX
+xfail[i386-gnu]-constant WEXITED
+xfail[i386-gnu]-constant WSTOPPED
 #  ifndef POSIX2008
-constant WCONTINUED
+xfail[i386-gnu]-constant WCONTINUED
 #  endif
 constant WNOHANG
-constant WNOWAIT
+xfail[i386-gnu]-constant WNOWAIT
 # endif
 
-#if !defined POSIX
+#if !defined XPG4 && !defined POSIX
 type idtype_t
 
 constant P_ALL
@@ -44,11 +46,14 @@ element siginfo_t pid_t si_pid
 element siginfo_t uid_t si_uid
 element siginfo_t {void*} si_addr
 element siginfo_t int si_status
-element siginfo_t long si_band
+// Bug 23821: si_band has type int on sparc64.
+xfail[sparc64-linux]-element siginfo_t long si_band
+# ifndef XPG42
 element siginfo_t {union sigval} si_value
+# endif
 #endif
 
-#if !defined POSIX && !defined XPG3 && !defined XOPEN2K8 && !defined POSIX2008
+#if !defined POSIX && !defined XPG4 && !defined XOPEN2K8 && !defined POSIX2008
 type {struct rusage}
 
 element {struct rusage} {struct timeval} ru_utime
@@ -60,15 +65,15 @@ type pid_t
 #endif
 
 function pid_t wait (int*)
-#if !defined POSIX && !defined XOPEN2K && !defined XOPEN2K8 && !defined POSIX2008
+#if !defined XPG4 && !defined POSIX && !defined XOPEN2K && !defined XOPEN2K8 && !defined POSIX2008
 function pid_t wait3 (int*, int, struct rusage*)
 #endif
-#if !defined POSIX
+#if !defined XPG4 && !defined POSIX
 function int waitid (idtype_t, id_t, siginfo_t*, int)
 #endif
 function pid_t waitpid (pid_t, int*, int)
 
-#if !defined POSIX
+#if !defined XPG4 && !defined POSIX
 allow-header signal.h
 allow-header sys/resource.h
 

@@ -14,7 +14,7 @@ compare (const void *p1, const void *p2)
 }
 
 int
-main (int argc, char *argv[])
+do_test (void)
 {
   char line[MAX_LINE_SIZE + 1];
   char *str[MAX_STRINGS];
@@ -43,3 +43,5 @@ main (int argc, char *argv[])
 
   return EXIT_SUCCESS;
 }
+
+#include <support/test-driver.c>

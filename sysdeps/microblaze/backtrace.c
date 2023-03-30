@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <string.h>
@@ -27,7 +27,7 @@ _identify_sighandler (unsigned long fp, unsigned long pc,
                       unsigned long *pprev_fp, unsigned long *pprev_pc,
                       unsigned long *retaddr);
 
-inline long
+static inline long
 get_frame_size (unsigned long instr)
 {
   return abs ((short signed) (instr & 0xFFFF));
@@ -113,6 +113,9 @@ __backtrace (void **array, int size)
 
   int count;
   int rc = 0;
+
+  if (size <= 0)
+    return 0;
 
   __asm__ __volatile__ ("mfs %0, rpc"
                         : "=r"(pc));

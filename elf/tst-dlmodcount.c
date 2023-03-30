@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David Mosberger <davidm@hpl.hp.com>, 2004.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <link.h>
 #include <stddef.h>
@@ -92,8 +92,8 @@ unload (const char *path, void *handle)
   dl_iterate_phdr (callback, (void *)(intptr_t) REMOVE);
 }
 
-int
-main (int argc, char **argv)
+static int
+do_test (void)
 {
   void *handle1, *handle2;
 
@@ -104,3 +104,5 @@ main (int argc, char **argv)
   unload ("globalmod1.so", handle2);
   return 0;
 }
+
+#include <support/test-driver.c>

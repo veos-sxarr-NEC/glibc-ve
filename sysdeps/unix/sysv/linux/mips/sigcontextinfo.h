@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 2000.
 
@@ -14,29 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#ifndef _SIGCONTEXTINFO_H
+#define _SIGCONTEXTINFO_H
 
-#include <sgidefs.h>
-
-#if _MIPS_SIM == _ABIO32
-
-#define SIGCONTEXT unsigned long _code, struct sigcontext *
-#define SIGCONTEXT_EXTRA_ARGS _code,
-#define GET_PC(ctx)	((void *) (unsigned long) ctx->sc_pc)
-#define GET_FRAME(ctx)	((void *) (unsigned long) ctx->sc_regs[30])
-#define GET_STACK(ctx)	((void *) (unsigned long) ctx->sc_regs[29])
-#define CALL_SIGHANDLER(handler, signo, ctx) \
-  (handler)((signo), SIGCONTEXT_EXTRA_ARGS (ctx))
-
-#else
-
-#define SIGCONTEXT unsigned long _code, ucontext_t *
-#define SIGCONTEXT_EXTRA_ARGS _code,
-#define GET_PC(ctx)	((void *) (unsigned long) ctx->uc_mcontext.pc)
-#define GET_FRAME(ctx)	((void *) (unsigned long) ctx->uc_mcontext.gregs[30])
-#define GET_STACK(ctx)	((void *) (unsigned long) ctx->uc_mcontext.gregs[29])
-#define CALL_SIGHANDLER(handler, signo, ctx) \
-  (handler)((signo), SIGCONTEXT_EXTRA_ARGS (ctx))
+static inline uintptr_t
+sigcontext_get_pc (const ucontext_t *ctx)
+{
+ return ctx->uc_mcontext.pc;
+}
 
 #endif

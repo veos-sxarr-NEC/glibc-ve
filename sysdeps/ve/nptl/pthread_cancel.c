@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <errno.h>
 #include <signal.h>
@@ -23,10 +23,10 @@
 #include "pthreadP.h"
 #include <atomic.h>
 #include <sysdep.h>
-
+#include <unistd.h>
 
 int
-pthread_cancel (pthread_t th)
+__pthread_cancel (pthread_t th)
 {
   volatile struct pthread *pd = (volatile struct pthread *) th;
 
@@ -34,6 +34,7 @@ pthread_cancel (pthread_t th)
   if (INVALID_TD_P (pd))
     /* Not a valid thread handle.  */
     return ESRCH;
+
 #ifndef __ve__
 /* pthread_cancel_init() needs "libgcc_s.so.1" to provide force unwinding,
  * In Current vegcc we do not provide "libgcc_s.so.1" library so as a
@@ -71,30 +72,15 @@ pthread_cancel (pthread_t th)
 						    oldval))
 	    goto again;
 
-#ifdef SIGCANCEL
 	  /* The cancellation handler will take care of marking the
 	     thread as canceled.  */
+	  pid_t pid = __getpid ();
+
 	  INTERNAL_SYSCALL_DECL (err);
-
-	  /* One comment: The PID field in the TCB can temporarily be
-	     changed (in fork).  But this must not affect this code
-	     here.  Since this function would have to be called while
-	     the thread is executing fork, it would have to happen in
-	     a signal handler.  But this is no allowed, pthread_cancel
-	     is not guaranteed to be async-safe.  */
-	  int val;
-	  val = INTERNAL_SYSCALL (tgkill, err, 3,
-				  THREAD_GETMEM (THREAD_SELF, pid), pd->tid,
-				  SIGCANCEL);
-
+	  int val = INTERNAL_SYSCALL_CALL (tgkill, err, pid, pd->tid,
+					   SIGCANCEL);
 	  if (INTERNAL_SYSCALL_ERROR_P (val, err))
 	    result = INTERNAL_SYSCALL_ERRNO (val, err);
-#else
-          /* It should be impossible to get here at all, since
-             pthread_setcanceltype should never have allowed
-             PTHREAD_CANCEL_ASYNCHRONOUS to be set.  */
-          abort ();
-#endif
 
 	  break;
 	}
@@ -115,5 +101,6 @@ pthread_cancel (pthread_t th)
 
   return result;
 }
+weak_alias (__pthread_cancel, pthread_cancel)
 
-PTHREAD_STATIC_FN_REQUIRE (pthread_create)
+PTHREAD_STATIC_FN_REQUIRE (__pthread_create)

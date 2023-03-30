@@ -1,5 +1,5 @@
 /* Hardware capability support for run-time dynamic loader.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <elf.h>
@@ -24,6 +24,7 @@
 #include <ldsodefs.h>
 
 #include <dl-procinfo.h>
+#include <dl-hwcaps.h>
 
 #ifdef _DL_FIRST_PLATFORM
 # define _DL_FIRST_EXTRA (_DL_FIRST_PLATFORM + _DL_PLATFORMS_COUNT)
@@ -33,12 +34,12 @@
 
 /* Return an array of useful/necessary hardware capability names.  */
 const struct r_strlenpair *
-internal_function
 _dl_important_hwcaps (const char *platform, size_t platform_len, size_t *sz,
 		      size_t *max_capstrlen)
 {
+  uint64_t hwcap_mask = GET_HWCAP_MASK();
   /* Determine how many important bits are set.  */
-  uint64_t masked = GLRO(dl_hwcap) & GLRO(dl_hwcap_mask);
+  uint64_t masked = GLRO(dl_hwcap) & hwcap_mask;
   size_t cnt = platform != NULL;
   size_t n, m;
   size_t total;
@@ -66,6 +67,18 @@ _dl_important_hwcaps (const char *platform, size_t platform_len, size_t *sz,
 	  {
 	    const ElfW(Addr) start = (phdr[i].p_vaddr
 				      + GLRO(dl_sysinfo_map)->l_addr);
+	    /* NB: Some PT_NOTE segment may have alignment value of 0
+	       or 1.  gABI specifies that PT_NOTE segments should be
+	       aligned to 4 bytes in 32-bit objects and to 8 bytes in
+	       64-bit objects.  As a Linux extension, we also support
+	       4 byte alignment in 64-bit objects.  If p_align is less
+	       than 4, we treate alignment as 4 bytes since some note
+	       segments have 0 or 1 byte alignment.   */
+	    ElfW(Addr) align = phdr[i].p_align;
+	    if (align < 4)
+	      align = 4;
+	    else if (align != 4 && align != 8)
+	      continue;
 	    /* The standard ELF note layout is exactly as the anonymous struct.
 	       The next element is a variable length vendor name of length
 	       VENDORLEN (with a real length rounded to ElfW(Word)), followed
@@ -79,7 +92,6 @@ _dl_important_hwcaps (const char *platform, size_t platform_len, size_t *sz,
 	    } *note = (const void *) start;
 	    while ((ElfW(Addr)) (note + 1) - start < phdr[i].p_memsz)
 	      {
-#define ROUND(len) (((len) + sizeof (ElfW(Word)) - 1) & -sizeof (ElfW(Word)))
 		/* The layout of the type 2, vendor "GNU" note is as follows:
 		   .long <Number of capabilities enabled by this note>
 		   .long <Capabilities mask> (as mask >> _DL_FIRST_EXTRA).
@@ -90,17 +102,18 @@ _dl_important_hwcaps (const char *platform, size_t platform_len, size_t *sz,
 		    && !memcmp ((note + 1), "GNU", sizeof "GNU")
 		    && note->datalen > 2 * sizeof (ElfW(Word)) + 2)
 		  {
-		    const ElfW(Word) *p = ((const void *) (note + 1)
-					   + ROUND (sizeof "GNU"));
+		    const ElfW(Word) *p
+		      = ((const void *) note
+			 + ELF_NOTE_DESC_OFFSET (sizeof "GNU", align));
 		    cnt += *p++;
 		    ++p;	/* Skip mask word.  */
 		    dsocaps = (const char *) p; /* Pseudo-string "<b>name"  */
 		    dsocapslen = note->datalen - sizeof *p * 2;
 		    break;
 		  }
-		note = ((const void *) (note + 1)
-			+ ROUND (note->vendorlen) + ROUND (note->datalen));
-#undef ROUND
+		note = ((const void *) note
+			+ ELF_NOTE_NEXT_OFFSET (note->vendorlen,
+						note->datalen, align));
 	      }
 	    if (dsocaps != NULL)
 	      break;
@@ -125,7 +138,12 @@ _dl_important_hwcaps (const char *platform, size_t platform_len, size_t *sz,
 	 LD_HWCAP_MASK environment variable (or default HWCAP_IMPORTANT).
 	 So there is no way to request ignoring an OS-supplied dsocap
 	 string and bit like you can ignore an OS-supplied HWCAP bit.  */
-      GLRO(dl_hwcap_mask) |= (uint64_t) mask << _DL_FIRST_EXTRA;
+      hwcap_mask |= (uint64_t) mask << _DL_FIRST_EXTRA;
+#if HAVE_TUNABLES
+      TUNABLE_SET (glibc, cpu, hwcap_mask, uint64_t, hwcap_mask);
+#else
+      GLRO(dl_hwcap_mask) = hwcap_mask;
+#endif
       size_t len;
       for (const char *p = dsocaps; p < dsocaps + dsocapslen; p += len + 1)
 	{

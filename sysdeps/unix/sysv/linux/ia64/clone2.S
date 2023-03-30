@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 
 #include <sysdep.h>
@@ -58,7 +58,7 @@ ENTRY(__clone2)
 	 */
 	mov r15=SYS_ify (clone2)
 	.save rp, r0
-	break __BREAK_SYSCALL
+	break __IA64_BREAK_SYSCALL
 	.body
 	cmp.eq p6,p0=-1,r10
 	cmp.eq CHILD,PARENT=0,r8 /* Are we the child?   */
@@ -67,34 +67,22 @@ ENTRY(__clone2)
 (CHILD)	mov loc0=gp
 (PARENT) ret
 	;;
-	tbit.nz p6,p0=in3,16	/* CLONE_THREAD */
-	tbit.z p7,p10=in3,8	/* CLONE_VM */
-(p6)	br.cond.dptk 1f
-	;;
-	mov r15=SYS_ify (getpid)
-(p10)	addl r8=-1,r0
-(p7)	break __BREAK_SYSCALL
-	;;
-	add r9=PID,r13
-	add r10=TID,r13
-	;;
-	st4 [r9]=r8
-	st4 [r10]=r8
-	;;
-1:	ld8 out1=[in0],8	/* Retrieve code pointer.	*/
+	ld8 out1=[in0],8	/* Retrieve code pointer.	*/
 	mov out0=in4		/* Pass proper argument	to fn */
 	;;
 	ld8 gp=[in0]		/* Load function gp.		*/
 	mov b6=out1
 	br.call.dptk.many rp=b6	/* Call fn(arg) in the child 	*/
 	;;
-	mov out0=r8		/* Argument to _exit		*/
+	mov out0=r8		/* Argument to exit		*/
 	mov gp=loc0
-	.globl HIDDEN_JUMPTARGET(_exit)
-	br.call.dpnt.many rp=HIDDEN_JUMPTARGET(_exit)
-				/* call _exit with result from fn.	*/
+	mov r15=SYS_ify (exit)
+	.save rp, r0
+	break __IA64_BREAK_SYSCALL
 	ret			/* Not reached.		*/
 PSEUDO_END(__clone2)
+
+libc_hidden_def (__clone2)
 
 /* For now we leave __clone undefined.  This is unlikely to be a	*/
 /* problem, since at least the i386 __clone in glibc always failed	*/

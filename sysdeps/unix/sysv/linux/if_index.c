@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <errno.h>
@@ -24,7 +24,7 @@
 #include <net/if.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <not-cancel.h>
 
 #include "netlinkaccess.h"
@@ -38,21 +38,28 @@ __if_nametoindex (const char *ifname)
   return 0;
 #else
   struct ifreq ifr;
+  if (strlen (ifname) >= IFNAMSIZ)
+    {
+      __set_errno (ENODEV);
+      return 0;
+    }
+
+  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+
   int fd = __opensock ();
 
   if (fd < 0)
     return 0;
 
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (__ioctl (fd, SIOCGIFINDEX, &ifr) < 0)
     {
       int saved_errno = errno;
-      close_not_cancel_no_status (fd);
+      __close_nocancel_nostatus (fd);
       if (saved_errno == EINVAL)
 	__set_errno (ENOSYS);
       return 0;
     }
-  close_not_cancel_no_status (fd);
+  __close_nocancel_nostatus (fd);
   return ifr.ifr_ifindex;
 #endif
 }
@@ -224,7 +231,7 @@ __if_indextoname (unsigned int ifindex, char *ifname)
   ifr.ifr_ifindex = ifindex;
   status = __ioctl (fd, SIOCGIFNAME, &ifr);
 
-  close_not_cancel_no_status (fd);
+  __close_nocancel_nostatus (fd);
 
   if (status  < 0)
     {

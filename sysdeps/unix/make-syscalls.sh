@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Usage: make-syscalls.sh ../sysdeps/unix/common
 # Expects $sysdirs in environment.
@@ -7,12 +7,11 @@
 #
 # This script is used to process the syscall data encoded in the various
 # syscalls.list files to produce thin assembly syscall wrappers around the
-# appropriate OS syscall. See syscall-template.s for more details on the
+# appropriate OS syscall. See syscall-template.S for more details on the
 # actual wrapper.
 #
 # Syscall Signature Prefixes:
 #
-# C: cancellable (i.e., this syscall is a cancellation point)
 # E: errno and return value are not set by the call
 # V: errno is not set, but errno or zero (success) is returned from the call
 #
@@ -28,7 +27,7 @@
 # n: scalar buffer length (e.g., 3rd arg to read)
 # N: pointer to value/return scalar buffer length (e.g., 6th arg to recvfrom)
 # p: non-NULL pointer to typed object (e.g., any non-void* arg)
-# P: optionally-NULL pointer to typed object (e.g., 2nd argument to gettimeofday)
+# P: optionally-NULL pointer to typed object (e.g., 3rd argument to sigaction)
 # s: non-NULL string (e.g., 1st arg to open)
 # S: optionally-NULL string (e.g., 1st arg to acct)
 # v: vararg scalar (e.g., optional 3rd arg to open)
@@ -81,12 +80,9 @@ emit_weak_aliases()
 
   # We use the <shlib-compat.h> macros to generate the versioned aliases
   # so that the version sets can be mapped to the configuration's
-  # minimum version set as per shlib-versions DEFAULT lines.  But note
-  # we don't generate any "#if SHLIB_COMPAT (...)" conditionals.  To do
-  # that we'd need to change the syscalls.list format so that it can
-  # list the "obsoleted" version set too.  If it ever arises that we
-  # have a syscall entry point that is obsoleted by a newer version set,
-  # we'll have to revamp all this.
+  # minimum version set as per shlib-versions DEFAULT lines.  If an
+  # entry point is specified in the form NAME@VERSION:OBSOLETED, a
+  # SHLIB_COMPAT conditional is generated.
   if [ $any_versioned = t ]; then
     echo "	 echo '#include <shlib-compat.h>'; \\"
   fi
@@ -107,13 +103,23 @@ emit_weak_aliases()
 	fi
 	echo "	 echo 'versioned_symbol (libc, $source, $base, $ver)'; \\"
 	echo "	 echo '#else'; \\"
-	echo "	 echo 'strong_alias ($strong, $base)'; \\"
+	echo "	 echo 'weak_alias ($strong, $base)'; \\"
 	echo "	 echo '#endif'; \\"
 	;;
       *@*)
 	base=`echo $name | sed 's/@.*//'`
 	ver=`echo $name | sed 's/.*@//;s/\./_/g'`
-	echo "	 echo '#if defined SHARED && IS_IN (libc)'; \\"
+	case $ver in
+	  *:*)
+	    compat_ver=${ver#*:}
+	    ver=${ver%%:*}
+	    compat_cond=" && SHLIB_COMPAT (libc, $ver, $compat_ver)"
+	    ;;
+	  *)
+	    compat_cond=
+	    ;;
+	esac
+	echo "	 echo '#if defined SHARED && IS_IN (libc)$compat_cond'; \\"
 	if test -z "$vcount" ; then
 	  source=$strong
 	  vcount=1
@@ -128,11 +134,11 @@ emit_weak_aliases()
       !*)
 	name=`echo $name | sed 's/.//'`
 	echo "	 echo 'strong_alias ($strong, $name)'; \\"
-	echo "	 echo 'libc_hidden_def ($name)'; \\"
+	echo "	 echo 'hidden_def ($name)'; \\"
 	;;
       *)
 	echo "	 echo 'weak_alias ($strong, $name)'; \\"
-	echo "	 echo 'libc_hidden_weak ($name)'; \\"
+	echo "	 echo 'hidden_weak ($name)'; \\"
 	;;
     esac
   done
@@ -142,14 +148,6 @@ emit_weak_aliases()
 # Emit rules to compile the syscalls remaining in $calls.
 echo "$calls" |
 while read file srcfile caller syscall args strong weak; do
-
-  vdso_syscall=
-  case x"$syscall" in
-  *:*@*)
-    vdso_syscall="${syscall#*:}"
-    syscall="${syscall%:*}"
-    ;;
-  esac
 
   case x"$syscall" in
   x-) callnum=_ ;;
@@ -164,11 +162,9 @@ while read file srcfile caller syscall args strong weak; do
   ;;
   esac
 
-  cancellable=0
   noerrno=0
   errval=0
   case $args in
-  C*) cancellable=1; args=`echo $args | sed 's/C:\?//'`;;
   E*) noerrno=1; args=`echo $args | sed 's/E:\?//'`;;
   V*) errval=1; args=`echo $args | sed 's/V:\?//'`;;
   esac
@@ -229,10 +225,9 @@ while read file srcfile caller syscall args strong weak; do
   if test $shared_only = t; then
     # The versioned symbols are only in the shared library.
     echo "shared-only-routines += $file"
-    test -n "$vdso_syscall" || echo "\$(objpfx)${file}.os: \\"
+    echo "\$(objpfx)${file}.os: \\"
   else
     object_suffixes='$(object-suffixes)'
-    test -z "$vdso_syscall" || object_suffixes='$(object-suffixes-noshared)'
     echo "\
 \$(foreach p,\$(sysd-rules-targets),\
 \$(foreach o,${object_suffixes},\$(objpfx)\$(patsubst %,\$p,$file)\$o)): \\"
@@ -250,14 +245,9 @@ while read file srcfile caller syscall args strong weak; do
 	\$(make-target-directory)
 	(echo '#define SYSCALL_NAME $syscall'; \\
 	 echo '#define SYSCALL_NARGS $nargs'; \\
-	 echo '#define SYSCALL_SYMBOL $strong'; \\"
-  [ $cancellable = 0 ] || echo "\
-	 echo '#define SYSCALL_CANCELLABLE 1'; \\"
-  [ $noerrno = 0 ] || echo "\
-	 echo '#define SYSCALL_NOERRNO 1'; \\"
-  [ $errval = 0 ] || echo "\
-	 echo '#define SYSCALL_ERRVAL 1'; \\"
-  echo "\
+	 echo '#define SYSCALL_SYMBOL $strong'; \\
+	 echo '#define SYSCALL_NOERRNO $noerrno'; \\
+	 echo '#define SYSCALL_ERRVAL $errval'; \\
 	 echo '#include <syscall-template.S>'; \\"
   ;;
   esac
@@ -268,37 +258,6 @@ while read file srcfile caller syscall args strong weak; do
   # And finally, pipe this all into the compiler.
   echo '	) | $(compile-syscall) '"\
 \$(foreach p,\$(patsubst %$file,%,\$(basename \$(@F))),\$(\$(p)CPPFLAGS))"
-
-  if test -n "$vdso_syscall"; then
-    # In the shared library, we're going to emit an IFUNC using a vDSO function.
-    # $vdso_syscall looks like "name@KERNEL_X.Y" where "name" is the symbol
-    # name in the vDSO and KERNEL_X.Y is its symbol version.
-    vdso_symbol="${vdso_syscall%@*}"
-    vdso_symver="${vdso_syscall#*@}"
-    vdso_symver=`echo "$vdso_symver" | sed 's/\./_/g'`
-    echo "\
-\$(foreach p,\$(sysd-rules-targets),\$(objpfx)\$(patsubst %,\$p,$file).os): \\
-		\$(..)sysdeps/unix/make-syscalls.sh\
-	\$(make-target-directory)
-	(echo '#include <dl-vdso.h>'; \\
-	 echo 'extern void *${strong}_ifunc (void) __asm (\"${strong}\");'; \\
-	 echo 'void *'; \\
-	 echo '${strong}_ifunc (void)'; \\
-	 echo '{'; \\
-	 echo '  PREPARE_VERSION_KNOWN (symver, ${vdso_symver});'; \\
-	 echo '  return _dl_vdso_vsym (\"${vdso_symbol}\", &symver);'; \\
-	 echo '}'; \\
-	 echo 'asm (\".type ${strong}, %gnu_indirect_function\");'; \\"
-    # This is doing "libc_hidden_def (${strong})", but the compiler
-    # doesn't know that we've defined ${strong} in the same file, so
-    # we can't do it the normal way.
-    echo "\
-	 echo 'asm (\".globl __GI_${strong}\\n\"'; \\
-	 echo '     \"__GI_${strong} = ${strong}\");'; \\"
-    emit_weak_aliases
-    echo '	) | $(compile-stdin.c) '"\
-\$(foreach p,\$(patsubst %$file,%,\$(basename \$(@F))),\$(\$(p)CPPFLAGS))"
-  fi
 
   if test $shared_only = t; then
     # The versioned symbols are only in the shared library.

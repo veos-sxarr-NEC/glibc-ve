@@ -57,11 +57,12 @@
     Lesser General Public License for more details.
 
     You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, see <http://www.gnu.org/licenses/>.
+    License along with this library; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 /* Coefficients for ln(1+x) = x - x**2/2 + x**3 P(x)/Q(x)
  * 1/sqrt(2) <= x < sqrt(2)
@@ -189,7 +190,7 @@ __ieee754_log10l (long double x)
   xhi = ldbl_high (x);
   EXTRACT_WORDS64 (hx, xhi);
   if ((hx & 0x7fffffffffffffffLL) == 0)
-    return (-1.0L / (x - x));
+    return (-1.0L / fabsl (x));		/* log10l(+-0)=-inf  */
   if (hx < 0)
     return (x - x) / (x - x);
   if (hx >= 0x7ff0000000000000LL)
@@ -258,4 +259,4 @@ done:
   z += e * L102A;
   return (z);
 }
-strong_alias (__ieee754_log10l, __log10l_finite)
+libm_alias_finite (__ieee754_log10l, __log10l)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdarg.h>
 #include <termios.h>
@@ -41,15 +41,15 @@ __ioctl (int fd, unsigned long int request, ...)
       break;
 
     case TCSETS:
-      result = tcsetattr (fd, TCSANOW, (struct termios *) arg);
+      result = __tcsetattr (fd, TCSANOW, (struct termios *) arg);
       break;
 
     case TCSETSW:
-      result = tcsetattr (fd, TCSADRAIN, (struct termios *) arg);
+      result = __tcsetattr (fd, TCSADRAIN, (struct termios *) arg);
       break;
 
     case TCSETSF:
-      result = tcsetattr (fd, TCSAFLUSH, (struct termios *) arg);
+      result = __tcsetattr (fd, TCSAFLUSH, (struct termios *) arg);
       break;
 
     default:
@@ -61,4 +61,5 @@ __ioctl (int fd, unsigned long int request, ...)
 
   return result;
 }
+libc_hidden_def (__ioctl)
 weak_alias (__ioctl, ioctl)

@@ -1,5 +1,5 @@
-/* Assembler macros for x86-64.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Assembler macros for VE.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef _VE_SYSDEP_H
 #define _VE_SYSDEP_H 1
@@ -80,16 +80,14 @@ lose:									      \
 #undef JUMPTARGET
 #ifdef PIC
 #define JUMPTARGET(name)						      \
-	lea     %s12, name@plt_lo(-24);					      \
-        and     %s12, %s12, (32)0;					      \
+        addi %s12,-16,name@PLT_LO; 					      \
         sic     %s35;							      \
         lea.sl  %s12, name@plt_hi(%s12,%s35);			 	      \
         xor     %s35, %s35, %s35;					      \
         beq.l.t 0x0, 0x0(,%s12);
 #else
 #define JUMPTARGET(name)						      \
-	lea     %s12, name@CALL_LO;						      \
-        and     %s12, %s12,(32)0;					      \
+        addi %s12,0,name@CALL_LO; 					      \
 	lea.sl  %s12, name@CALL_HI(,%s12);					      \
 	beq.l.t 0x0, 0x0(,%s12);
 #endif

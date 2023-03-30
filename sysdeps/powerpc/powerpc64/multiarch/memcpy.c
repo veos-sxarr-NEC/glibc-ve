@@ -1,5 +1,5 @@
 /* Multiple versions of memcpy. PowerPC64 version.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Define multiple versions only for the definition in lib and for
    DSO.  In static binaries we need memcpy before the initialization
@@ -35,18 +35,21 @@ extern __typeof (__redirect_memcpy) __memcpy_cell attribute_hidden;
 extern __typeof (__redirect_memcpy) __memcpy_power6 attribute_hidden;
 extern __typeof (__redirect_memcpy) __memcpy_a2 attribute_hidden;
 extern __typeof (__redirect_memcpy) __memcpy_power7 attribute_hidden;
+extern __typeof (__redirect_memcpy) __memcpy_power8_cached attribute_hidden;
 
 libc_ifunc (__libc_memcpy,
-            (hwcap & PPC_FEATURE_HAS_VSX)
-            ? __memcpy_power7 :
-	      (hwcap & PPC_FEATURE_ARCH_2_06)
-	      ? __memcpy_a2 :
-		(hwcap & PPC_FEATURE_ARCH_2_05)
-		? __memcpy_power6 :
-		  (hwcap & PPC_FEATURE_CELL_BE)
-		  ? __memcpy_cell :
-		    (hwcap & PPC_FEATURE_POWER4)
-		    ? __memcpy_power4
+	    ((hwcap2 & PPC_FEATURE2_ARCH_2_07) && use_cached_memopt)
+	    ? __memcpy_power8_cached :
+	      (hwcap & PPC_FEATURE_HAS_VSX)
+	      ? __memcpy_power7 :
+		(hwcap & PPC_FEATURE_ARCH_2_06)
+		? __memcpy_a2 :
+		  (hwcap & PPC_FEATURE_ARCH_2_05)
+		  ? __memcpy_power6 :
+		    (hwcap & PPC_FEATURE_CELL_BE)
+		    ? __memcpy_cell :
+		      (hwcap & PPC_FEATURE_POWER4)
+		      ? __memcpy_power4
             : __memcpy_ppc);
 
 #undef memcpy

@@ -1,5 +1,5 @@
 /* Optimized memcpy implementation for PowerPC32 on POWER6.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,11 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
-/* __ptr_t [r3] memcpy (__ptr_t dst [r3], __ptr_t src [r4], size_t len [r5]);
+/* void * [r3] memcpy (void *dst [r3], void *src [r4], size_t len [r5]);
    Returns 'dst'.
 
    Memcpy handles short copies (< 32-bytes) using a binary move blocks
@@ -46,8 +46,8 @@ EALIGN (memcpy, 5, 0)
     ble-   cr1,L(word_unaligned_short)	/* If move < 32 bytes.  */
     cmplw  cr6,10,11
     stw    31,24(1)
-    cfi_offset(31,(24-32))
     stw    30,20(1)
+    cfi_offset(31,(24-32))
     cfi_offset(30,(20-32))
     mr     30,3
     beq    .L0

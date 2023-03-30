@@ -4,15 +4,11 @@ endif
 
 ifeq ($(subdir),misc)
 sysdep_routines += ioperm
-sysdep_headers += sys/elf.h sys/io.h
+sysdep_headers += sys/elf.h
 endif
 
 ifeq ($(subdir),signal)
 sysdep_routines += sigrestorer
-endif
-
-ifeq ($(subdir),resource)
-sysdep_routines += oldgetrlimit64
 endif
 
 ifeq ($(subdir),stdlib)
@@ -66,7 +62,5 @@ Unknown ABI, must be one of $(abi-variants)
 endif
 
 abi-includes :=
-abi-soft-options := -U__ARM_PCS_VFP
 abi-soft-condition := !defined __ARM_PCS_VFP
-abi-hard-options := -D__ARM_PCS_VFP
 abi-hard-condition := defined __ARM_PCS_VFP

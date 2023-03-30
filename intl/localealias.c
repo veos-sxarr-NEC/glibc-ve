@@ -1,5 +1,5 @@
 /* Handle aliases for locale names.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as published by
@@ -12,7 +12,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Tell glibc's <string.h> to provide a prototype for mempcpy().
    This must come before <config.h> because <config.h> may include
@@ -83,18 +83,14 @@ char *alloca ();
 
 /* Handle multi-threaded applications.  */
 #ifdef _LIBC
-# include <bits/libc-lock.h>
+# include <libc-lock.h>
 #else
 # include "lock.h"
 #endif
 
-#ifndef internal_function
-# define internal_function
-#endif
-
 /* Some optimizations for glibc.  */
 #ifdef _LIBC
-# define FEOF(fp)		feof_unlocked (fp)
+# define FEOF(fp)		__feof_unlocked (fp)
 # define FGETS(buf, n, fp)	__fgets_unlocked (buf, n, fp)
 #else
 # define FEOF(fp)		feof (fp)
@@ -143,8 +139,7 @@ static size_t maxmap;
 
 
 /* Prototypes for local functions.  */
-static size_t read_alias_file (const char *fname, int fname_len)
-     internal_function;
+static size_t read_alias_file (const char *fname, int fname_len);
 static int extend_alias_table (void);
 static int alias_compare (const struct alias_map *map1,
 			  const struct alias_map *map2);
@@ -212,7 +207,6 @@ _nl_expand_alias (const char *name)
 
 
 static size_t
-internal_function
 read_alias_file (const char *fname, int fname_len)
 {
   FILE *fp;

@@ -1,6 +1,6 @@
 /* PowerPC64 mpn_lshift --  mpn_add_n/mpn_sub_n -- mpn addition and
    subtraction.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -36,19 +36,19 @@
 #define VP  r5
 #define N   r6
 
-EALIGN(FUNC, 5, 0)
+ENTRY_TOCLESS (FUNC, 5)
 #ifdef USE_AS_SUB
-	addic	r0, r0, 0
+	addic	r0, r1, -1
 #else
-	addic   r0, r1, -1
+	addic	r0, r0, 0
 #endif
 	andi.	r7, N, 1
 	beq	L(bx0)
 
 	ld	r7, 0(UP)
-	ld	r9, r0(VP)
+	ld	r9, 0(VP)
 	ADDSUBC	r11, r9, r7
-	std	r11, r0(RP)
+	std	r11, 0(RP)
 	cmpldi	N, N, 1
 	beq	N, L(end)
 	addi	UP, UP, 8

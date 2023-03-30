@@ -1,5 +1,5 @@
 /* termios type and macro definitions.  4.4 BSD/generic GNU version.
-   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+   Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _TERMIOS_H
 # error "Never include <bits/termios.h> directly; use <termios.h> instead."
@@ -123,13 +123,13 @@ struct termios
 #define	ICRNL	(1 << 8)	/* Map CR to NL on input.  */
 #define	IXON	(1 << 9)	/* Enable start/stop output control.  */
 #define	IXOFF	(1 << 10)	/* Enable start/stop input control.  */
-#if defined __USE_MISC || defined __USE_UNIX98
+#if defined __USE_MISC || defined __USE_XOPEN || defined __USE_XOPEN2K8
 # define IXANY	(1 << 11)	/* Any character will restart after stop.  */
 #endif
 #ifdef	__USE_MISC
 # define IMAXBEL (1 << 13)	/* Ring bell when input queue is full.  */
 #endif
-#ifdef __USE_GNU
+#if defined __USE_GNU || (defined __USE_XOPEN && !defined __USE_XOPEN2K)
 # define IUCLC	(1 << 14)	/* Translate upper case input to lower case. */
 #endif
 
@@ -152,7 +152,7 @@ struct termios
 # define NLDLY	(3 << 8)	/* NL delay.  */
 # define NL0	(0 << 8)	/* NL type 0.  */
 # define NL1	(1 << 8)	/* NL type 1.  */
-# define TABDLY	(3 << 10)	/* TAB delay.  */
+# define TABDLY	(3 << 10 | 1 << 2)	/* TAB delay.  */
 # define TAB0	(0 << 10)	/* TAB delay type 0.  */
 # define TAB1	(1 << 10)	/* TAB delay type 1.  */
 # define TAB2	(2 << 10)	/* TAB delay type 2.  */
@@ -172,11 +172,12 @@ struct termios
 # define VT0	(0 << 16)	/* VT delay type 0.  */
 # define VT1	(1 << 16)	/* VT delay type 1.  */
 #endif /* __USE_MISC || __USE_XOPEN */
-#ifdef __USE_GNU
+#if defined __USE_GNU || (defined __USE_XOPEN && !defined __USE_XOPEN2K)
 # define OLCUC	(1 << 17)	/* Translate lower case output to upper case */
 #endif
 #ifdef __USE_XOPEN
 # define OFILL	(1 << 18)	/* Send fill characters for delays.  */
+# define OFDEL	(1 << 19)	/* Fill is DEL.  */
 #endif
 
   /* Control modes.  */
@@ -230,11 +231,18 @@ struct termios
 #endif
 #define	_IEXTEN	(1 << 10)	/* Enable DISCARD and LNEXT.  */
 #define	IEXTEN	_IEXTEN
-#define	EXTPROC	(1 << 11)	/* External processing.  */
+#ifdef	__USE_MISC
+# define EXTPROC	(1 << 11)	/* External processing.  */
+#endif
 #define	_TOSTOP	(1 << 22)	/* Send SIGTTOU for background output.  */
 #define	TOSTOP	_TOSTOP
 #ifdef	__USE_MISC
 # define FLUSHO	(1 << 23)	/* Output being flushed (state).  */
+#endif
+#if defined __USE_XOPEN && !defined __USE_XOPEN2K
+# define XCASE	(1 << 24)	/* Canonical upper/lower case.  */
+#endif
+#ifdef __USE_MISC
 # define NOKERNINFO (1 << 25)	/* Disable VSTATUS.  */
 # define PENDIN	(1 << 29)	/* Retype pending input (state).  */
 #endif

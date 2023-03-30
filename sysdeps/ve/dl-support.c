@@ -1,5 +1,5 @@
 /* Support for dynamic linking code in static libc.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,11 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This file defines some things that for the dynamic linker are defined in
    rtld.c and dl-sysdep.c in ways appropriate to bootstrap dynamic linking.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <errno.h>
 #include <libintl.h>
@@ -28,13 +28,16 @@
 #include <stdint.h>
 #include <ldsodefs.h>
 #include <dl-machine.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <dl-cache.h>
 #include <dl-librecon.h>
 #include <dl-procinfo.h>
 #include <unsecvars.h>
 #include <hp-timing.h>
 #include <stackinfo.h>
+#include <dl-vdso.h>
+#include <dl-vdso-setup.h>
+#include <dl-auxv.h>
 
 extern char *__progname;
 char **_dl_argv = &__progname;	/* This is checked for some error messages.  */
@@ -92,7 +95,6 @@ static struct link_map _dl_main_map =
     .l_scope = _dl_main_map.l_scope_mem,
     .l_local_scope = { &_dl_main_map.l_searchlist },
     .l_used = 1,
-    .l_flags_1 = DF_1_NODEFLIB,
     .l_tls_offset = NO_TLS_OFFSET,
     .l_serial = 1,
   };
@@ -128,6 +130,7 @@ int _dl_starting_up = 1;
 void *_dl_random;
 
 /* Get architecture specific initializer.  */
+#include <dl-procruntime.c>
 #include <dl-procinfo.c>
 
 /* Initial value of the CPU clock.  */
@@ -166,6 +169,7 @@ uint64_t _dl_hwcap2 __attribute__ ((nocommon));
 /* The value of the FPU control word the kernel will preset in hardware.  */
 fpu_control_t _dl_fpu_control = _FPU_DEFAULT;
 
+#if !HAVE_TUNABLES
 /* This is not initialized to HWCAP_IMPORTANT, matching the definition
    of _dl_important_hwcaps, below, where no hwcap strings are ever
    used.  This mask is still used to mediate the lookups in the cache
@@ -173,6 +177,7 @@ fpu_control_t _dl_fpu_control = _FPU_DEFAULT;
    LD_HWCAP_MASK environment variable here), there is no real point in
    setting _dl_hwcap nonzero below, but we do anyway.  */
 uint64_t _dl_hwcap_mask __attribute__ ((nocommon));
+#endif
 
 /* Prevailing state of the stack.  Generally this includes PF_X, indicating it's
  * executable but this isn't true for all platforms.  */
@@ -181,13 +186,15 @@ ElfW(Word) _dl_stack_flags = DEFAULT_STACK_PERMS;
 /* If loading a shared object requires that we make the stack executable
    when it was not, we do it by calling this function.
    It returns an errno code or zero on success.  */
-int (*_dl_make_stack_executable_hook) (void **) internal_function
-  = _dl_make_stack_executable;
+int (*_dl_make_stack_executable_hook) (void **) = _dl_make_stack_executable;
 
 
 /* Function in libpthread to wait for termination of lookups.  */
 void (*_dl_wait_lookup_done) (void);
 
+#if !THREAD_GSCOPE_IN_TCB
+int _dl_thread_gscope_count;
+#endif
 struct dl_scope_free_list *_dl_scope_free_list;
 
 #ifdef NEED_DL_SYSINFO
@@ -203,6 +210,8 @@ struct link_map *_dl_sysinfo_map;
 # include "get-dynamic-info.h"
 #endif
 #include "setup-vdso.h"
+/* Define the vDSO function pointers.  */
+#include <dl-vdso-setup.c>
 
 /* During the program run we must not modify the global data of
    loaded shared object simultanously in two threads.  Therefore we
@@ -222,7 +231,6 @@ __rtld_lock_define_initialized_recursive (, _dl_load_write_lock)
 int _dl_clktck;
 
 void
-internal_function
 _dl_aux_init (ElfW(auxv_t) *av)
 {
   int seen = 0;
@@ -245,6 +253,9 @@ _dl_aux_init (ElfW(auxv_t) *av)
 	break;
       case AT_PHNUM:
 	GL(dl_phnum) = av->a_un.a_val;
+	break;
+      case AT_PLATFORM:
+	GLRO(dl_platform) = (void *) av->a_un.a_val;
 	break;
       case AT_HWCAP:
 	GLRO(dl_hwcap) = (unsigned long int) av->a_un.a_val;
@@ -289,9 +300,7 @@ _dl_aux_init (ElfW(auxv_t) *av)
       case AT_RANDOM:
 	_dl_random = (void *) av->a_un.a_val;
 	break;
-# ifdef DL_PLATFORM_AUXV
       DL_PLATFORM_AUXV
-# endif
       }
   if (seen == 0xf)
     {
@@ -303,7 +312,6 @@ _dl_aux_init (ElfW(auxv_t) *av)
 
 
 void
-internal_function
 _dl_non_dynamic_init (void)
 {
   _dl_main_map.l_origin = _dl_get_origin ();
@@ -318,6 +326,9 @@ _dl_non_dynamic_init (void)
   /* Set up the data structures for the system-supplied DSO early,
      so they can influence _dl_init_paths.  */
   setup_vdso (NULL, NULL);
+
+  /* With vDSO setup we can initialize the function pointers.  */
+  setup_vdso_pointers ();
 
   /* Initialize the data structures for the search paths for shared
      objects.  */
@@ -353,8 +364,10 @@ _dl_non_dynamic_init (void)
 	  cp = (const char *) __rawmemchr (cp, '\0') + 1;
 	}
 
+#if !HAVE_TUNABLES
       if (__access ("/etc/suid-debug", F_OK) != 0)
 	__unsetenv ("VE_MALLOC_CHECK_");
+#endif
     }
 
 #ifdef DL_PLATFORM_INIT
@@ -369,16 +382,37 @@ _dl_non_dynamic_init (void)
   if (_dl_platform != NULL)
     _dl_platformlen = strlen (_dl_platform);
 
-  /* Scan for a program header telling us the stack is nonexecutable.  */
   if (_dl_phdr != NULL)
-    for (uint_fast16_t i = 0; i < _dl_phnum; ++i)
-      if (_dl_phdr[i].p_type == PT_GNU_STACK)
+    for (const ElfW(Phdr) *ph = _dl_phdr; ph < &_dl_phdr[_dl_phnum]; ++ph)
+      switch (ph->p_type)
 	{
-	  _dl_stack_flags = _dl_phdr[i].p_flags;
+	/* Check if the stack is nonexecutable.  */
+	case PT_GNU_STACK:
+	  _dl_stack_flags = ph->p_flags;
+	  break;
+
+	case PT_GNU_RELRO:
+	  _dl_main_map.l_relro_addr = ph->p_vaddr;
+	  _dl_main_map.l_relro_size = ph->p_memsz;
 	  break;
 	}
+
+  /* Setup relro on the binary itself.  */
+  if (_dl_main_map.l_relro_size != 0)
+    _dl_protect_relro (&_dl_main_map);
 }
 
 #ifdef DL_SYSINFO_IMPLEMENTATION
 DL_SYSINFO_IMPLEMENTATION
+#endif
+
+#if ENABLE_STATIC_PIE
+/* Since relocation to hidden _dl_main_map causes relocation overflow on
+   aarch64, a function is used to get the address of _dl_main_map.  */
+
+struct link_map *
+_dl_get_dl_main_map (void)
+{
+  return &_dl_main_map;
+}
 #endif

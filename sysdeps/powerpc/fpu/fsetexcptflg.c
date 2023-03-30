@@ -1,5 +1,5 @@
 /* Set floating-point environment exception handling.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <fenv_libc.h>
 
@@ -31,8 +31,12 @@ __fesetexceptflag (const fexcept_t *flagp, int excepts)
   flag = *flagp & excepts;
 
   /* Replace the exception status */
-  n.l = ((u.l & ~(FPSCR_STICKY_BITS & excepts))
+  int excepts_mask = FPSCR_STICKY_BITS & excepts;
+  if ((excepts & FE_INVALID) != 0)
+    excepts_mask |= FE_ALL_INVALID;
+  n.l = ((u.l & ~excepts_mask)
 	 | (flag & FPSCR_STICKY_BITS)
+	 /* Turn FE_INVALID into FE_INVALID_SOFTWARE.  */
 	 | (flag >> ((31 - FPSCR_VX) - (31 - FPSCR_VXSOFT))
 	    & FE_INVALID_SOFTWARE));
 

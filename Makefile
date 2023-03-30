@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Master Makefile for the GNU C library
@@ -26,8 +26,17 @@ include Makeconfig
 
 
 # This is the default target; it makes everything except the tests.
-.PHONY: all
-all: lib others
+.PHONY: all help minihelp
+all: minihelp lib others
+
+help:
+	@sed '0,/^help-starts-here$$/d' Makefile.help
+
+minihelp:
+	@echo
+	@echo type \"make help\" for help with common glibc makefile targets
+	@echo
+
 
 ifneq ($(AUTOCONF),no)
 
@@ -53,13 +62,15 @@ endif # $(AUTOCONF) = no
 		   subdir_clean subdir_distclean subdir_realclean	\
 		   tests xtests						\
 		   subdir_update-abi subdir_check-abi			\
+		   subdir_update-all-abi				\
 		   subdir_echo-headers					\
 		   subdir_install					\
 		   subdir_objs subdir_stubs subdir_testclean		\
 		   $(addprefix install-, no-libc.a bin lib data headers others)
 
-headers := limits.h values.h features.h gnu-versions.h bits/libc-lock.h \
-	   bits/xopen_lim.h gnu/libc-version.h stdc-predef.h
+headers := limits.h values.h features.h gnu-versions.h \
+	   bits/xopen_lim.h gnu/libc-version.h stdc-predef.h \
+	   bits/libc-header-start.h
 
 echo-headers: subdir_echo-headers
 
@@ -126,22 +137,268 @@ ifeq (yes,$(build-shared))
 lib: $(common-objpfx)libc.so $(common-objpfx)linkobj/libc.so
 endif # $(build-shared)
 
+# Used to build testrun.sh.
+define testrun-script
+#!/bin/bash
+builddir=`dirname "$$0"`
+VE_GCONV_PATH="$${builddir}/iconvdata"
+
+usage () {
+  echo "usage: $$0 [--tool=strace] PROGRAM [ARGUMENTS...]" 2>&1
+  echo "       $$0 --tool=valgrind PROGRAM [ARGUMENTS...]" 2>&1
+  exit 1
+}
+
+toolname=default
+while test $$# -gt 0 ; do
+  case "$$1" in
+    --tool=*)
+      toolname="$${1:7}"
+      shift
+      ;;
+    --*)
+      usage
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if test $$# -eq 0 ; then
+  usage
+fi
+
+case "$$toolname" in
+  default)
+    exec $(subst $(common-objdir),"$${builddir}", $(test-program-prefix)) \
+      $${1+"$$@"}
+    ;;
+  strace)
+    exec strace $(patsubst %, -E%, $(run-program-env)) \
+      $(test-via-rtld-prefix) $${1+"$$@"}
+    ;;
+  valgrind)
+    exec env $(run-program-env) valgrind $(test-via-rtld-prefix) $${1+"$$@"}
+    ;;
+  container)
+    exec env $(run-program-env) $(test-via-rtld-prefix) \
+      $(common-objdir)/support/test-container \
+      env $(run-program-env) $(test-via-rtld-prefix) $${1+"$$@"}
+    ;;
+  *)
+    usage
+    ;;
+esac
+endef
 
 # This is a handy script for running any dynamically linked program against
 # the current libc build for testing.
 $(common-objpfx)testrun.sh: $(common-objpfx)config.make \
 			    $(..)Makeconfig $(..)Makefile
-	(echo '#!/bin/sh'; \
-	 echo 'builddir=`dirname "$$0"`'; \
-	 echo 'VE_GCONV_PATH="$${builddir}/iconvdata" \'; \
-	 echo 'exec $(subst $(common-objdir),"$${builddir}",\
-			    $(test-program-prefix)) $${1+"$$@"}'; \
-	) > $@T
+	$(file >$@T,$(testrun-script))
 	chmod a+x $@T
 	mv -f $@T $@
 postclean-generated += testrun.sh
 
-others: $(common-objpfx)testrun.sh
+define debugglibc
+#!/bin/bash
+
+SOURCE_DIR="$(CURDIR)"
+BUILD_DIR="$(common-objpfx)"
+CMD_FILE="$(common-objpfx)debugglibc.gdb"
+CONTAINER=false
+DIRECT=true
+STATIC=false
+SYMBOLSFILE=true
+unset TESTCASE
+unset BREAKPOINTS
+unset ENVVARS
+
+usage()
+{
+cat << EOF
+Usage: $$0 [OPTIONS] <program>
+
+   Or: $$0 [OPTIONS] -- <program> [<args>]...
+
+  where <program> is the path to the program being tested,
+  and <args> are the arguments to be passed to it.
+
+Options:
+
+  -h, --help
+	Prints this message and leaves.
+
+  The following options require one argument:
+
+  -b, --breakpoint
+	Breakpoints to set at the beginning of the execution
+	(each breakpoint demands its own -b option, e.g. -b foo -b bar)
+  -e, --environment-variable
+	Environment variables to be set with 'exec-wrapper env' in GDB
+	(each environment variable demands its own -e option, e.g.
+	-e FOO=foo -e BAR=bar)
+
+  The following options do not take arguments:
+
+  -c, --in-container
+	Run the test case inside a container and automatically attach
+	GDB to it.
+  -i, --no-direct
+	Selects whether to pass the --direct flag to the program.
+	--direct is useful when debugging glibc test cases. It inhibits the
+	tests from forking and executing in a subprocess.
+	Default behaviour is to pass the --direct flag, except when the
+	program is run with user specified arguments using the "--" separator.
+  -s, --no-symbols-file
+	Do not tell GDB to load debug symbols from the program.
+EOF
+}
+
+# Parse input options
+while [[ $$# > 0 ]]
+do
+  key="$$1"
+  case $$key in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -b|--breakpoint)
+      BREAKPOINTS="break $$2\n$$BREAKPOINTS"
+      shift
+      ;;
+    -e|--environment-variable)
+      ENVVARS="$$2 $$ENVVARS"
+      shift
+      ;;
+    -c|--in-container)
+      CONTAINER=true
+      ;;
+    -i|--no-direct)
+      DIRECT=false
+      ;;
+    -s|--no-symbols-file)
+      SYMBOLSFILE=false
+      ;;
+    --)
+      shift
+      TESTCASE=$$1
+      COMMANDLINE="$$@"
+      # Don't add --direct when user specifies program arguments
+      DIRECT=false
+      break
+      ;;
+    *)
+      TESTCASE=$$1
+      COMMANDLINE=$$TESTCASE
+      ;;
+  esac
+  shift
+done
+
+# Check for required argument and if the testcase exists
+if [ ! -v TESTCASE ] || [ ! -f $${TESTCASE} ]
+then
+  usage
+  exit 1
+fi
+
+# Expand environment setup command
+if [ -v ENVVARS ]
+then
+  ENVVARSCMD="set exec-wrapper env $$ENVVARS"
+fi
+
+# Expand direct argument
+if [ "$$DIRECT" == true ]
+then
+  DIRECT="--direct"
+else
+  DIRECT=""
+fi
+
+# Check if the test case is static
+if file $${TESTCASE} | grep "statically linked" >/dev/null
+then
+  STATIC=true
+else
+  STATIC=false
+fi
+
+# Expand symbols loading command
+if [ "$$SYMBOLSFILE" == true ]
+then
+  SYMBOLSFILE="add-symbol-file $${TESTCASE}"
+else
+  SYMBOLSFILE=""
+fi
+
+# GDB commands template
+template ()
+{
+cat <<EOF
+set environment C -E -x c-header
+set auto-load safe-path $${BUILD_DIR}/nptl_db:\$$debugdir:\$$datadir/auto-load
+set libthread-db-search-path $${BUILD_DIR}/nptl_db
+__ENVVARS__
+__SYMBOLSFILE__
+break _dl_start_user
+run --library-path $(rpath-link):$${BUILD_DIR}/nptl_db \
+__COMMANDLINE__ __DIRECT__
+__BREAKPOINTS__
+EOF
+}
+
+# Generate the commands file for gdb initialization
+template | sed \
+  -e "s|__ENVVARS__|$$ENVVARSCMD|" \
+  -e "s|__SYMBOLSFILE__|$$SYMBOLSFILE|" \
+  -e "s|__COMMANDLINE__|$$COMMANDLINE|" \
+  -e "s|__DIRECT__|$$DIRECT|" \
+  -e "s|__BREAKPOINTS__|$$BREAKPOINTS|" \
+  > $$CMD_FILE
+
+echo
+echo "Debugging glibc..."
+echo "Build directory  : $$BUILD_DIR"
+echo "Source directory : $$SOURCE_DIR"
+echo "GLIBC Testcase   : $$TESTCASE"
+echo "GDB Commands     : $$CMD_FILE"
+echo "Env vars         : $$ENVVARS"
+echo
+
+if [ "$$CONTAINER" == true ]
+then
+# Use testrun.sh to start the test case with WAIT_FOR_DEBUGGER=1, then
+# automatically attach GDB to it.
+WAIT_FOR_DEBUGGER=1 $(common-objpfx)testrun.sh --tool=container $${TESTCASE} &
+gdb -x $${TESTCASE}.gdb
+elif [ "$$STATIC" == true ]
+then
+gdb $${TESTCASE}
+else
+# Start the test case debugging in two steps:
+#   1. the following command invokes gdb to run the loader;
+#   2. the commands file tells the loader to run the test case.
+gdb -q \
+  -x $${CMD_FILE} \
+  -d $${SOURCE_DIR} \
+  $${BUILD_DIR}/elf/ld.so
+fi
+endef
+
+# This is another handy script for debugging dynamically linked program
+# against the current libc build for testing.
+$(common-objpfx)debugglibc.sh: $(common-objpfx)config.make \
+			    $(..)Makeconfig $(..)Makefile
+	$(file >$@T,$(debugglibc))
+	chmod a+x $@T
+	mv -f $@T $@
+postclean-generated += debugglibc.sh debugglibc.gdb
+
+others: $(common-objpfx)testrun.sh $(common-objpfx)debugglibc.sh
 
 # Makerules creates a file `stubs' in each subdirectory, which
 # contains `#define __stub_FUNCTION' for each function defined in that
@@ -250,71 +507,121 @@ mostlyclean: parent-mostlyclean
 tests-clean:
 	@$(MAKE) subdir_testclean no_deps=t
 
-tests-special += $(objpfx)c++-types-check.out $(objpfx)check-local-headers.out
-ifneq ($(CXX),no)
-
+ifneq (,$(CXX))
 vpath c++-types.data $(+sysdep_dirs)
 
+tests-special += $(objpfx)c++-types-check.out
 $(objpfx)c++-types-check.out: c++-types.data scripts/check-c++-types.sh
-	scripts/check-c++-types.sh $< $(CXX) $(filter-out -std=gnu99 -Wstrict-prototypes,$(CFLAGS)) $(CPPFLAGS) > $@; \
+	scripts/check-c++-types.sh $< $(CXX) $(filter-out -std=gnu11 $(+gccwarn-c),$(CFLAGS)) $(CPPFLAGS) > $@; \
 	$(evaluate-test)
 endif
 
+tests-special += $(objpfx)check-local-headers.out
 $(objpfx)check-local-headers.out: scripts/check-local-headers.sh
 	AWK='$(AWK)' scripts/check-local-headers.sh \
-	  "$(includedir)" "$(objpfx)" > $@; \
+	  "$(includedir)" "$(objpfx)" < /dev/null > $@; \
 	$(evaluate-test)
 
-ifneq ($(PERL),no)
-installed-headers = argp/argp.h assert/assert.h catgets/nl_types.h \
-		    crypt/crypt.h ctype/ctype.h debug/execinfo.h \
-		    dirent/dirent.h dlfcn/dlfcn.h elf/elf.h elf/link.h \
-		    gmon/sys/gmon.h gmon/sys/gmon_out.h gmon/sys/profil.h \
-		    grp/grp.h gshadow/gshadow.h iconv/iconv.h iconv/gconv.h \
-		    $(wildcard inet/netinet/*.h) \
-		    $(wildcard inet/arpa/*.h inet/protocols/*.h) \
-		    inet/aliases.h inet/ifaddrs.h inet/netinet/ip6.h \
-		    inet/netinet/icmp6.h intl/libintl.h io/sys/stat.h \
-		    io/sys/statfs.h io/sys/vfs.h io/sys/statvfs.h \
-		    io/fcntl.h io/sys/fcntl.h io/poll.h io/sys/poll.h \
-		    io/utime.h io/ftw.h io/fts.h io/sys/sendfile.h \
-		    libio/stdio.h libio/libio.h locale/locale.h \
-		    locale/langinfo.h locale/xlocale.h login/utmp.h \
-		    login/lastlog.h login/pty.h malloc/malloc.h \
-		    malloc/obstack.h malloc/mcheck.h math/math.h \
-		    math/complex.h math/fenv.h math/tgmath.h misc/sys/uio.h \
-		    $(wildcard nis/rpcsvc/*.h) nptl_db/thread_db.h \
-		    sysdeps/nptl/pthread.h sysdeps/pthread/semaphore.h \
-		    nss/nss.h posix/sys/utsname.h posix/sys/times.h \
-		    posix/sys/wait.h posix/sys/types.h posix/unistd.h \
-		    posix/glob.h posix/regex.h posix/wordexp.h posix/fnmatch.h\
-		    posix/getopt.h posix/tar.h posix/sys/unistd.h \
-		    posix/sched.h posix/re_comp.h posix/wait.h \
-		    posix/cpio.h posix/spawn.h pwd/pwd.h resolv/resolv.h \
-		    resolv/netdb.h $(wildcard resolv/arpa/*.h) \
-		    resource/sys/resource.h resource/sys/vlimit.h \
-		    resource/sys/vtimes.h resource/ulimit.h rt/aio.h \
-		    rt/mqueue.h setjmp/setjmp.h shadow/shadow.h \
-		    signal/signal.h signal/sys/signal.h socket/sys/socket.h \
-		    socket/sys/un.h stdio-common/printf.h \
-		    stdio-common/stdio_ext.h stdlib/stdlib.h stdlib/alloca.h \
-		    stdlib/monetary.h stdlib/fmtmsg.h stdlib/ucontext.h \
-		    sysdeps/generic/inttypes.h sysdeps/generic/stdint.h \
-		    stdlib/errno.h stdlib/sys/errno.h string/string.h \
-		    string/strings.h string/memory.h string/endian.h \
-		    string/argz.h string/envz.h string/byteswap.h \
-		    $(wildcard sunrpc/rpc/*.h sunrpc/rpcsvc/*.h) \
-		    sysvipc/sys/ipc.h sysvipc/sys/msg.h sysvipc/sys/sem.h \
-		    sysvipc/sys/shm.h termios/termios.h \
-		    termios/sys/termios.h termios/sys/ttychars.h time/time.h \
-		    time/sys/time.h time/sys/timeb.h wcsmbs/wchar.h \
-		    wctype/wctype.h
-
-tests-special += $(objpfx)begin-end-check.out
-$(objpfx)begin-end-check.out: scripts/begin-end-check.pl
-	$(PERL) scripts/begin-end-check.pl $(installed-headers) > $@; \
+ifneq "$(headers)" ""
+# Special test of all the installed headers in this directory.
+tests-special += $(objpfx)check-installed-headers-c.out
+libof-check-installed-headers-c := testsuite
+$(objpfx)check-installed-headers-c.out: \
+    scripts/check-installed-headers.sh $(headers)
+	$(SHELL) $(..)scripts/check-installed-headers.sh c \
+	  "$(CC) $(filter-out -std=%,$(CFLAGS)) -D_ISOMAC $(+includes)" \
+	  $(headers) > $@; \
 	$(evaluate-test)
+
+ifneq "$(CXX)" ""
+tests-special += $(objpfx)check-installed-headers-cxx.out
+libof-check-installed-headers-cxx := testsuite
+$(objpfx)check-installed-headers-cxx.out: \
+    scripts/check-installed-headers.sh $(headers)
+	$(SHELL) $(..)scripts/check-installed-headers.sh c++ \
+	  "$(CXX) $(filter-out -std=%,$(CXXFLAGS)) -D_ISOMAC $(+includes)" \
+	  $(headers) > $@; \
+	$(evaluate-test)
+endif # $(CXX)
+
+tests-special += $(objpfx)check-wrapper-headers.out
+$(objpfx)check-wrapper-headers.out: scripts/check-wrapper-headers.py $(headers)
+	$(PYTHON) $< --root=. --subdir=. $(headers) \
+	  --generated $(common-generated) > $@; $(evaluate-test)
+endif # $(headers)
+
+define summarize-tests
+@egrep -v '^(PASS|XFAIL):' $(objpfx)$1 || true
+@echo "Summary of test results$2:"
+@sed 's/:.*//' < $(objpfx)$1 | sort | uniq -c
+@! egrep -q -v '^(X?PASS|XFAIL|UNSUPPORTED):' $(objpfx)$1
+endef
+
+# The intention here is to do ONE install of our build into the
+# testroot.pristine/ directory, then rsync (internal to
+# support/test-container) that to testroot.root/ at the start of each
+# test.  That way we can promise each test a "clean" install, without
+# having to do the install for each test.
+#
+# In addition, we have to copy some files (which we build) into this
+# root in addition to what glibc installs.  For example, many tests
+# require additional programs including /bin/sh, /bin/true, and
+# /bin/echo, all of which we build below to limit library dependencies
+# to just those things in glibc and language support libraries which
+# we also copy into the into the rootfs.  To determine what language
+# support libraries we need we build a "test" program in either C or
+# (if available) C++ just so we can copy in any shared objects
+# (which we do not build) that GCC-compiled programs depend on.
+
+
+ifeq (,$(CXX))
+LINKS_DSO_PROGRAM = links-dso-program-c
+else
+LINKS_DSO_PROGRAM = links-dso-program
 endif
+
+$(tests-container) $(addsuffix /tests,$(subdirs)) : \
+		$(objpfx)testroot.pristine/install.stamp
+$(objpfx)testroot.pristine/install.stamp :
+	test -d $(objpfx)testroot.pristine || \
+	  mkdir $(objpfx)testroot.pristine
+	# We need a working /bin/sh for some of the tests.
+	test -d $(objpfx)testroot.pristine/bin || \
+	  mkdir $(objpfx)testroot.pristine/bin
+	cp $(objpfx)support/shell-container $(objpfx)testroot.pristine/bin/sh
+	cp $(objpfx)support/echo-container $(objpfx)testroot.pristine/bin/echo
+	cp $(objpfx)support/true-container $(objpfx)testroot.pristine/bin/true
+ifeq ($(run-built-tests),yes)
+	# Copy these DSOs first so we can overwrite them with our own.
+	for dso in `$(test-wrapper-env) LD_TRACE_LOADED_OBJECTS=1  \
+		$(rtld-prefix) \
+		$(objpfx)testroot.pristine/bin/sh \
+	        | sed -n '/\//{s@.*=> /@/@;s/^[^/]*//;s/ .*//p;}'` ;\
+	  do \
+	    test -d `dirname $(objpfx)testroot.pristine$$dso` || \
+	      mkdir -p `dirname $(objpfx)testroot.pristine$$dso` ;\
+	    $(test-wrapper) cp $$dso $(objpfx)testroot.pristine$$dso ;\
+	  done
+	for dso in `$(test-wrapper-env) LD_TRACE_LOADED_OBJECTS=1  \
+		$(rtld-prefix) \
+		$(objpfx)support/$(LINKS_DSO_PROGRAM) \
+	        | sed -n '/\//{s@.*=> /@/@;s/^[^/]*//;s/ .*//p;}'` ;\
+	  do \
+	    test -d `dirname $(objpfx)testroot.pristine$$dso` || \
+	      mkdir -p `dirname $(objpfx)testroot.pristine$$dso` ;\
+	    $(test-wrapper) cp $$dso $(objpfx)testroot.pristine$$dso ;\
+	  done
+endif
+	# $(symbolic-link-list) is a file that encodes $(DESTDIR) so we
+	# have to purge it
+	rm -f $(symbolic-link-list)
+	# Setting INSTALL_UNCOMPRESSED causes localedata/Makefile to
+	# install the charmaps uncompressed, as the testroot does not
+	# provide a gunzip program.
+	$(MAKE) install DESTDIR=$(objpfx)testroot.pristine \
+	  INSTALL_UNCOMPRESSED=yes subdirs='$(sorted-subdirs)'
+	rm -f $(symbolic-link-list)
+	touch $(objpfx)testroot.pristine/install.stamp
 
 tests-special-notdir = $(patsubst $(objpfx)%, %, $(tests-special))
 tests: $(tests-special)
@@ -324,22 +631,12 @@ tests: $(tests-special)
 	$(..)scripts/merge-test-results.sh -t $(objpfx) subdir-tests.sum \
 	  $(sort $(subdirs) .) \
 	  > $(objpfx)tests.sum
-	@grep '^ERROR:' $(objpfx)tests.sum || true
-	@grep '^FAIL:' $(objpfx)tests.sum || true
-	@echo "Summary of test results:"
-	@sed 's/:.*//' < $(objpfx)tests.sum | sort | uniq -c
-	@if grep -q '^ERROR:' $(objpfx)tests.sum; then exit 1; fi
-	@if grep -q '^FAIL:' $(objpfx)tests.sum; then exit 1; fi
+	$(call summarize-tests,tests.sum)
 xtests:
 	$(..)scripts/merge-test-results.sh -t $(objpfx) subdir-xtests.sum \
 	  $(sort $(subdirs)) \
 	  > $(objpfx)xtests.sum
-	@grep '^ERROR:' $(objpfx)xtests.sum || true
-	@grep '^FAIL:' $(objpfx)xtests.sum || true
-	@echo "Summary of test results for extra tests:"
-	@sed 's/:.*//' < $(objpfx)xtests.sum | sort | uniq -c
-	@if grep -q '^ERROR:' $(objpfx)xtests.sum; then exit 1; fi
-	@if grep -q '^FAIL:' $(objpfx)xtests.sum; then exit 1; fi
+	$(call summarize-tests,xtests.sum, for extra tests)
 
 # The realclean target is just like distclean for the parent, but we want
 # the subdirs to know the difference in case they care.
@@ -376,12 +673,11 @@ TAGS:
 
 generated := $(generated) stubs.h
 
-files-for-dist := README INSTALL configure ChangeLog NEWS
+files-for-dist := README INSTALL configure NEWS
 
 # Regenerate stuff, then error if these things are not committed yet.
 dist-prepare: $(files-for-dist)
-	conf=`find sysdeps $(addsuffix /sysdeps,$(sysdeps-add-ons)) \
-		   -name configure`; \
+	conf=`find sysdeps -name configure`; \
 	$(MAKE) $$conf && \
 	git diff --stat HEAD -- $^ $$conf \
 	| $(AWK) '{ print; rc=1 } END { exit rc }'
@@ -422,29 +718,11 @@ FORCE:
 iconvdata/% localedata/% po/%: FORCE
 	$(MAKE) $(PARALLELMFLAGS) -C $(@D) $(@F)
 
-# glibc 2.0 contains some header files which aren't used with glibc 2.1
-# anymore.
-# These rules should remove those headers
-ifeq (,$(install_root))
-ifeq ($(old-glibc-headers),yes)
-install: remove-old-headers
-endif
-endif
-
-headers2_0 :=	__math.h bytesex.h confname.h direntry.h elfclass.h	\
-		errnos.h fcntlbits.h huge_val.h ioctl-types.h		\
-		ioctls.h iovec.h jmp_buf.h libc-lock.h local_lim.h	\
-		mathcalls.h mpool.h nan.h ndbm.h posix1_lim.h		\
-		posix2_lim.h posix_opt.h resourcebits.h schedbits.h	\
-		selectbits.h semaphorebits.h sigaction.h sigcontext.h	\
-		signum.h sigset.h sockaddrcom.h socketbits.h stab.def	\
-		statbuf.h statfsbuf.h stdio-lock.h stdio_lim.h		\
-		syscall-list.h termbits.h timebits.h ustatbits.h	\
-		utmpbits.h utsnamelen.h waitflags.h waitstatus.h	\
-		xopen_lim.h gnu/types.h sys/ipc_buf.h			\
-		sys/kernel_termios.h sys/msq_buf.h sys/sem_buf.h	\
-		sys/shm_buf.h sys/socketcall.h sigstack.h
-
-.PHONY: remove-old-headers
-remove-old-headers:
-	rm -f $(addprefix $(inst_includedir)/, $(headers2_0))
+# Convenience target to rerun one test, from the top of the build tree
+# Example: make test t=wcsmbs/test-wcsnlen
+.PHONY: test
+test :
+	@-rm -f $(objpfx)$t.out
+	$(MAKE) subdir=$(patsubst %/,%,$(dir $t)) -C $(dir $t) ..=../ $(objpfx)$t.out
+	@cat $(objpfx)$t.test-result
+	@cat $(objpfx)$t.out

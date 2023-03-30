@@ -1,4 +1,4 @@
-/* Copyright (c) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@suse.de>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* getent: get entries from administrative database.  */
 
@@ -39,6 +39,8 @@
 #include <netinet/ether.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <scratch_buffer.h>
+#include <inttypes.h>
 
 /* Get libc version number.  */
 #include <version.h>
@@ -87,7 +89,7 @@ print_version (FILE *stream, struct argp_state *state)
 Copyright (C) %s Free Software Foundation, Inc.\n\
 This is free software; see the source for copying conditions.  There is NO\n\
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\
-"), "2015");
+"), "2020");
   fprintf (stream, gettext ("Written by %s.\n"), "Thorsten Kukuk");
 }
 
@@ -184,20 +186,8 @@ ethers_keys (int number, char *key[])
 static void
 print_group (struct group *grp)
 {
-  unsigned int i = 0;
-
-  printf ("%s:%s:%lu:", grp->gr_name ? grp->gr_name : "",
-	  grp->gr_passwd ? grp->gr_passwd : "",
-	  (unsigned long int) grp->gr_gid);
-
-  while (grp->gr_mem[i] != NULL)
-    {
-      fputs_unlocked (grp->gr_mem[i], stdout);
-      ++i;
-      if (grp->gr_mem[i] != NULL)
-	putchar_unlocked (',');
-    }
-  putchar_unlocked ('\n');
+  if (putgrent (grp, stdout) != 0)
+    fprintf (stderr, "error writing group entry: %m\n");
 }
 
 static int
@@ -241,32 +231,8 @@ group_keys (int number, char *key[])
 static void
 print_gshadow (struct sgrp *sg)
 {
-  unsigned int i = 0;
-
-  printf ("%s:%s:",
-	  sg->sg_namp ? sg->sg_namp : "",
-	  sg->sg_passwd ? sg->sg_passwd : "");
-
-  while (sg->sg_adm[i] != NULL)
-    {
-      fputs_unlocked (sg->sg_adm[i], stdout);
-      ++i;
-      if (sg->sg_adm[i] != NULL)
-	putchar_unlocked (',');
-    }
-
-  putchar_unlocked (':');
-
-  i = 0;
-  while (sg->sg_mem[i] != NULL)
-    {
-      fputs_unlocked (sg->sg_mem[i], stdout);
-      ++i;
-      if (sg->sg_mem[i] != NULL)
-	putchar_unlocked (',');
-    }
-
-  putchar_unlocked ('\n');
+  if (putsgent (sg, stdout) != 0)
+    fprintf (stderr, "error writing gshadow entry: %m\n");
 }
 
 static int
@@ -428,15 +394,34 @@ ahosts_keys_int (int af, int xflags, int number, char *key[])
 		  sockstr = sockbuf;
 		}
 
+	      /* Three digits per byte, plus '%' and null terminator.  */
+	      char scope[3 * sizeof (uint32_t) + 2];
+	      struct sockaddr_in6 *addr6
+		= (struct sockaddr_in6 *) runp->ai_addr;
+	      if (runp->ai_family != AF_INET6 || addr6->sin6_scope_id == 0)
+		/* No scope ID present.  */
+		scope[0] = '\0';
+	      else
+		snprintf (scope, sizeof (scope), "%%%" PRIu32,
+			  addr6->sin6_scope_id);
+
 	      char buf[INET6_ADDRSTRLEN];
-	      printf ("%-15s %-6s %s\n",
-		      inet_ntop (runp->ai_family,
-				 runp->ai_family == AF_INET
-				 ? (void *) &((struct sockaddr_in *) runp->ai_addr)->sin_addr
-				 : (void *) &((struct sockaddr_in6 *) runp->ai_addr)->sin6_addr,
-				 buf, sizeof (buf)),
-		      sockstr,
-		      runp->ai_canonname ?: "");
+	      if (inet_ntop (runp->ai_family,
+			     runp->ai_family == AF_INET
+			     ? (void *) &((struct sockaddr_in *) runp->ai_addr)->sin_addr
+			     : &addr6->sin6_addr,
+			     buf, sizeof (buf)) == NULL)
+		{
+		  strcpy (buf, "<invalid>");
+		  scope[0] = '\0';
+		}
+
+	      int pad = 15 - strlen (buf) - strlen (scope);
+	      if (pad < 0)
+		pad = 0;
+
+	      printf ("%s%-*s %-6s %s\n",
+		      buf, pad, scope, sockstr, runp->ai_canonname ?: "");
 
 	      runp = runp->ai_next;
 	    }
@@ -509,40 +494,59 @@ netgroup_keys (int number, char *key[])
   return result;
 }
 
+#define DYNARRAY_STRUCT gid_list
+#define DYNARRAY_ELEMENT gid_t
+#define DYNARRAY_PREFIX gid_list_
+#define DYNARRAY_INITIAL_SIZE 10
+#include <malloc/dynarray-skeleton.c>
+
 /* This is for initgroups */
 static int
 initgroups_keys (int number, char *key[])
 {
-  int ngrps = 100;
-  size_t grpslen = ngrps * sizeof (gid_t);
-  gid_t *grps = alloca (grpslen);
-
   if (number == 0)
     {
       fprintf (stderr, _("Enumeration not supported on %s\n"), "initgroups");
       return 3;
     }
 
+  struct gid_list list;
+  gid_list_init (&list);
+  if (!gid_list_resize (&list, 10))
+    {
+      fprintf (stderr, _("Could not allocate group list: %m\n"));
+      return 3;
+    }
+
   for (int i = 0; i < number; ++i)
     {
-      int no = ngrps;
+      int no = gid_list_size (&list);
       int n;
-      while ((n = getgrouplist (key[i], -1, grps, &no)) == -1
-	     && no > ngrps)
+      while ((n = getgrouplist (key[i], -1, gid_list_begin (&list), &no)) == -1
+	     && no > gid_list_size (&list))
 	{
-	  grps = extend_alloca (grps, grpslen, no * sizeof (gid_t));
-	  ngrps = no;
+	  if (!gid_list_resize (&list, no))
+	    {
+	      fprintf (stderr, _("Could not allocate group list: %m\n"));
+	      return 3;
+	    }
 	}
 
       if (n == -1)
-	return 1;
+	{
+	  gid_list_free (&list);
+	  return 1;
+	}
 
+      const gid_t *grps = gid_list_begin (&list);
       printf ("%-21s", key[i]);
       for (int j = 0; j < n; ++j)
 	if (grps[j] != -1)
 	  printf (" %ld", (long int) grps[j]);
       putchar_unlocked ('\n');
     }
+
+  gid_list_free (&list);
 
   return 0;
 }
@@ -603,14 +607,8 @@ networks_keys (int number, char *key[])
 static void
 print_passwd (struct passwd *pwd)
 {
-  printf ("%s:%s:%lu:%lu:%s:%s:%s\n",
-	  pwd->pw_name ? pwd->pw_name : "",
-	  pwd->pw_passwd ? pwd->pw_passwd : "",
-	  (unsigned long int) pwd->pw_uid,
-	  (unsigned long int) pwd->pw_gid,
-	  pwd->pw_gecos ? pwd->pw_gecos : "",
-	  pwd->pw_dir ? pwd->pw_dir : "",
-	  pwd->pw_shell ? pwd->pw_shell : "");
+  if (putpwent (pwd, stdout) != 0)
+    fprintf (stderr, "error writing passwd entry: %m\n");
 }
 
 static int
@@ -700,6 +698,7 @@ protocols_keys (int number, char *key[])
   return result;
 }
 
+#if HAVE_SUNRPC
 /* Now is all for rpc */
 static void
 print_rpc (struct rpcent *rpc)
@@ -745,6 +744,7 @@ rpc_keys (int number, char *key[])
 
   return result;
 }
+#endif
 
 /* for services */
 static void
@@ -810,26 +810,8 @@ services_keys (int number, char *key[])
 static void
 print_shadow (struct spwd *sp)
 {
-  printf ("%s:%s:",
-	  sp->sp_namp ? sp->sp_namp : "",
-	  sp->sp_pwdp ? sp->sp_pwdp : "");
-
-#define SHADOW_FIELD(n) \
-  if (sp->n == -1)							      \
-    putchar_unlocked (':');						      \
-  else									      \
-    printf ("%ld:", sp->n)
-
-  SHADOW_FIELD (sp_lstchg);
-  SHADOW_FIELD (sp_min);
-  SHADOW_FIELD (sp_max);
-  SHADOW_FIELD (sp_warn);
-  SHADOW_FIELD (sp_inact);
-  SHADOW_FIELD (sp_expire);
-  if (sp->sp_flag == ~0ul)
-    putchar_unlocked ('\n');
-  else
-    printf ("%lu\n", sp->sp_flag);
+  if (putspent (sp, stdout) != 0)
+    fprintf (stderr, "error writing shadow entry: %m\n");
 }
 
 static int
@@ -884,7 +866,9 @@ D(netgroup)
 D(networks)
 D(passwd)
 D(protocols)
+#if HAVE_SUNRPC
 D(rpc)
+#endif
 D(services)
 D(shadow)
 #undef D

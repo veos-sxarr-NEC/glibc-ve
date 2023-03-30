@@ -1,5 +1,5 @@
 /* Implement __kernel_standard_f.
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,12 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
-#include <math_private.h>
+#include <math-svid-compat.h>
 
 
+#if LIBM_SVID_COMPAT
 /* Handle errors for a libm function as specified by TYPE (see
    comments in k_standard.c for details), with arguments X and Y,
    returning the appropriate return value for that function.  */
@@ -29,3 +30,4 @@ __kernel_standard_f (float x, float y, int type)
 {
   return __kernel_standard (x, y, type);
 }
+#endif

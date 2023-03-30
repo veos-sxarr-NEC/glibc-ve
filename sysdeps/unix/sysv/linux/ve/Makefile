@@ -19,14 +19,13 @@ gen-as-const-headers += ucontext_i.sym
 endif
 
 ifeq ($(subdir),elf)
-sysdep_routines += dl-vdso
 sysdep-dl-routines += dl-static
 sysdep_routines += $(sysdep-dl-routines)
 sysdep-rtld-routines += $(sysdep-dl-routines)
 endif
 
-ifeq (io,$(subdir))
-sysdep_routines += io_hook
-endif
-
 sysdep_headers += io_hook.h
+
+ifeq (io,$(subdir))
+sysdep_routines += mmap_ve64 mmap_ve
+endif

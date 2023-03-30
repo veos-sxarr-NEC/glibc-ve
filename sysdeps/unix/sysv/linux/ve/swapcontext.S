@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 /* Save current context and install the given one. */
@@ -80,6 +80,11 @@ ENTRY(__swapcontext)
 	st	%s1, -16(, %sp)
 	lea     %sp, -16(,%sp)
 
+	or %s34,14,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
 	/* Save the floating-point environment.  */
 	smir	%s3, %psw
 /*	and	%s3, %s3, (50)0	*/
@@ -462,6 +467,11 @@ ENTRY(__swapcontext)
 	shm.l	%s2, 0x10(%s60)
 	shm.l	%s3, 0x18(%s60)
 	shm.l	%s4, 0x20(%s60)
+	or %s34,10,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
 	monc
 
 	/* check return val */

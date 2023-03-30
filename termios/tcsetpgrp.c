@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -21,9 +21,7 @@
 
 /* Set the foreground process group ID of FD set PGRP_ID.  */
 int
-tcsetpgrp (fd, pgrp_id)
-     int fd;
-     pid_t pgrp_id;
+tcsetpgrp (int fd, pid_t pgrp_id)
 {
   if (fd < 0)
     {

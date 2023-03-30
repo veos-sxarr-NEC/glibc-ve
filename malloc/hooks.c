@@ -1,5 +1,5 @@
 /* Malloc implementation for multiple threads without lock contention.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Wolfram Gloger <wg@malloc.de>, 2001.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 /* What to do if the standard debugging hooks are in place and a
    corrupt pointer is detected: do nothing (0), print an error message
@@ -52,30 +52,10 @@ memalign_hook_ini (size_t alignment, size_t sz, const void *caller)
 /* Whether we are using malloc checking.  */
 static int using_malloc_checking;
 
-/* A flag that is set by malloc_set_state, to signal that malloc checking
-   must not be enabled on the request from the user (via the MALLOC_CHECK_
-   environment variable).  It is reset by __malloc_check_init to tell
-   malloc_set_state that the user has requested malloc checking.
-
-   The purpose of this flag is to make sure that malloc checking is not
-   enabled when the heap to be restored was constructed without malloc
-   checking, and thus does not contain the required magic bytes.
-   Otherwise the heap would be corrupted by calls to free and realloc.  If
-   it turns out that the heap was created with malloc checking and the
-   user has requested it malloc_set_state just calls __malloc_check_init
-   again to enable it.  On the other hand, reusing such a heap without
-   further malloc checking is safe.  */
-static int disallow_malloc_check;
-
 /* Activate a standard set of debugging hooks. */
 void
 __malloc_check_init (void)
 {
-  if (disallow_malloc_check)
-    {
-      disallow_malloc_check = 0;
-      return;
-    }
   using_malloc_checking = 1;
   __malloc_hook = malloc_check;
   __free_hook = free_check;
@@ -88,11 +68,22 @@ __malloc_check_init (void)
    overruns.  The goal here is to avoid obscure crashes due to invalid
    usage, unlike in the MALLOC_DEBUG code. */
 
-#define MAGICBYTE(p) ((((size_t) p >> 3) ^ ((size_t) p >> 11)) & 0xFF)
+static unsigned char
+magicbyte (const void *p)
+{
+  unsigned char magic;
 
-/* Visualize the chunk as being partitioned into blocks of 256 bytes from the
-   highest address of the chunk, downwards.  The beginning of each block tells
-   us the size of the previous block, up to the actual size of the requested
+  magic = (((uintptr_t) p >> 3) ^ ((uintptr_t) p >> 11)) & 0xFF;
+  /* Do not return 1.  See the comment in mem2mem_check().  */
+  if (magic == 1)
+    ++magic;
+  return magic;
+}
+
+
+/* Visualize the chunk as being partitioned into blocks of 255 bytes from the
+   highest address of the chunk, downwards.  The end of each block tells
+   us the size of that block, up to the actual size of the requested
    memory.  Our magic byte is right at the end of the requested size, so we
    must reach it with this iteration, otherwise we have witnessed a memory
    corruption.  */
@@ -101,7 +92,7 @@ malloc_check_get_size (mchunkptr p)
 {
   size_t size;
   unsigned char c;
-  unsigned char magic = MAGICBYTE (p);
+  unsigned char magic = magicbyte (p);
 
   assert (using_malloc_checking == 1);
 
@@ -110,11 +101,7 @@ malloc_check_get_size (mchunkptr p)
        size -= c)
     {
       if (c <= 0 || size < (c + 2 * SIZE_SZ))
-        {
-          malloc_printerr (check_action, "malloc_check_get_size: memory corruption",
-                           chunk2mem (p));
-          return 0;
-        }
+	malloc_printerr ("malloc_check_get_size: memory corruption");
     }
 
   /* chunk2mem size.  */
@@ -122,32 +109,35 @@ malloc_check_get_size (mchunkptr p)
 }
 
 /* Instrument a chunk with overrun detector byte(s) and convert it
-   into a user pointer with requested size sz. */
+   into a user pointer with requested size req_sz. */
 
 static void *
-internal_function
-mem2mem_check (void *ptr, size_t sz)
+mem2mem_check (void *ptr, size_t req_sz)
 {
   mchunkptr p;
   unsigned char *m_ptr = ptr;
-  size_t i;
+  size_t max_sz, block_sz, i;
+  unsigned char magic;
 
   if (!ptr)
     return ptr;
 
   p = mem2chunk (ptr);
-  for (i = chunksize (p) - (chunk_is_mmapped (p) ? 2 * SIZE_SZ + 1 : SIZE_SZ + 1);
-       i > sz;
-       i -= 0xFF)
+  magic = magicbyte (p);
+  max_sz = chunksize (p) - 2 * SIZE_SZ;
+  if (!chunk_is_mmapped (p))
+    max_sz += SIZE_SZ;
+  for (i = max_sz - 1; i > req_sz; i -= block_sz)
     {
-      if (i - sz < 0x100)
-        {
-          m_ptr[i] = (unsigned char) (i - sz);
-          break;
-        }
-      m_ptr[i] = 0xFF;
+      block_sz = MIN (i - req_sz, 0xff);
+      /* Don't allow the magic byte to appear in the chain of length bytes.
+         For the following to work, magicbyte cannot return 0x01.  */
+      if (block_sz == magic)
+        --block_sz;
+
+      m_ptr[i] = block_sz;
     }
-  m_ptr[sz] = MAGICBYTE (p);
+  m_ptr[req_sz] = magic;
   return (void *) m_ptr;
 }
 
@@ -155,7 +145,6 @@ mem2mem_check (void *ptr, size_t sz)
    pointer.  If the provided pointer is not valid, return NULL. */
 
 static mchunkptr
-internal_function
 mem2chunk_check (void *mem, unsigned char **magic_p)
 {
   mchunkptr p;
@@ -166,24 +155,24 @@ mem2chunk_check (void *mem, unsigned char **magic_p)
     return NULL;
 
   p = mem2chunk (mem);
+  sz = chunksize (p);
+  magic = magicbyte (p);
   if (!chunk_is_mmapped (p))
     {
       /* Must be a chunk in conventional heap memory. */
       int contig = contiguous (&main_arena);
-      sz = chunksize (p);
       if ((contig &&
            ((char *) p < mp_.sbrk_base ||
             ((char *) p + sz) >= (mp_.sbrk_base + main_arena.system_mem))) ||
           sz < MINSIZE || sz & MALLOC_ALIGN_MASK || !inuse (p) ||
-          (!prev_inuse (p) && (p->prev_size & MALLOC_ALIGN_MASK ||
+          (!prev_inuse (p) && ((prev_size (p) & MALLOC_ALIGN_MASK) != 0 ||
                                (contig && (char *) prev_chunk (p) < mp_.sbrk_base) ||
                                next_chunk (prev_chunk (p)) != p)))
         return NULL;
 
-      magic = MAGICBYTE (p);
       for (sz += SIZE_SZ - 1; (c = ((unsigned char *) p)[sz]) != magic; sz -= c)
         {
-          if (c <= 0 || sz < (c + 2 * SIZE_SZ))
+          if (c == 0 || sz < (c + 2 * SIZE_SZ))
             return NULL;
         }
     }
@@ -199,15 +188,14 @@ mem2chunk_check (void *mem, unsigned char **magic_p)
            offset != 0x20 && offset != 0x40 && offset != 0x80 && offset != 0x100 &&
            offset != 0x200 && offset != 0x400 && offset != 0x800 && offset != 0x1000 &&
            offset < 0x2000) ||
-          !chunk_is_mmapped (p) || (p->size & PREV_INUSE) ||
-          ((((unsigned long) p - p->prev_size) & page_mask) != 0) ||
-          ((sz = chunksize (p)), ((p->prev_size + sz) & page_mask) != 0))
+          !chunk_is_mmapped (p) || prev_inuse (p) ||
+          ((((unsigned long) p - prev_size (p)) & page_mask) != 0) ||
+          ((prev_size (p) + sz) & page_mask) != 0)
         return NULL;
 
-      magic = MAGICBYTE (p);
       for (sz -= 1; (c = ((unsigned char *) p)[sz]) != magic; sz -= c)
         {
-          if (c <= 0 || sz < (c + 2 * SIZE_SZ))
+          if (c == 0 || sz < (c + 2 * SIZE_SZ))
             return NULL;
         }
     }
@@ -217,17 +205,11 @@ mem2chunk_check (void *mem, unsigned char **magic_p)
   return p;
 }
 
-/* Check for corruption of the top chunk, and try to recover if
-   necessary. */
-
-static int
-internal_function
+/* Check for corruption of the top chunk.  */
+static void
 top_check (void)
 {
   mchunkptr t = top (&main_arena);
-  char *brk, *new_brk;
-  INTERNAL_SIZE_T front_misalign, sbrk_size;
-  unsigned long pagesz = GLRO (dl_pagesize);
 
   if (t == initial_top (&main_arena) ||
       (!chunk_is_mmapped (t) &&
@@ -235,49 +217,27 @@ top_check (void)
        prev_inuse (t) &&
        (!contiguous (&main_arena) ||
         (char *) t + chunksize (t) == mp_.sbrk_base + main_arena.system_mem)))
-    return 0;
+    return;
 
-  malloc_printerr (check_action, "malloc: top chunk is corrupt", t);
-
-  /* Try to set up a new top chunk. */
-  brk = MORECORE (0);
-  front_misalign = (unsigned long) chunk2mem (brk) & MALLOC_ALIGN_MASK;
-  if (front_misalign > 0)
-    front_misalign = MALLOC_ALIGNMENT - front_misalign;
-  sbrk_size = front_misalign + mp_.top_pad + MINSIZE;
-  sbrk_size += pagesz - ((unsigned long) (brk + sbrk_size) & (pagesz - 1));
-  new_brk = (char *) (MORECORE (sbrk_size));
-  if (new_brk == (char *) (MORECORE_FAILURE))
-    {
-      __set_errno (ENOMEM);
-      return -1;
-    }
-  /* Call the `morecore' hook if necessary.  */
-  void (*hook) (void) = atomic_forced_read (__after_morecore_hook);
-  if (hook)
-    (*hook)();
-  main_arena.system_mem = (new_brk - mp_.sbrk_base) + sbrk_size;
-
-  top (&main_arena) = (mchunkptr) (brk + front_misalign);
-  set_head (top (&main_arena), (sbrk_size - front_misalign) | PREV_INUSE);
-
-  return 0;
+  malloc_printerr ("malloc: top chunk is corrupt");
 }
 
 static void *
 malloc_check (size_t sz, const void *caller)
 {
   void *victim;
+  size_t nb;
 
-  if (sz + 1 == 0)
+  if (__builtin_add_overflow (sz, 1, &nb))
     {
       __set_errno (ENOMEM);
       return NULL;
     }
 
-  (void) mutex_lock (&main_arena.mutex);
-  victim = (top_check () >= 0) ? _int_malloc (&main_arena, sz + 1) : NULL;
-  (void) mutex_unlock (&main_arena.mutex);
+  __libc_lock_lock (main_arena.mutex);
+  top_check ();
+  victim = _int_malloc (&main_arena, nb);
+  __libc_lock_unlock (main_arena.mutex);
   return mem2mem_check (victim, sz);
 }
 
@@ -289,23 +249,18 @@ free_check (void *mem, const void *caller)
   if (!mem)
     return;
 
-  (void) mutex_lock (&main_arena.mutex);
+  __libc_lock_lock (main_arena.mutex);
   p = mem2chunk_check (mem, NULL);
   if (!p)
-    {
-      (void) mutex_unlock (&main_arena.mutex);
-
-      malloc_printerr (check_action, "free(): invalid pointer", mem);
-      return;
-    }
+    malloc_printerr ("free(): invalid pointer");
   if (chunk_is_mmapped (p))
     {
-      (void) mutex_unlock (&main_arena.mutex);
+      __libc_lock_unlock (main_arena.mutex);
       munmap_chunk (p);
       return;
     }
   _int_free (&main_arena, p, 1);
-  (void) mutex_unlock (&main_arena.mutex);
+  __libc_lock_unlock (main_arena.mutex);
 }
 
 static void *
@@ -314,8 +269,9 @@ realloc_check (void *oldmem, size_t bytes, const void *caller)
   INTERNAL_SIZE_T nb;
   void *newmem = 0;
   unsigned char *magic_p;
+  size_t rb;
 
-  if (bytes + 1 == 0)
+  if (__builtin_add_overflow (bytes, 1, &rb))
     {
       __set_errno (ENOMEM);
       return NULL;
@@ -328,18 +284,17 @@ realloc_check (void *oldmem, size_t bytes, const void *caller)
       free_check (oldmem, NULL);
       return NULL;
     }
-  (void) mutex_lock (&main_arena.mutex);
+  __libc_lock_lock (main_arena.mutex);
   const mchunkptr oldp = mem2chunk_check (oldmem, &magic_p);
-  (void) mutex_unlock (&main_arena.mutex);
+  __libc_lock_unlock (main_arena.mutex);
   if (!oldp)
-    {
-      malloc_printerr (check_action, "realloc(): invalid pointer", oldmem);
-      return malloc_check (bytes, NULL);
-    }
+    malloc_printerr ("realloc(): invalid pointer");
   const INTERNAL_SIZE_T oldsize = chunksize (oldp);
 
-  checked_request2size (bytes + 1, nb);
-  (void) mutex_lock (&main_arena.mutex);
+  if (!checked_request2size (rb, &nb))
+    goto invert;
+
+  __libc_lock_lock (main_arena.mutex);
 
   if (chunk_is_mmapped (oldp))
     {
@@ -356,8 +311,8 @@ realloc_check (void *oldmem, size_t bytes, const void *caller)
         else
           {
             /* Must alloc, copy, free. */
-            if (top_check () >= 0)
-              newmem = _int_malloc (&main_arena, bytes + 1);
+	    top_check ();
+	    newmem = _int_malloc (&main_arena, rb);
             if (newmem)
               {
                 memcpy (newmem, oldmem, oldsize - 2 * SIZE_SZ);
@@ -368,21 +323,25 @@ realloc_check (void *oldmem, size_t bytes, const void *caller)
     }
   else
     {
-      if (top_check () >= 0)
-        {
-          INTERNAL_SIZE_T nb;
-          checked_request2size (bytes + 1, nb);
-          newmem = _int_realloc (&main_arena, oldp, oldsize, nb);
-        }
+      top_check ();
+      newmem = _int_realloc (&main_arena, oldp, oldsize, nb);
     }
 
+  DIAG_PUSH_NEEDS_COMMENT;
+#if __GNUC_PREREQ (7, 0)
+  /* GCC 7 warns about magic_p may be used uninitialized.  But we never
+     reach here if magic_p is uninitialized.  */
+  DIAG_IGNORE_NEEDS_COMMENT (7, "-Wmaybe-uninitialized");
+#endif
   /* mem2chunk_check changed the magic byte in the old chunk.
      If newmem is NULL, then the old chunk will still be used though,
      so we need to invert that change here.  */
+invert:
   if (newmem == NULL)
     *magic_p ^= 0xFF;
+  DIAG_POP_NEEDS_COMMENT;
 
-  (void) mutex_unlock (&main_arena.mutex);
+  __libc_lock_unlock (main_arena.mutex);
 
   return mem2mem_check (newmem, bytes);
 }
@@ -422,32 +381,23 @@ memalign_check (size_t alignment, size_t bytes, const void *caller)
       alignment = a;
     }
 
-  (void) mutex_lock (&main_arena.mutex);
-  mem = (top_check () >= 0) ? _int_memalign (&main_arena, alignment, bytes + 1) :
-        NULL;
-  (void) mutex_unlock (&main_arena.mutex);
+  __libc_lock_lock (main_arena.mutex);
+  top_check ();
+  mem = _int_memalign (&main_arena, alignment, bytes + 1);
+  __libc_lock_unlock (main_arena.mutex);
   return mem2mem_check (mem, bytes);
 }
 
+#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_25)
 
-/* Get/set state: malloc_get_state() records the current state of all
-   malloc variables (_except_ for the actual heap contents and `hook'
-   function pointers) in a system dependent, opaque data structure.
-   This data structure is dynamically allocated and can be free()d
-   after use.  malloc_set_state() restores the state of all malloc
-   variables to the previously obtained state.  This is especially
-   useful when using this malloc as part of a shared library, and when
-   the heap contents are saved/restored via some other method.  The
-   primary example for this is GNU Emacs with its `dumping' procedure.
-   `Hook' function pointers are never saved or restored by these
-   functions, with two exceptions: If malloc checking was in use when
-   malloc_get_state() was called, then malloc_set_state() calls
-   __malloc_check_init() if possible; if malloc checking was not in
-   use in the recorded state but the user requested malloc checking,
-   then the hooks are reset to 0.  */
+/* Support for restoring dumped heaps contained in historic Emacs
+   executables.  The heap saving feature (malloc_get_state) is no
+   longer implemented in this version of glibc, but we have a heap
+   rewriter in malloc_set_state which transforms the heap into a
+   version compatible with current malloc.  */
 
 #define MALLOC_STATE_MAGIC   0x444c4541l
-#define MALLOC_STATE_VERSION (0 * 0x100l + 4l) /* major*0x100 + minor */
+#define MALLOC_STATE_VERSION (0 * 0x100l + 5l) /* major*0x100 + minor */
 
 struct malloc_save_state
 {
@@ -462,7 +412,7 @@ struct malloc_save_state
   unsigned long mmap_threshold;
   int check_action;
   unsigned long max_sbrked_mem;
-  unsigned long max_total_mem;
+  unsigned long max_total_mem;	/* Always 0, for backwards compatibility.  */
   unsigned int n_mmaps;
   unsigned int max_n_mmaps;
   unsigned long mmapped_mem;
@@ -474,67 +424,24 @@ struct malloc_save_state
   unsigned long narenas;
 };
 
+/* Dummy implementation which always fails.  We need to provide this
+   symbol so that existing Emacs binaries continue to work with
+   BIND_NOW.  */
 void *
-__malloc_get_state (void)
+attribute_compat_text_section
+malloc_get_state (void)
 {
-  struct malloc_save_state *ms;
-  int i;
-  mbinptr b;
-
-  ms = (struct malloc_save_state *) __libc_malloc (sizeof (*ms));
-  if (!ms)
-    return 0;
-
-  (void) mutex_lock (&main_arena.mutex);
-  malloc_consolidate (&main_arena);
-  ms->magic = MALLOC_STATE_MAGIC;
-  ms->version = MALLOC_STATE_VERSION;
-  ms->av[0] = 0;
-  ms->av[1] = 0; /* used to be binblocks, now no longer used */
-  ms->av[2] = top (&main_arena);
-  ms->av[3] = 0; /* used to be undefined */
-  for (i = 1; i < NBINS; i++)
-    {
-      b = bin_at (&main_arena, i);
-      if (first (b) == b)
-        ms->av[2 * i + 2] = ms->av[2 * i + 3] = 0; /* empty bin */
-      else
-        {
-          ms->av[2 * i + 2] = first (b);
-          ms->av[2 * i + 3] = last (b);
-        }
-    }
-  ms->sbrk_base = mp_.sbrk_base;
-  ms->sbrked_mem_bytes = main_arena.system_mem;
-  ms->trim_threshold = mp_.trim_threshold;
-  ms->top_pad = mp_.top_pad;
-  ms->n_mmaps_max = mp_.n_mmaps_max;
-  ms->mmap_threshold = mp_.mmap_threshold;
-  ms->check_action = check_action;
-  ms->max_sbrked_mem = main_arena.max_system_mem;
-  ms->max_total_mem = 0;
-  ms->n_mmaps = mp_.n_mmaps;
-  ms->max_n_mmaps = mp_.max_n_mmaps;
-  ms->mmapped_mem = mp_.mmapped_mem;
-  ms->max_mmapped_mem = mp_.max_mmapped_mem;
-  ms->using_malloc_checking = using_malloc_checking;
-  ms->max_fast = get_max_fast ();
-  ms->arena_test = mp_.arena_test;
-  ms->arena_max = mp_.arena_max;
-  ms->narenas = narenas;
-  (void) mutex_unlock (&main_arena.mutex);
-  return (void *) ms;
+  __set_errno (ENOSYS);
+  return NULL;
 }
+compat_symbol (libc, malloc_get_state, malloc_get_state, GLIBC_2_0);
 
 int
-__malloc_set_state (void *msptr)
+attribute_compat_text_section
+malloc_set_state (void *msptr)
 {
   struct malloc_save_state *ms = (struct malloc_save_state *) msptr;
-  size_t i;
-  mbinptr b;
 
-  disallow_malloc_check = 1;
-  ptmalloc_init ();
   if (ms->magic != MALLOC_STATE_MAGIC)
     return -1;
 
@@ -542,108 +449,65 @@ __malloc_set_state (void *msptr)
   if ((ms->version & ~0xffl) > (MALLOC_STATE_VERSION & ~0xffl))
     return -2;
 
-  (void) mutex_lock (&main_arena.mutex);
-  /* There are no fastchunks.  */
-  clear_fastchunks (&main_arena);
-  if (ms->version >= 4)
-    set_max_fast (ms->max_fast);
-  else
-    set_max_fast (64);  /* 64 used to be the value we always used.  */
-  for (i = 0; i < NFASTBINS; ++i)
-    fastbin (&main_arena, i) = 0;
-  for (i = 0; i < BINMAPSIZE; ++i)
-    main_arena.binmap[i] = 0;
-  top (&main_arena) = ms->av[2];
-  main_arena.last_remainder = 0;
-  for (i = 1; i < NBINS; i++)
-    {
-      b = bin_at (&main_arena, i);
-      if (ms->av[2 * i + 2] == 0)
-        {
-          assert (ms->av[2 * i + 3] == 0);
-          first (b) = last (b) = b;
-        }
-      else
-        {
-          if (ms->version >= 3 &&
-              (i < NSMALLBINS || (largebin_index (chunksize (ms->av[2 * i + 2])) == i &&
-                                  largebin_index (chunksize (ms->av[2 * i + 3])) == i)))
-            {
-              first (b) = ms->av[2 * i + 2];
-              last (b) = ms->av[2 * i + 3];
-              /* Make sure the links to the bins within the heap are correct.  */
-              first (b)->bk = b;
-              last (b)->fd = b;
-              /* Set bit in binblocks.  */
-              mark_bin (&main_arena, i);
-            }
-          else
-            {
-              /* Oops, index computation from chunksize must have changed.
-                 Link the whole list into unsorted_chunks.  */
-              first (b) = last (b) = b;
-              b = unsorted_chunks (&main_arena);
-              ms->av[2 * i + 2]->bk = b;
-              ms->av[2 * i + 3]->fd = b->fd;
-              b->fd->bk = ms->av[2 * i + 3];
-              b->fd = ms->av[2 * i + 2];
-            }
-        }
-    }
-  if (ms->version < 3)
-    {
-      /* Clear fd_nextsize and bk_nextsize fields.  */
-      b = unsorted_chunks (&main_arena)->fd;
-      while (b != unsorted_chunks (&main_arena))
-        {
-          if (!in_smallbin_range (chunksize (b)))
-            {
-              b->fd_nextsize = NULL;
-              b->bk_nextsize = NULL;
-            }
-          b = b->fd;
-        }
-    }
-  mp_.sbrk_base = ms->sbrk_base;
-  main_arena.system_mem = ms->sbrked_mem_bytes;
-  mp_.trim_threshold = ms->trim_threshold;
-  mp_.top_pad = ms->top_pad;
-  mp_.n_mmaps_max = ms->n_mmaps_max;
-  mp_.mmap_threshold = ms->mmap_threshold;
-  check_action = ms->check_action;
-  main_arena.max_system_mem = ms->max_sbrked_mem;
-  mp_.n_mmaps = ms->n_mmaps;
-  mp_.max_n_mmaps = ms->max_n_mmaps;
-  mp_.mmapped_mem = ms->mmapped_mem;
-  mp_.max_mmapped_mem = ms->max_mmapped_mem;
-  /* add version-dependent code here */
-  if (ms->version >= 1)
-    {
-      /* Check whether it is safe to enable malloc checking, or whether
-         it is necessary to disable it.  */
-      if (ms->using_malloc_checking && !using_malloc_checking &&
-          !disallow_malloc_check)
-        __malloc_check_init ();
-      else if (!ms->using_malloc_checking && using_malloc_checking)
-        {
-          __malloc_hook = NULL;
-          __free_hook = NULL;
-          __realloc_hook = NULL;
-          __memalign_hook = NULL;
-          using_malloc_checking = 0;
-        }
-    }
-  if (ms->version >= 4)
-    {
-      mp_.arena_test = ms->arena_test;
-      mp_.arena_max = ms->arena_max;
-      narenas = ms->narenas;
-    }
-  check_malloc_state (&main_arena);
+  /* We do not need to perform locking here because malloc_set_state
+     must be called before the first call into the malloc subsytem
+     (usually via __malloc_initialize_hook).  pthread_create always
+     calls calloc and thus must be called only afterwards, so there
+     cannot be more than one thread when we reach this point.  */
 
-  (void) mutex_unlock (&main_arena.mutex);
+  /* Disable the malloc hooks (and malloc checking).  */
+  __malloc_hook = NULL;
+  __realloc_hook = NULL;
+  __free_hook = NULL;
+  __memalign_hook = NULL;
+  using_malloc_checking = 0;
+
+  /* Patch the dumped heap.  We no longer try to integrate into the
+     existing heap.  Instead, we mark the existing chunks as mmapped.
+     Together with the update to dumped_main_arena_start and
+     dumped_main_arena_end, realloc and free will recognize these
+     chunks as dumped fake mmapped chunks and never free them.  */
+
+  /* Find the chunk with the lowest address with the heap.  */
+  mchunkptr chunk = NULL;
+  {
+    size_t *candidate = (size_t *) ms->sbrk_base;
+    size_t *end = (size_t *) (ms->sbrk_base + ms->sbrked_mem_bytes);
+    while (candidate < end)
+      if (*candidate != 0)
+	{
+	  chunk = mem2chunk ((void *) (candidate + 1));
+	  break;
+	}
+      else
+	++candidate;
+  }
+  if (chunk == NULL)
+    return 0;
+
+  /* Iterate over the dumped heap and patch the chunks so that they
+     are treated as fake mmapped chunks.  */
+  mchunkptr top = ms->av[2];
+  while (chunk < top)
+    {
+      if (inuse (chunk))
+	{
+	  /* Mark chunk as mmapped, to trigger the fallback path.  */
+	  size_t size = chunksize (chunk);
+	  set_head (chunk, size | IS_MMAPPED);
+	}
+      chunk = next_chunk (chunk);
+    }
+
+  /* The dumped fake mmapped chunks all lie in this address range.  */
+  dumped_main_arena_start = (mchunkptr) ms->sbrk_base;
+  dumped_main_arena_end = top;
+
   return 0;
 }
+compat_symbol (libc, malloc_set_state, malloc_set_state, GLIBC_2_0);
+
+#endif	/* SHLIB_COMPAT */
 
 /*
  * Local variables:

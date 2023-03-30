@@ -1,5 +1,5 @@
 /* Floating point output for `printf'.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
    Written by Ulrich Drepper <drepper@gnu.ai.mit.edu>, 1995.
@@ -16,11 +16,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* The gmp headers need some configuration frobs.  */
 #define HAVE_ALLOCA 1
 
+#include <array_length.h>
 #include <libioP.h>
 #include <alloca.h>
 #include <ctype.h>
@@ -55,17 +56,12 @@
 #endif
 #include <assert.h>
 
-/* This defines make it possible to use the same code for GNU C library and
-   the GNU I/O library.	 */
 #define PUT(f, s, n) _IO_sputn (f, s, n)
 #define PAD(f, c, n) (wide ? _IO_wpadn (f, c, n) : _IO_padn (f, c, n))
-/* We use this file GNU C library and GNU I/O library.	So make
-   names equal.	 */
 #undef putc
 #define putc(c, f) (wide \
 		    ? (int)_IO_putwc_unlocked (c, f) : _IO_putc_unlocked (c, f))
-#define size_t     _IO_size_t
-#define FILE	     _IO_FILE
+
 
 /* Macros for doing the actual output.  */
 
@@ -139,14 +135,11 @@ extern mp_size_t __mpn_extract_double (mp_ptr res_ptr, mp_size_t size,
 extern mp_size_t __mpn_extract_long_double (mp_ptr res_ptr, mp_size_t size,
 					    int *expt, int *is_neg,
 					    long double value);
-extern unsigned int __guess_grouping (unsigned int intdig_max,
-				      const char *grouping);
 
 
 static wchar_t *group_number (wchar_t *buf, wchar_t *bufend,
 			      unsigned int intdig_no, const char *grouping,
-			      wchar_t thousands_sep, int ngroups)
-     internal_function;
+			      wchar_t thousands_sep, int ngroups);
 
 struct hack_digit_param
 {
@@ -209,15 +202,18 @@ hack_digit (struct hack_digit_param *p)
 }
 
 int
-___printf_fp (FILE *fp,
-	      const struct printf_info *info,
-	      const void *const *args)
+__printf_fp_l (FILE *fp, locale_t loc,
+	       const struct printf_info *info,
+	       const void *const *args)
 {
   /* The floating-point value to output.  */
   union
     {
       double dbl;
-      __long_double_t ldbl;
+      long double ldbl;
+#if __HAVE_DISTINCT_FLOAT128
+      _Float128 f128;
+#endif
     }
   fpnum;
 
@@ -234,9 +230,17 @@ ___printf_fp (FILE *fp,
   const char *special = NULL;
   const wchar_t *wspecial = NULL;
 
+  /* When _Float128 is enabled in the library and ABI-distinct from long
+     double, we need mp_limbs enough for any of them.  */
+#if __HAVE_DISTINCT_FLOAT128
+# define GREATER_MANT_DIG FLT128_MANT_DIG
+#else
+# define GREATER_MANT_DIG LDBL_MANT_DIG
+#endif
   /* We need just a few limbs for the input before shifting to the right
      position.	*/
-  mp_limb_t fp_input[(LDBL_MANT_DIG + BITS_PER_MP_LIMB - 1) / BITS_PER_MP_LIMB];
+  mp_limb_t fp_input[(GREATER_MANT_DIG + BITS_PER_MP_LIMB - 1)
+		     / BITS_PER_MP_LIMB];
   /* We need to shift the contents of fp_input by this amount of bits.	*/
   int to_shift = 0;
 
@@ -263,18 +267,19 @@ ___printf_fp (FILE *fp,
   /* Figure out the decimal point character.  */
   if (info->extra == 0)
     {
-      decimal = _NL_CURRENT (LC_NUMERIC, DECIMAL_POINT);
-      decimalwc = _NL_CURRENT_WORD (LC_NUMERIC, _NL_NUMERIC_DECIMAL_POINT_WC);
+      decimal = _nl_lookup (loc, LC_NUMERIC, DECIMAL_POINT);
+      decimalwc = _nl_lookup_word
+	(loc, LC_NUMERIC, _NL_NUMERIC_DECIMAL_POINT_WC);
     }
   else
     {
-      decimal = _NL_CURRENT (LC_MONETARY, MON_DECIMAL_POINT);
+      decimal = _nl_lookup (loc, LC_MONETARY, MON_DECIMAL_POINT);
       if (*decimal == '\0')
-	decimal = _NL_CURRENT (LC_NUMERIC, DECIMAL_POINT);
-      decimalwc = _NL_CURRENT_WORD (LC_MONETARY,
+	decimal = _nl_lookup (loc, LC_NUMERIC, DECIMAL_POINT);
+      decimalwc = _nl_lookup_word (loc, LC_MONETARY,
 				    _NL_MONETARY_DECIMAL_POINT_WC);
       if (decimalwc == L'\0')
-	decimalwc = _NL_CURRENT_WORD (LC_NUMERIC,
+	decimalwc = _nl_lookup_word (loc, LC_NUMERIC,
 				      _NL_NUMERIC_DECIMAL_POINT_WC);
     }
   /* The decimal point character must not be zero.  */
@@ -284,9 +289,9 @@ ___printf_fp (FILE *fp,
   if (info->group)
     {
       if (info->extra == 0)
-	grouping = _NL_CURRENT (LC_NUMERIC, GROUPING);
+	grouping = _nl_lookup (loc, LC_NUMERIC, GROUPING);
       else
-	grouping = _NL_CURRENT (LC_MONETARY, MON_GROUPING);
+	grouping = _nl_lookup (loc, LC_MONETARY, MON_GROUPING);
 
       if (*grouping <= 0 || *grouping == CHAR_MAX)
 	grouping = NULL;
@@ -296,19 +301,20 @@ ___printf_fp (FILE *fp,
 	  if (wide)
 	    {
 	      if (info->extra == 0)
-		thousands_sepwc =
-		  _NL_CURRENT_WORD (LC_NUMERIC, _NL_NUMERIC_THOUSANDS_SEP_WC);
+		thousands_sepwc = _nl_lookup_word
+		  (loc, LC_NUMERIC, _NL_NUMERIC_THOUSANDS_SEP_WC);
 	      else
 		thousands_sepwc =
-		  _NL_CURRENT_WORD (LC_MONETARY,
+		  _nl_lookup_word (loc, LC_MONETARY,
 				    _NL_MONETARY_THOUSANDS_SEP_WC);
 	    }
 	  else
 	    {
 	      if (info->extra == 0)
-		thousands_sep = _NL_CURRENT (LC_NUMERIC, THOUSANDS_SEP);
+		thousands_sep = _nl_lookup (loc, LC_NUMERIC, THOUSANDS_SEP);
 	      else
-		thousands_sep = _NL_CURRENT (LC_MONETARY, MON_THOUSANDS_SEP);
+		thousands_sep = _nl_lookup
+		  (loc, LC_MONETARY, MON_THOUSANDS_SEP);
 	    }
 
 	  if ((wide && thousands_sepwc == L'\0')
@@ -325,97 +331,62 @@ ___printf_fp (FILE *fp,
   else
     grouping = NULL;
 
+#define PRINTF_FP_FETCH(FLOAT, VAR, SUFFIX, MANT_DIG)			\
+  {									\
+    (VAR) = *(const FLOAT *) args[0];					\
+									\
+    /* Check for special values: not a number or infinity.  */		\
+    if (isnan (VAR))							\
+      {									\
+	is_neg = signbit (VAR);						\
+	if (isupper (info->spec))					\
+	  {								\
+	    special = "NAN";						\
+	    wspecial = L"NAN";						\
+	  }								\
+	else								\
+	  {								\
+	    special = "nan";						\
+	    wspecial = L"nan";						\
+	  }								\
+      }									\
+    else if (isinf (VAR))						\
+      {									\
+	is_neg = signbit (VAR);						\
+	if (isupper (info->spec))					\
+	  {								\
+	    special = "INF";						\
+	    wspecial = L"INF";						\
+	  }								\
+	else								\
+	  {								\
+	    special = "inf";						\
+	    wspecial = L"inf";						\
+	  }								\
+      }									\
+    else								\
+      {									\
+	p.fracsize = __mpn_extract_##SUFFIX				\
+		     (fp_input, array_length (fp_input),		\
+		      &p.exponent, &is_neg, VAR);			\
+	to_shift = 1 + p.fracsize * BITS_PER_MP_LIMB - MANT_DIG;	\
+      }									\
+  }
+
   /* Fetch the argument value.	*/
+#if __HAVE_DISTINCT_FLOAT128
+  if (info->is_binary128)
+    PRINTF_FP_FETCH (_Float128, fpnum.f128, float128, FLT128_MANT_DIG)
+  else
+#endif
 #ifndef __NO_LONG_DOUBLE_MATH
   if (info->is_long_double && sizeof (long double) > sizeof (double))
-    {
-      fpnum.ldbl = *(const long double *) args[0];
-
-      /* Check for special values: not a number or infinity.  */
-      int res;
-      if (__isnanl (fpnum.ldbl))
-	{
-	  is_neg = signbit (fpnum.ldbl);
-	  if (isupper (info->spec))
-	    {
-	      special = "NAN";
-	      wspecial = L"NAN";
-	    }
-	    else
-	      {
-		special = "nan";
-		wspecial = L"nan";
-	      }
-	}
-      else if ((res = __isinfl (fpnum.ldbl)))
-	{
-	  is_neg = res < 0;
-	  if (isupper (info->spec))
-	    {
-	      special = "INF";
-	      wspecial = L"INF";
-	    }
-	  else
-	    {
-	      special = "inf";
-	      wspecial = L"inf";
-	    }
-	}
-      else
-	{
-	  p.fracsize = __mpn_extract_long_double (fp_input,
-						(sizeof (fp_input) /
-						 sizeof (fp_input[0])),
-						&p.exponent, &is_neg,
-						fpnum.ldbl);
-	  to_shift = 1 + p.fracsize * BITS_PER_MP_LIMB - LDBL_MANT_DIG;
-	}
-    }
+    PRINTF_FP_FETCH (long double, fpnum.ldbl, long_double, LDBL_MANT_DIG)
   else
-#endif	/* no long double */
-    {
-      fpnum.dbl = *(const double *) args[0];
+#endif
+    PRINTF_FP_FETCH (double, fpnum.dbl, double, DBL_MANT_DIG)
 
-      /* Check for special values: not a number or infinity.  */
-      int res;
-      if (__isnan (fpnum.dbl))
-	{
-	  union ieee754_double u = { .d = fpnum.dbl };
-	  is_neg = u.ieee.negative != 0;
-	  if (isupper (info->spec))
-	    {
-	      special = "NAN";
-	      wspecial = L"NAN";
-	    }
-	  else
-	    {
-	      special = "nan";
-	      wspecial = L"nan";
-	    }
-	}
-      else if ((res = __isinf (fpnum.dbl)))
-	{
-	  is_neg = res < 0;
-	  if (isupper (info->spec))
-	    {
-	      special = "INF";
-	      wspecial = L"INF";
-	    }
-	  else
-	    {
-	      special = "inf";
-	      wspecial = L"inf";
-	    }
-	}
-      else
-	{
-	  p.fracsize = __mpn_extract_double (fp_input,
-					   (sizeof (fp_input)
-					    / sizeof (fp_input[0])),
-					   &p.exponent, &is_neg, fpnum.dbl);
-	  to_shift = 1 + p.fracsize * BITS_PER_MP_LIMB - DBL_MANT_DIG;
-	}
-    }
+#undef PRINTF_FP_FETCH
 
   if (special)
     {
@@ -449,9 +420,10 @@ ___printf_fp (FILE *fp,
      efficient to use variables of the fixed maximum size but because this
      would be really big it could lead to memory problems.  */
   {
-    mp_size_t bignum_size = ((ABS (p.exponent) + BITS_PER_MP_LIMB - 1)
+    mp_size_t bignum_size = ((abs (p.exponent) + BITS_PER_MP_LIMB - 1)
 			     / BITS_PER_MP_LIMB
-			     + (LDBL_MANT_DIG / BITS_PER_MP_LIMB > 2 ? 8 : 4))
+			     + (GREATER_MANT_DIG / BITS_PER_MP_LIMB > 2
+				? 8 : 4))
 			    * sizeof (mp_limb_t);
     p.frac = (mp_limb_t *) alloca (bignum_size);
     p.tmp = (mp_limb_t *) alloca (bignum_size);
@@ -466,7 +438,15 @@ ___printf_fp (FILE *fp,
     {
       /* |FP| >= 8.0.  */
       int scaleexpo = 0;
-      int explog = LDBL_MAX_10_EXP_LOG;
+      int explog;
+#if __HAVE_DISTINCT_FLOAT128
+      if (info->is_binary128)
+	explog = FLT128_MAX_10_EXP_LOG;
+      else
+	explog = LDBL_MAX_10_EXP_LOG;
+#else
+      explog = LDBL_MAX_10_EXP_LOG;
+#endif
       int exp10 = 0;
       const struct mp_power *powers = &_fpioconst_pow10[explog + 1];
       int cnt_h, cnt_l, i;
@@ -479,8 +459,8 @@ ___printf_fp (FILE *fp,
 	}
       else
 	{
-	  cy = __mpn_lshift (p.frac +
-			     (p.exponent + to_shift) / BITS_PER_MP_LIMB,
+	  cy = __mpn_lshift (p.frac
+			     + (p.exponent + to_shift) / BITS_PER_MP_LIMB,
 			     fp_input, p.fracsize,
 			     (p.exponent + to_shift) % BITS_PER_MP_LIMB);
 	  p.fracsize += (p.exponent + to_shift) / BITS_PER_MP_LIMB;
@@ -500,6 +480,27 @@ ___printf_fp (FILE *fp,
 	    {
 	      if (p.scalesize == 0)
 		{
+#if __HAVE_DISTINCT_FLOAT128
+		  if ((FLT128_MANT_DIG
+			    > _FPIO_CONST_OFFSET * BITS_PER_MP_LIMB)
+			   && info->is_binary128)
+		    {
+#define _FLT128_FPIO_CONST_SHIFT \
+  (((FLT128_MANT_DIG + BITS_PER_MP_LIMB - 1) / BITS_PER_MP_LIMB) \
+   - _FPIO_CONST_OFFSET)
+		      /* 64bit const offset is not enough for
+			 IEEE 854 quad long double (_Float128).  */
+		      p.tmpsize = powers->arraysize + _FLT128_FPIO_CONST_SHIFT;
+		      memcpy (p.tmp + _FLT128_FPIO_CONST_SHIFT,
+			      &__tens[powers->arrayoff],
+			      p.tmpsize * sizeof (mp_limb_t));
+		      MPN_ZERO (p.tmp, _FLT128_FPIO_CONST_SHIFT);
+		      /* Adjust p.exponent, as scaleexpo will be this much
+			 bigger too.  */
+		      p.exponent += _FLT128_FPIO_CONST_SHIFT * BITS_PER_MP_LIMB;
+		    }
+		  else
+#endif /* __HAVE_DISTINCT_FLOAT128 */
 #ifndef __NO_LONG_DOUBLE_MATH
 		  if (LDBL_MANT_DIG > _FPIO_CONST_OFFSET * BITS_PER_MP_LIMB
 		      && info->is_long_double)
@@ -532,8 +533,8 @@ ___printf_fp (FILE *fp,
 				  &__tens[powers->arrayoff
 					 + _FPIO_CONST_OFFSET],
 				  powers->arraysize - _FPIO_CONST_OFFSET);
-		  p.tmpsize = p.scalesize +
-		    powers->arraysize - _FPIO_CONST_OFFSET;
+		  p.tmpsize = p.scalesize
+		    + powers->arraysize - _FPIO_CONST_OFFSET;
 		  if (cy == 0)
 		    --p.tmpsize;
 		}
@@ -640,7 +641,15 @@ ___printf_fp (FILE *fp,
     {
       /* |FP| < 1.0.  */
       int exp10 = 0;
-      int explog = LDBL_MAX_10_EXP_LOG;
+      int explog;
+#if __HAVE_DISTINCT_FLOAT128
+      if (info->is_binary128)
+	explog = FLT128_MAX_10_EXP_LOG;
+      else
+	explog = LDBL_MAX_10_EXP_LOG;
+#else
+      explog = LDBL_MAX_10_EXP_LOG;
+#endif
       const struct mp_power *powers = &_fpioconst_pow10[explog + 1];
 
       /* Now shift the input value to its right place.	*/
@@ -708,10 +717,10 @@ ___printf_fp (FILE *fp,
 		 multiplication was not valid.  This is because we cannot
 		 determine the number of bits in the result in advance.  */
 	      if (incr < p.exponent + 3
-		  || (incr == p.exponent + 3 &&
-		      (p.tmp[p.tmpsize - 1] < topval[1]
-		       || (p.tmp[p.tmpsize - 1] == topval[1]
-			   && p.tmp[p.tmpsize - 2] < topval[0]))))
+		  || (incr == p.exponent + 3
+		      && (p.tmp[p.tmpsize - 1] < topval[1]
+			  || (p.tmp[p.tmpsize - 1] == topval[1]
+			      && p.tmp[p.tmpsize - 2] < topval[0]))))
 		{
 		  /* The factor is right.  Adapt binary and decimal
 		     exponents.	 */
@@ -800,8 +809,8 @@ ___printf_fp (FILE *fp,
 	 numbers are in the range of 1.0 <= |fp| < 8.0.  We simply
 	 shift it to the right place and divide it by 1.0 to get the
 	 leading digit.	 (Of course this division is not really made.)	*/
-      assert (0 <= p.exponent && p.exponent < 3 &&
-	      p.exponent + to_shift < BITS_PER_MP_LIMB);
+      assert (0 <= p.exponent && p.exponent < 3
+	      && p.exponent + to_shift < BITS_PER_MP_LIMB);
 
       /* Now shift the input value to its right place.	*/
       cy = __mpn_lshift (p.frac, fp_input, p.fracsize, (p.exponent + to_shift));
@@ -1174,9 +1183,11 @@ ___printf_fp (FILE *fp,
 	  size_t decimal_len;
 	  size_t thousands_sep_len;
 	  wchar_t *copywc;
-	  size_t factor = (info->i18n
-			   ? _NL_CURRENT_WORD (LC_CTYPE, _NL_CTYPE_MB_CUR_MAX)
-			   : 1);
+	  size_t factor;
+	  if (info->i18n)
+	    factor = _nl_lookup_word (loc, LC_CTYPE, _NL_CTYPE_MB_CUR_MAX);
+	  else
+	    factor = 1;
 
 	  decimal_len = strlen (decimal);
 
@@ -1247,8 +1258,17 @@ ___printf_fp (FILE *fp,
   }
   return done;
 }
+libc_hidden_def (__printf_fp_l)
+
+int
+___printf_fp (FILE *fp, const struct printf_info *info,
+	      const void *const *args)
+{
+  return __printf_fp_l (fp, _NL_CURRENT_LOCALE, info, args);
+}
 ldbl_hidden_def (___printf_fp, __printf_fp)
 ldbl_strong_alias (___printf_fp, __printf_fp)
+
 
 /* Return the number of extra grouping characters that will be inserted
    into a number with INTDIG_MAX integer digits.  */
@@ -1293,7 +1313,6 @@ __guess_grouping (unsigned int intdig_max, const char *grouping)
    Return the new end of buffer.  */
 
 static wchar_t *
-internal_function
 group_number (wchar_t *buf, wchar_t *bufend, unsigned int intdig_no,
 	      const char *grouping, wchar_t thousands_sep, int ngroups)
 {

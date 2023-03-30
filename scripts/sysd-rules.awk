@@ -50,11 +50,15 @@ BEGIN {
         split(pattern, td, ":");
         target_pattern = td[1];
         dep_pattern = td[2];
+        # rtld objects are always PIC.
+        if (target_pattern ~ /^rtld/ && o != ".os") {
+            continue;
+        }
         if (target_pattern == "%") {
           command_suffix = "";
         } else {
-          prefix = gensub(/%/, "", "", target_pattern);
-          command_suffix = " $(" prefix  "CPPFLAGS)";
+          prefix = gensub(/%/, "", 1, target_pattern);
+          command_suffix = " $(" prefix  "CPPFLAGS)" " $(" prefix  "CFLAGS)";
         }
         target = "$(objpfx)" target_pattern o ":";
         if (asm_rules) {

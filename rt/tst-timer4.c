@@ -1,5 +1,5 @@
 /* Tests for POSIX timer implementation.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2004
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
@@ -24,7 +24,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdint.h>
-#if _POSIX_THREADS
+#if _POSIX_THREADS && defined SA_SIGINFO
 # include <pthread.h>
 
 # ifndef TEST_CLOCK
@@ -178,7 +178,6 @@ check_ts (const char *name, const struct timespec *start,
     return 0;
 }
 
-#define TIMEOUT 15
 #define TEST_FUNCTION do_test ()
 static int
 do_test (void)
@@ -641,6 +640,11 @@ do_test (void)
     }
   return result;
 }
+
+#elif defined TEST_CLOCK_MISSING
+/* This just ensures that any functions called in TEST_CLOCK_MISSING
+   are not diagnosed as unused.  */
+# define TEST_FUNCTION (TEST_CLOCK_MISSING (TEST_CLOCK), 0)
 #else
 # define TEST_FUNCTION 0
 #endif

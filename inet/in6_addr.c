@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Philip Blundell <pjb27@cam.ac.uk>, 1997.
 
@@ -14,13 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <netinet/in.h>
 
-const struct in6_addr in6addr_any =
+const struct in6_addr __in6addr_any =
 { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } };
-libc_hidden_data_def (in6addr_any)
-const struct in6_addr in6addr_loopback =
+libc_hidden_data_def (__in6addr_any)
+weak_alias (__in6addr_any, in6addr_any)
+libc_hidden_data_weak (in6addr_any)
+const struct in6_addr __in6addr_loopback =
 { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } };
-libc_hidden_data_def (in6addr_loopback)
+libc_hidden_data_def (__in6addr_loopback)
+weak_alias (__in6addr_loopback, in6addr_loopback)
+libc_hidden_data_weak (in6addr_loopback)

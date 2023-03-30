@@ -1,7 +1,7 @@
 /*
  * IBM Accurate Mathematical Library
  * written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2001-2020 Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,7 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 /****************************************************************/
 /*  MODULE_NAME: sincos32.c                                     */
@@ -42,6 +42,7 @@
 #include "endian.h"
 #include "mpa.h"
 #include "sincos32.h"
+#include <math.h>
 #include <math_private.h>
 #include <stap-probe.h>
 
@@ -318,7 +319,7 @@ __mpranred (double x, mp_no *y, int p)
   int i, k, n;
   mp_no a, b, c;
 
-  if (ABS (x) < 2.8e14)
+  if (fabs (x) < 2.8e14)
     {
       t = (x * hpinv.d + toint.d);
       xn = t - toint.d;

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Torbjorn Granlund (tege@sics.se).
 
@@ -14,14 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
-
-#undef	__ptr_t
-#define __ptr_t	void *
 
 #if defined HAVE_STRING_H || defined _LIBC
 # include <string.h>
@@ -50,7 +47,7 @@
    This should normally be the biggest type supported by a single load
    and store.  Must be an unsigned type.  */
 # define op_t	unsigned long int
-# define OPSIZ	(sizeof(op_t))
+# define OPSIZ	(sizeof (op_t))
 
 /* Threshold value for when to enter the unrolled loops.  */
 # define OP_T_THRES	16
@@ -93,8 +90,7 @@ typedef unsigned char byte;
 static int memcmp_bytes (op_t, op_t) __THROW;
 
 static int
-memcmp_bytes (a, b)
-     op_t a, b;
+memcmp_bytes (op_t a, op_t b)
 {
   long int srcp1 = (long int) &a;
   long int srcp2 = (long int) &b;
@@ -118,10 +114,7 @@ static int memcmp_common_alignment (long, long, size_t) __THROW;
    objects (not LEN bytes!).  Both SRCP1 and SRCP2 should be aligned for
    memory operations on `op_t's.  */
 static int
-memcmp_common_alignment (srcp1, srcp2, len)
-     long int srcp1;
-     long int srcp2;
-     size_t len;
+memcmp_common_alignment (long int srcp1, long int srcp2, size_t len)
 {
   op_t a0, a1;
   op_t b0, b1;
@@ -205,10 +198,7 @@ static int memcmp_not_common_alignment (long, long, size_t) __THROW;
    `op_t' objects (not LEN bytes!).  SRCP2 should be aligned for memory
    operations on `op_t', but SRCP1 *should be unaligned*.  */
 static int
-memcmp_not_common_alignment (srcp1, srcp2, len)
-     long int srcp1;
-     long int srcp2;
-     size_t len;
+memcmp_not_common_alignment (long int srcp1, long int srcp2, size_t len)
 {
   op_t a0, a1, a2, a3;
   op_t b0, b1, b2, b3;
@@ -308,10 +298,7 @@ memcmp_not_common_alignment (srcp1, srcp2, len)
 }
 
 int
-MEMCMP (s1, s2, len)
-     const __ptr_t s1;
-     const __ptr_t s2;
-     size_t len;
+MEMCMP (const void *s1, const void *s2, size_t len)
 {
   op_t a0;
   op_t b0;

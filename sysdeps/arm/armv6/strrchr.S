@@ -1,5 +1,5 @@
 /* strrchr -- find the last occurence of C in a nul-terminated string
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -33,8 +33,7 @@ ENTRY (strrchr)
 	@ Loop a few times until we're aligned.
 	tst	r3, #7
 	beq	2f
-1:	sfi_breg r3, \
-	ldrb	r2, [\B], #1
+1:	ldrb	r2, [r3], #1
 	cmp	r2, r1			@ Find the character
 	it	eq
 	subeq	r0, r3, #1
@@ -65,8 +64,7 @@ ENTRY (strrchr)
 	@ Loop searching for EOS and C, 8 bytes at a time.
 	@ Any time we find a match in a word, we copy the address of
 	@ the word to r0, and the found bits to r2.
-3:	sfi_breg r3, \
-	ldrd	r4, r5, [\B], #8
+3:	ldrd	r4, r5, [r3], #8
 	@ Subtracting (unsigned saturating) from 1 means result of 1 for
 	@ any byte that was originally zero and 0 otherwise.  Therefore
 	@ we consider the lsb of each byte the "found" bit.

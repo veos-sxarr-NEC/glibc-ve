@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 
@@ -38,8 +38,7 @@ ENTRY(__start_context)
 	   exit the program with the return error value (-1).  */
 	or	%s0, %s0, (0)0
 1:
-	lea %got,_GLOBAL_OFFSET_TABLE_@PC_LO(-24)
-	and %got,%got,(32)0
+	addi %got,-16,_GLOBAL_OFFSET_TABLE_@PC_LO
 	sic %plt
 	lea.sl %got,_GLOBAL_OFFSET_TABLE_@PC_HI(%plt,%got)
 	JUMPTARGET(exit)
@@ -47,6 +46,11 @@ ENTRY(__start_context)
 	   the process to terminate.  */
 2:	nop
 	/* Here we need to stop the core immediately. */
+	or %s34,10,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
 	monc
 	breq.l.t 0, 0x0, 2b
 

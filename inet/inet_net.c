@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* Copyright (C) 2013-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -42,12 +42,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-
-
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)inet_network.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -59,13 +54,12 @@ static char sccsid[] = "@(#)inet_network.c	8.1 (Berkeley) 6/4/93";
  * The library routines call this routine to interpret
  * network numbers.
  */
-u_int32_t
-inet_network(cp)
-	const char *cp;
+uint32_t
+inet_network (const char *cp)
 {
-	u_int32_t val, base, n, i;
+	uint32_t val, base, n, i;
 	char c;
-	u_int32_t parts[4], *pp = parts;
+	uint32_t parts[4], *pp = parts;
 	int digit;
 
 again:

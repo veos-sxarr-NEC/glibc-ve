@@ -1,5 +1,5 @@
 /* PLT trampoline.  MIPS version.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Kazumoto Kojima <kkojima@info.kanagawa-u.ac.jp>.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /*  FIXME: Profiling of shared libraries is not implemented yet.  */
 
@@ -166,8 +166,8 @@ __dl_runtime_resolve (ElfW(Word) sym_index,
 
 		break;
 	      }
-	    /* Fall through.  */
 	  }
+	  /* Fall through.  */
 	case 0:
 	  {
           /* We need to keep the scope around so do some locking.  This is
@@ -192,12 +192,12 @@ __dl_runtime_resolve (ElfW(Word) sym_index,
 
       /* Currently value contains the base load address of the object
 	 that defines sym.  Now add in the symbol offset.  */
-      value = (sym ? sym_map->l_addr + sym->st_value : 0);
+      value = SYMBOL_ADDRESS (sym_map, sym, true);
     }
   else
     /* We already found the symbol.  The module (and therefore its load
        address) is also known.  */
-    value = l->l_addr + sym->st_value;
+    value = SYMBOL_ADDRESS (l, sym, true);
 
   /* Apply the relocation with that value.  */
   *(got + local_gotno + sym_index - gotsym) = value;

@@ -1,5 +1,5 @@
 /* getresgid -- fetch real group ID, effective group ID, and saved-set group ID
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -27,7 +27,6 @@ int
 __getresgid (gid_t *rgid, gid_t *egid, gid_t *sgid)
 {
   error_t err;
-  gid_t real, eff, saved;
 
   HURD_CRITICAL_BEGIN;
   __mutex_lock (&_hurd_id.lock);
@@ -40,22 +39,18 @@ __getresgid (gid_t *rgid, gid_t *egid, gid_t *sgid)
 	err = EGRATUITOUS;
       else
 	{
-	  real = _hurd_id.aux.gids[0];
-	  eff = _hurd_id.gen.ngids < 1 ? real : _hurd_id.gen.gids[0];
-	  saved = _hurd_id.aux.ngids < 2 ? real : _hurd_id.aux.gids[1];
+	  gid_t real = _hurd_id.aux.gids[0];
+
+	  *rgid = real;
+	  *egid = _hurd_id.gen.ngids < 1 ? real : _hurd_id.gen.gids[0];
+	  *sgid = _hurd_id.aux.ngids < 2 ? real : _hurd_id.aux.gids[1];
 	}
     }
 
   __mutex_unlock (&_hurd_id.lock);
   HURD_CRITICAL_END;
 
-  if (err)
-    return __hurd_fail (err);
-
-  *rgid = real;
-  *egid = eff;
-  *sgid = saved;
-  return 0;
+  return __hurd_fail (err);
 }
 libc_hidden_def (__getresgid)
 weak_alias (__getresgid, getresgid)

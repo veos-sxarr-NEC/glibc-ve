@@ -1,5 +1,5 @@
 /* Pythagorean addition using floats
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Adhemerval Zanella <azanella@br.ibm.com>, 2011
 
@@ -15,13 +15,12 @@
 
    You should have received a copy of the GNU Library General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
 #include <stdint.h>
-
-static const float two30  = 1.0737418e09;
+#include <libm-alias-finite.h>
 
 /* __ieee754_hypotf(x,y)
 
@@ -33,10 +32,11 @@ static const float two30  = 1.0737418e09;
 #ifdef _ARCH_PWR7
 /* POWER7 isinf and isnan optimizations are fast. */
 # define TEST_INF_NAN(x, y)                                      \
-   if (isinff(x) || isinff(y))                                   \
+   if ((isinff(x) || isinff(y))					 \
+       && !issignaling (x) && !issignaling (y))			 \
      return INFINITY;                                            \
    if (isnanf(x) || isnanf(y))                                   \
-     return NAN;
+     return x + y;
 # else
 /* For POWER6 and below isinf/isnan triggers LHS and PLT calls are
  * costly (especially for POWER6). */
@@ -58,9 +58,10 @@ static const float two30  = 1.0737418e09;
      uint32_t ht = hx; hx = hy; hy = ht;                         \
    }                                                             \
    if (hx >= 0x7f800000) {                                       \
-     if (hx == 0x7f800000 || hy == 0x7f800000)                   \
+     if ((hx == 0x7f800000 || hy == 0x7f800000)			 \
+	 && !issignaling (x) && !issignaling (y))		 \
        return INFINITY;                                          \
-     return NAN;                                                 \
+     return x + y;						 \
    }                                                             \
  } while (0)
 #endif
@@ -71,6 +72,8 @@ __ieee754_hypotf (float x, float y)
 {
   TEST_INF_NAN (x, y);
 
-  return __ieee754_sqrt ((double) x * x + (double) y * y);
+  return sqrt ((double) x * x + (double) y * y);
 }
-strong_alias (__ieee754_hypotf, __hypotf_finite)
+#ifndef __ieee754_hypotf
+libm_alias_finite (__ieee754_hypotf, __hypotf)
+#endif

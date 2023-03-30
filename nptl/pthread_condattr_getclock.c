@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,17 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "pthreadP.h"
 
 
 int
-pthread_condattr_getclock (attr, clock_id)
-     const pthread_condattr_t *attr;
-     clockid_t *clock_id;
+pthread_condattr_getclock (const pthread_condattr_t *attr, clockid_t *clock_id)
 {
   *clock_id = (((((const struct pthread_condattr *) attr)->value) >> 1)
-	       & ((1 << COND_NWAITERS_SHIFT) - 1));
+	       & ((1 << COND_CLOCK_BITS) - 1));
   return 0;
 }

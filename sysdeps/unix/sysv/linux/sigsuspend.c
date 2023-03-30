@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,47 +13,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
 #include <signal.h>
-#include <unistd.h>
-
 #include <sysdep-cancel.h>
-#include <sys/syscall.h>
-
-
-static inline int __attribute__ ((always_inline))
-do_sigsuspend (const sigset_t *set)
-{
-  return INLINE_SYSCALL (rt_sigsuspend, 2, set, _NSIG / 8);
-}
 
 /* Change the set of blocked signals to SET,
    wait until a signal arrives, and restore the set of blocked signals.  */
 int
 __sigsuspend (const sigset_t *set)
 {
-  if (SINGLE_THREAD_P)
-    return do_sigsuspend (set);
-
-  int oldtype = LIBC_CANCEL_ASYNC ();
-
-  int result = do_sigsuspend (set);
-
-  LIBC_CANCEL_RESET (oldtype);
-
-  return result;
+  return SYSCALL_CANCEL (rt_sigsuspend, set, _NSIG / 8);
 }
 libc_hidden_def (__sigsuspend)
 weak_alias (__sigsuspend, sigsuspend)
 strong_alias (__sigsuspend, __libc_sigsuspend)
-
-#ifndef NO_CANCELLATION
-int
-__sigsuspend_nocancel (set)
-     const sigset_t *set;
-{
-  return do_sigsuspend (set);
-}
-#endif

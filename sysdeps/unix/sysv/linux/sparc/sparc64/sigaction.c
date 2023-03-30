@@ -1,5 +1,5 @@
 /* POSIX.1 sigaction call for Linux/SPARC64.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Miguel de Icaza <miguel@nuclecu.unam.mx> and
 		  Jakub Jelinek <jj@ultra.linux.cz>.
@@ -16,57 +16,23 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <syscall.h>
 #include <sysdep.h>
-#include <sys/signal.h>
-#include <errno.h>
-
-#include <kernel_sigaction.h>
-
-/* SPARC 64bit userland requires a kernel that has rt signals anyway. */
 
 static void __rt_sigreturn_stub (void);
 
-int
-__libc_sigaction (int sig, const struct sigaction *act, struct sigaction *oact)
-{
-  int ret;
-  struct kernel_sigaction kact, koact;
-  unsigned long stub = ((unsigned long) &__rt_sigreturn_stub) - 8;
+#define STUB(act, sigsetsize) \
+  (((unsigned long) &__rt_sigreturn_stub) - 8),	\
+  (sigsetsize)
 
-  if (act)
-    {
-      kact.k_sa_handler = act->sa_handler;
-      memcpy (&kact.sa_mask, &act->sa_mask, sizeof (sigset_t));
-      kact.sa_flags = act->sa_flags;
-      kact.sa_restorer = NULL;
-    }
+#include <sysdeps/unix/sysv/linux/sigaction.c>
 
-  /* XXX The size argument hopefully will have to be changed to the
-     real size of the user-level sigset_t.  */
-  ret = INLINE_SYSCALL (rt_sigaction, 5, sig,
-			act ? &kact : 0,
-			oact ? &koact : 0, stub, _NSIG / 8);
-
-  if (oact && ret >= 0)
-    {
-      oact->sa_handler = koact.k_sa_handler;
-      memcpy (&oact->sa_mask, &koact.sa_mask, sizeof (sigset_t));
-      oact->sa_flags = koact.sa_flags;
-      oact->sa_restorer = koact.sa_restorer;
-    }
-
-  return ret;
-}
-libc_hidden_def (__libc_sigaction)
-
-#include <nptl/sigaction.c>
-
-
-static void
+static
+inhibit_stack_protector
+void
 __rt_sigreturn_stub (void)
 {
   __asm__ ("mov %0, %%g1\n\t"

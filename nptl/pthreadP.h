@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _PTHREADP_H
 #define _PTHREADP_H	1
@@ -32,7 +32,8 @@
 #include <atomic.h>
 #include <kernel-features.h>
 #include <errno.h>
-#include <nptl-signals.h>
+#include <internal-signals.h>
+#include "pthread_mutex_conf.h"
 
 
 /* Atomic operations on TLS memory.  */
@@ -47,10 +48,14 @@
 #endif
 
 
-/* Adaptive mutex definitions.  */
-#ifndef MAX_ADAPTIVE_COUNT
-# define MAX_ADAPTIVE_COUNT 100
+static inline short max_adaptive_count (void)
+{
+#if HAVE_TUNABLES
+  return __mutex_aconf.spin_count;
+#else
+  return DEFAULT_ADAPTIVE_COUNT;
 #endif
+}
 
 
 /* Magic cookie representing robust mutex with dead owner.  */
@@ -110,19 +115,23 @@ enum
 };
 #define PTHREAD_MUTEX_PSHARED_BIT 128
 
+/* See concurrency notes regarding __kind in struct __pthread_mutex_s
+   in sysdeps/nptl/bits/thread-shared-types.h.  */
 #define PTHREAD_MUTEX_TYPE(m) \
-  ((m)->__data.__kind & 127)
+  (atomic_load_relaxed (&((m)->__data.__kind)) & 127)
 /* Don't include NO_ELISION, as that type is always the same
    as the underlying lock type.  */
 #define PTHREAD_MUTEX_TYPE_ELISION(m) \
-  ((m)->__data.__kind & (127|PTHREAD_MUTEX_ELISION_NP))
+  (atomic_load_relaxed (&((m)->__data.__kind))	\
+   & (127 | PTHREAD_MUTEX_ELISION_NP))
 
 #if LLL_PRIVATE == 0 && LLL_SHARED == 128
 # define PTHREAD_MUTEX_PSHARED(m) \
-  ((m)->__data.__kind & 128)
+  (atomic_load_relaxed (&((m)->__data.__kind)) & 128)
 #else
 # define PTHREAD_MUTEX_PSHARED(m) \
-  (((m)->__data.__kind & 128) ? LLL_SHARED : LLL_PRIVATE)
+  ((atomic_load_relaxed (&((m)->__data.__kind)) & 128)	\
+   ? LLL_SHARED : LLL_PRIVATE)
 #endif
 
 /* The kernel when waking robust mutexes on exit never uses
@@ -150,9 +159,16 @@ enum
    | PTHREAD_MUTEXATTR_PROTOCOL_MASK | PTHREAD_MUTEXATTR_PRIO_CEILING_MASK)
 
 
-/* Check whether rwlock prefers readers.   */
-#define PTHREAD_RWLOCK_PREFER_READER_P(rwlock) \
-  ((rwlock)->__data.__flags == 0)
+/* For the following, see pthread_rwlock_common.c.  */
+#define PTHREAD_RWLOCK_WRPHASE		1
+#define PTHREAD_RWLOCK_WRLOCKED		2
+#define PTHREAD_RWLOCK_RWAITING		4
+#define PTHREAD_RWLOCK_READER_SHIFT	3
+#define PTHREAD_RWLOCK_READER_OVERFLOW	((unsigned int) 1 \
+					 << (sizeof (unsigned int) * 8 - 1))
+#define PTHREAD_RWLOCK_WRHANDOVER	((unsigned int) 1 \
+					 << (sizeof (unsigned int) * 8 - 1))
+#define PTHREAD_RWLOCK_FUTEX_USED	2
 
 
 /* Bits used in robust mutex implementation.  */
@@ -165,6 +181,16 @@ enum
 #define __PTHREAD_ONCE_INPROGRESS	1
 #define __PTHREAD_ONCE_DONE		2
 #define __PTHREAD_ONCE_FORK_GEN_INCR	4
+
+/* Attribute to indicate thread creation was issued from C11 thrd_create.  */
+#define ATTR_C11_THREAD ((void*)(uintptr_t)-1)
+
+
+/* Condition variable definitions.  See __pthread_cond_wait_common.
+   Need to be defined here so there is one place from which
+   nptl_lock_constants can grab them.  */
+#define __PTHREAD_COND_CLOCK_MONOTONIC_MASK 2
+#define __PTHREAD_COND_SHARED_MASK 1
 
 
 /* Internal variables.  */
@@ -265,8 +291,8 @@ hidden_proto (__pthread_register_cancel)
 hidden_proto (__pthread_unregister_cancel)
 # ifdef SHARED
 extern void attribute_hidden pthread_cancel_init (void);
-extern void __unwind_freeres (void);
 # endif
+extern void __nptl_unwind_freeres (void) attribute_hidden;
 #endif
 
 
@@ -285,65 +311,25 @@ __do_cancel (void)
 }
 
 
-/* Set cancellation mode to asynchronous.  */
-#define CANCEL_ASYNC() \
-  __pthread_enable_asynccancel ()
-/* Reset to previous cancellation mode.  */
-#define CANCEL_RESET(oldtype) \
-  __pthread_disable_asynccancel (oldtype)
-
-#if IS_IN (libc)
-/* Same as CANCEL_ASYNC, but for use in libc.so.  */
-# define LIBC_CANCEL_ASYNC() \
-  __libc_enable_asynccancel ()
-/* Same as CANCEL_RESET, but for use in libc.so.  */
-# define LIBC_CANCEL_RESET(oldtype) \
-  __libc_disable_asynccancel (oldtype)
-# define LIBC_CANCEL_HANDLED() \
-  __asm (".globl " __SYMBOL_PREFIX "__libc_enable_asynccancel"); \
-  __asm (".globl " __SYMBOL_PREFIX "__libc_disable_asynccancel")
-#elif IS_IN (libpthread)
-# define LIBC_CANCEL_ASYNC() CANCEL_ASYNC ()
-# define LIBC_CANCEL_RESET(val) CANCEL_RESET (val)
-# define LIBC_CANCEL_HANDLED() \
-  __asm (".globl " __SYMBOL_PREFIX "__pthread_enable_asynccancel"); \
-  __asm (".globl " __SYMBOL_PREFIX "__pthread_disable_asynccancel")
-#elif IS_IN (librt)
-# define LIBC_CANCEL_ASYNC() \
-  __librt_enable_asynccancel ()
-# define LIBC_CANCEL_RESET(val) \
-  __librt_disable_asynccancel (val)
-# define LIBC_CANCEL_HANDLED() \
-  __asm (".globl " __SYMBOL_PREFIX "__librt_enable_asynccancel"); \
-  __asm (".globl " __SYMBOL_PREFIX "__librt_disable_asynccancel")
-#else
-# define LIBC_CANCEL_ASYNC()	0 /* Just a dummy value.  */
-# define LIBC_CANCEL_RESET(val)	((void)(val)) /* Nothing, but evaluate it.  */
-# define LIBC_CANCEL_HANDLED()	/* Nothing.  */
-#endif
-
-
 /* Internal prototypes.  */
 
 /* Thread list handling.  */
 extern struct pthread *__find_in_stack_list (struct pthread *pd)
-     attribute_hidden internal_function;
+     attribute_hidden;
 
 /* Deallocate a thread's stack after optionally making sure the thread
    descriptor is still valid.  */
-extern void __free_tcb (struct pthread *pd) attribute_hidden internal_function;
+extern void __free_tcb (struct pthread *pd) attribute_hidden;
 
 /* Free allocated stack.  */
-extern void __deallocate_stack (struct pthread *pd)
-     attribute_hidden internal_function;
+extern void __deallocate_stack (struct pthread *pd) attribute_hidden;
 
 /* Mark all the stacks except for the current one as available.  This
    function also re-initializes the lock for the stack cache.  */
 extern void __reclaim_stacks (void) attribute_hidden;
 
 /* Make all threads's stacks executable.  */
-extern int __make_stacks_executable (void **stack_endp)
-     internal_function attribute_hidden;
+extern int __make_stacks_executable (void **stack_endp) attribute_hidden;
 
 /* longjmp handling.  */
 extern void __pthread_cleanup_upto (__jmp_buf target, char *targetframe);
@@ -373,13 +359,11 @@ hidden_proto (__nptl_death_event)
 #ifdef TLS_MULTIPLE_THREADS_IN_TCB
 extern void __libc_pthread_init (unsigned long int *ptr,
 				 void (*reclaim) (void),
-				 const struct pthread_functions *functions)
-     internal_function;
+				 const struct pthread_functions *functions);
 #else
 extern int *__libc_pthread_init (unsigned long int *ptr,
 				 void (*reclaim) (void),
-				 const struct pthread_functions *functions)
-     internal_function;
+				 const struct pthread_functions *functions);
 
 /* Variable set to a nonzero value either if more than one thread runs or ran,
    or if a single-threaded process is trying to cancel itself.  See
@@ -387,16 +371,6 @@ extern int *__libc_pthread_init (unsigned long int *ptr,
 extern int __pthread_multiple_threads attribute_hidden;
 /* Pointer to the corresponding variable in libc.  */
 extern int *__libc_multiple_threads_ptr attribute_hidden;
-#endif
-
-/* Find a thread given its TID.  */
-extern struct pthread *__find_thread_by_id (pid_t tid) attribute_hidden
-#ifdef SHARED
-;
-#else
-weak_function;
-#define __find_thread_by_id(tid) \
-  (__find_thread_by_id ? (__find_thread_by_id) (tid) : (struct pthread *) NULL)
 #endif
 
 extern void __pthread_init_static_tls (struct link_map *) attribute_hidden;
@@ -414,14 +388,15 @@ extern int __pthread_mutex_init (pthread_mutex_t *__mutex,
 extern int __pthread_mutex_destroy (pthread_mutex_t *__mutex);
 extern int __pthread_mutex_trylock (pthread_mutex_t *_mutex);
 extern int __pthread_mutex_lock (pthread_mutex_t *__mutex);
+extern int __pthread_mutex_timedlock (pthread_mutex_t *__mutex,
+     const struct timespec *__abstime);
 extern int __pthread_mutex_cond_lock (pthread_mutex_t *__mutex)
-     attribute_hidden internal_function;
+     attribute_hidden;
 extern void __pthread_mutex_cond_lock_adjust (pthread_mutex_t *__mutex)
-     attribute_hidden internal_function;
+     attribute_hidden;
 extern int __pthread_mutex_unlock (pthread_mutex_t *__mutex);
 extern int __pthread_mutex_unlock_usercnt (pthread_mutex_t *__mutex,
-					   int __decr)
-     attribute_hidden internal_function;
+					   int __decr) attribute_hidden;
 extern int __pthread_mutexattr_init (pthread_mutexattr_t *attr);
 extern int __pthread_mutexattr_destroy (pthread_mutexattr_t *attr);
 extern int __pthread_mutexattr_settype (pthread_mutexattr_t *attr, int kind);
@@ -474,9 +449,15 @@ extern int __pthread_cond_wait (pthread_cond_t *cond, pthread_mutex_t *mutex);
 extern int __pthread_cond_timedwait (pthread_cond_t *cond,
 				     pthread_mutex_t *mutex,
 				     const struct timespec *abstime);
+extern int __pthread_cond_clockwait (pthread_cond_t *cond,
+				     pthread_mutex_t *mutex,
+				     clockid_t clockid,
+				     const struct timespec *abstime)
+  __nonnull ((1, 2, 4));
 extern int __pthread_condattr_destroy (pthread_condattr_t *attr);
 extern int __pthread_condattr_init (pthread_condattr_t *attr);
 extern int __pthread_key_create (pthread_key_t *key, void (*destr) (void *));
+extern int __pthread_key_delete (pthread_key_t key);
 extern void *__pthread_getspecific (pthread_key_t key);
 extern int __pthread_setspecific (pthread_key_t key, const void *value);
 extern int __pthread_once (pthread_once_t *once_control,
@@ -485,17 +466,25 @@ extern int __pthread_atfork (void (*prepare) (void), void (*parent) (void),
 			     void (*child) (void));
 extern pthread_t __pthread_self (void);
 extern int __pthread_equal (pthread_t thread1, pthread_t thread2);
+extern int __pthread_detach (pthread_t th);
+extern int __pthread_cancel (pthread_t th);
 extern int __pthread_kill (pthread_t threadid, int signo);
 extern void __pthread_exit (void *value) __attribute__ ((__noreturn__));
+extern int __pthread_join (pthread_t threadid, void **thread_return);
 extern int __pthread_setcanceltype (int type, int *oldtype);
 extern int __pthread_enable_asynccancel (void) attribute_hidden;
-extern void __pthread_disable_asynccancel (int oldtype)
-     internal_function attribute_hidden;
+extern void __pthread_disable_asynccancel (int oldtype) attribute_hidden;
+extern void __pthread_testcancel (void);
+extern int __pthread_clockjoin_ex (pthread_t, void **, clockid_t,
+				   const struct timespec *, bool)
+  attribute_hidden;
+
 
 #if IS_IN (libpthread)
 hidden_proto (__pthread_mutex_init)
 hidden_proto (__pthread_mutex_destroy)
 hidden_proto (__pthread_mutex_lock)
+hidden_proto (__pthread_mutex_trylock)
 hidden_proto (__pthread_mutex_unlock)
 hidden_proto (__pthread_rwlock_rdlock)
 hidden_proto (__pthread_rwlock_wrlock)
@@ -504,6 +493,10 @@ hidden_proto (__pthread_key_create)
 hidden_proto (__pthread_getspecific)
 hidden_proto (__pthread_setspecific)
 hidden_proto (__pthread_once)
+hidden_proto (__pthread_setcancelstate)
+hidden_proto (__pthread_testcancel)
+hidden_proto (__pthread_mutexattr_init)
+hidden_proto (__pthread_mutexattr_settype)
 #endif
 
 extern int __pthread_cond_broadcast_2_0 (pthread_cond_2_0_t *cond);
@@ -520,32 +513,25 @@ extern int __pthread_cond_wait_2_0 (pthread_cond_2_0_t *cond,
 extern int __pthread_getaffinity_np (pthread_t th, size_t cpusetsize,
 				     cpu_set_t *cpuset);
 
-/* The two functions are in libc.so and not exported.  */
-extern int __libc_enable_asynccancel (void) attribute_hidden;
-extern void __libc_disable_asynccancel (int oldtype)
-     internal_function attribute_hidden;
-
-
-/* The two functions are in librt.so and not exported.  */
-extern int __librt_enable_asynccancel (void) attribute_hidden;
-extern void __librt_disable_asynccancel (int oldtype)
-     internal_function attribute_hidden;
-
 #if IS_IN (libpthread)
 /* Special versions which use non-exported functions.  */
 extern void __pthread_cleanup_push (struct _pthread_cleanup_buffer *buffer,
 				    void (*routine) (void *), void *arg)
      attribute_hidden;
+
+/* Replace cleanup macros defined in <pthread.h> with internal
+   versions that don't depend on unwind info and better support
+   cancellation.  */
 # undef pthread_cleanup_push
-# define pthread_cleanup_push(routine,arg) \
-  { struct _pthread_cleanup_buffer _buffer;				      \
-    __pthread_cleanup_push (&_buffer, (routine), (arg));
+# define pthread_cleanup_push(routine,arg)              \
+  { struct _pthread_cleanup_buffer _buffer;             \
+  __pthread_cleanup_push (&_buffer, (routine), (arg));
 
 extern void __pthread_cleanup_pop (struct _pthread_cleanup_buffer *buffer,
 				   int execute) attribute_hidden;
 # undef pthread_cleanup_pop
-# define pthread_cleanup_pop(execute) \
-    __pthread_cleanup_pop (&_buffer, (execute)); }
+# define pthread_cleanup_pop(execute)                   \
+  __pthread_cleanup_pop (&_buffer, (execute)); }
 #endif
 
 extern void __pthread_cleanup_push_defer (struct _pthread_cleanup_buffer *buffer,
@@ -572,7 +558,8 @@ extern int __nptl_setxid (struct xid_command *cmdp) attribute_hidden;
 extern void __nptl_set_robust (struct pthread *self);
 #endif
 
-extern void __free_stacks (size_t limit) attribute_hidden;
+extern void __nptl_stacks_freeres (void) attribute_hidden;
+extern void __shm_directory_freeres (void) attribute_hidden;
 
 extern void __wait_lookup_done (void) attribute_hidden;
 
@@ -580,18 +567,6 @@ extern void __wait_lookup_done (void) attribute_hidden;
 # define PTHREAD_STATIC_FN_REQUIRE(name)
 #else
 # define PTHREAD_STATIC_FN_REQUIRE(name) __asm (".globl " #name);
-#endif
-
-/* Test if the mutex is suitable for the FUTEX_WAIT_REQUEUE_PI operation.  */
-#if (defined lll_futex_wait_requeue_pi \
-     && defined __ASSUME_REQUEUE_PI)
-# define USE_REQUEUE_PI(mut) \
-   ((mut) && (mut) != (void *) ~0l \
-    && (((mut)->__data.__kind \
-	 & (PTHREAD_MUTEX_PRIO_INHERIT_NP | PTHREAD_MUTEX_ROBUST_NORMAL_NP)) \
-	== PTHREAD_MUTEX_PRIO_INHERIT_NP))
-#else
-# define USE_REQUEUE_PI(mut) 0
 #endif
 
 /* Returns 0 if POL is a valid scheduling policy.  */
@@ -628,5 +603,22 @@ check_stacksize_attr (size_t st)
 
   return EINVAL;
 }
+
+#define ASSERT_TYPE_SIZE(type, size) 					\
+  _Static_assert (sizeof (type) == size,				\
+		  "sizeof (" #type ") != " #size)
+
+#define ASSERT_PTHREAD_INTERNAL_SIZE(type, internal) 			\
+  _Static_assert (sizeof ((type) { { 0 } }).__size >= sizeof (internal),\
+		  "sizeof (" #type ".__size) < sizeof (" #internal ")")
+
+#define ASSERT_PTHREAD_STRING(x) __STRING (x)
+#define ASSERT_PTHREAD_INTERNAL_OFFSET(type, member, offset)		\
+  _Static_assert (offsetof (type, member) == offset,			\
+		  "offset of " #member " field of " #type " != "	\
+		  ASSERT_PTHREAD_STRING (offset))
+#define ASSERT_PTHREAD_INTERNAL_MEMBER_SIZE(type, member, mtype)	\
+  _Static_assert (sizeof (((type) { 0 }).member) != 8,	\
+		  "sizeof (" #type "." #member ") != sizeof (" #mtype "))")
 
 #endif	/* pthreadP.h */

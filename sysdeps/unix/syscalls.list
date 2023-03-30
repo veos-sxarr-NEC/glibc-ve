@@ -19,7 +19,6 @@ fchmod		-	fchmod		i:ii	__fchmod	fchmod
 fchown		-	fchown		i:iii	__fchown	fchown
 fcntl		-	fcntl		Ci:iiF	__libc_fcntl	__fcntl fcntl
 fstatfs		-	fstatfs		i:ip	__fstatfs	fstatfs
-fsync		-	fsync		Ci:i	__libc_fsync	fsync
 ftruncate	-	ftruncate	i:ii	__ftruncate	ftruncate
 getdomain	-	getdomainname	i:si	getdomainname
 getgid		-	getgid		Ei:	__getgid	getgid
@@ -29,12 +28,11 @@ gethostname	-	gethostname	i:bn	__gethostname	gethostname
 getitimer	-	getitimer	i:ip	__getitimer	getitimer
 getpeername	-	getpeername	i:ibN	__getpeername	getpeername
 getpid		-	getpid		Ei:	__getpid	getpid
-getpriority	-	getpriority	i:ii	getpriority
+getpriority	-	getpriority	i:ii	__getpriority	getpriority
 getrlimit	-	getrlimit	i:ip	__getrlimit	getrlimit
 getrusage	-	getrusage	i:ip	__getrusage	getrusage
 getsockname	-	getsockname	i:ibN	__getsockname	getsockname
 getsockopt	-	getsockopt	i:iiiBN	getsockopt
-gettimeofday	-	gettimeofday	i:pP	__gettimeofday	gettimeofday
 getuid		-	getuid		Ei:	__getuid	getuid
 ioctl		-	ioctl		i:iiI	__ioctl		ioctl
 kill		-	kill		i:ii	__kill		kill
@@ -45,7 +43,6 @@ madvise		-	madvise		i:pii	__madvise	madvise
 mkdir		-	mkdir		i:si	__mkdir		mkdir
 mmap		-	mmap		b:aniiii __mmap		mmap
 mprotect	-	mprotect	i:aii	__mprotect	mprotect
-msync		-	msync		Ci:aii	__libc_msync	msync
 munmap		-	munmap		i:ai	__munmap	munmap
 open		-	open		Ci:siv	__libc_open __open open
 profil		-	profil		i:piii	__profil	profil
@@ -72,13 +69,12 @@ sethostid	-	sethostid	i:i	sethostid
 sethostname	-	sethostname	i:pi	sethostname
 setitimer	-	setitimer	i:ipp	__setitimer	setitimer
 setpgid		-	setpgrp		i:ii	__setpgid	setpgid
-setpriority	-	setpriority	i:iii	setpriority
+setpriority	-	setpriority	i:iii	__setpriority	setpriority
 setregid	-	setregid	i:ii	__setregid	setregid
 setreuid	-	setreuid	i:ii	__setreuid	setreuid
 setrlimit	-	setrlimit	i:ip	__setrlimit setrlimit
 setsid		-	setsid		i:	__setsid	setsid
 setsockopt	-	setsockopt	i:iiibn	setsockopt	__setsockopt
-settimeofday	-	settimeofday	i:PP	__settimeofday	settimeofday
 setuid		-	setuid		i:i	__setuid	setuid
 shutdown	-	shutdown	i:ii	shutdown
 sigaction	-	sigaction	i:ipp	__sigaction	sigaction

@@ -1,4 +1,4 @@
-/* Copyright (C) 1994-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -36,20 +36,16 @@
    necessary.  Returns the number of characters read (not including the
    null terminator), or -1 on error or EOF.  */
 
-_IO_ssize_t
-_IO_getdelim (lineptr, n, delimiter, fp)
-     char **lineptr;
-     _IO_size_t *n;
-     int delimiter;
-     _IO_FILE *fp;
+ssize_t
+_IO_getdelim (char **lineptr, size_t *n, int delimiter, FILE *fp)
 {
-  _IO_ssize_t result;
-  _IO_ssize_t cur_len = 0;
-  _IO_ssize_t len;
+  ssize_t result;
+  ssize_t cur_len = 0;
+  ssize_t len;
 
   if (lineptr == NULL || n == NULL)
     {
-      MAYBE_SET_EINVAL;
+      __set_errno (EINVAL);
       return -1;
     }
   CHECK_FILE (fp, -1);
@@ -84,7 +80,7 @@ _IO_getdelim (lineptr, n, delimiter, fp)
 
   for (;;)
     {
-      _IO_size_t needed;
+      size_t needed;
       char *t;
       t = (char *) memchr ((void *) fp->_IO_read_ptr, delimiter, len);
       if (t != NULL)
@@ -127,7 +123,5 @@ unlock_return:
   return result;
 }
 
-#ifdef weak_alias
 weak_alias (_IO_getdelim, __getdelim)
 weak_alias (_IO_getdelim, getdelim)
-#endif

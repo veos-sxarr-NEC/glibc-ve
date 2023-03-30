@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Chris Metcalf <cmetcalf@tilera.com>, 2011.
 
@@ -14,13 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <bits/wordsize.h>
 #include <kernel-features.h>
+#include <sysdeps/unix/sysdep.h>
+#include <sysdeps/unix/sysv/linux/sysdep.h>
 
 /* Provide the common name to allow more code reuse.  */
-#define __NR__llseek __NR_llseek
+#ifdef __NR_llseek
+# define __NR__llseek __NR_llseek
+#endif
 
 #if __WORDSIZE == 64
 /* By defining the older names, glibc will build syscall wrappers for
@@ -28,14 +32,4 @@
    will suppress generating any separate code for pread64.c.  */
 #define __NR_pread __NR_pread64
 #define __NR_pwrite __NR_pwrite64
-#endif
-
-/* Provide a dummy argument that can be used to force register
-   alignment for register pairs if required by the syscall ABI.  */
-#ifdef __ASSUME_ALIGNED_REGISTER_PAIRS
-#define __ALIGNMENT_ARG 0,
-#define __ALIGNMENT_COUNT(a,b) b
-#else
-#define __ALIGNMENT_ARG
-#define __ALIGNMENT_COUNT(a,b) a
 #endif

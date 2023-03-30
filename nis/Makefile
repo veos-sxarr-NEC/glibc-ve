@@ -1,4 +1,4 @@
-# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Makefile for NIS/NIS+ part.
@@ -22,11 +22,16 @@ subdir	:= nis
 
 include ../Makeconfig
 
-aux			:= nis_hash
+ifndef have-GLIBC_2.28
 
-ifeq ($(link-obsolete-rpc),yes)
-headers			:= $(wildcard rpcsvc/*.[hx])
+ifeq ($(build-obsolete-nsl),yes)
+$(error --enabe-obsolete-nsl is not available)
 endif
+
+else
+
+ifeq ($(build-obsolete-nsl),yes)
+headers			:= $(wildcard rpcsvc/*.[hx])
 
 # These are the databases available for the nis (and perhaps later nisplus)
 # service.  This must be a superset of the services in nss.
@@ -34,16 +39,22 @@ databases		= proto service hosts network grp pwd rpc ethers \
 			  spwd netgrp alias publickey
 
 # Specify rules for the nss_* modules.
-services		:= nis nisplus compat
+services		:= nis nisplus
+endif
 
-extra-libs		= libnsl $(services:%=libnss_%)
+extra-libs		= libnsl
+ifeq ($(build-obsolete-nsl),yes)
+extra-libs += $(services:%=libnss_%)
+endif
 # These libraries will be built in the `others' pass rather than
 # the `lib' pass, because they depend on libc.so being built already.
 extra-libs-others	= $(extra-libs)
 
+ifeq ($(build-obsolete-nsl),yes)
 # The sources are found in the appropriate subdir.
 subdir-dirs = $(services:%=nss_%)
 vpath %.c $(subdir-dirs)
+endif
 
 libnsl-routines = yp_xdr ypclnt ypupdate_xdr \
 		  nis_subr nis_local_names nis_free nis_file \
@@ -55,11 +66,10 @@ libnsl-routines = yp_xdr ypclnt ypupdate_xdr \
 		  nis_print_group_entry nis_domain_of nis_domain_of_r\
 		  nis_modify nis_remove nis_add nis_defaults\
 		  nis_findserv nis_callback nis_clone_dir nis_clone_obj\
-		  nis_clone_res nss-default
+		  nis_clone_res
 
-libnss_compat-routines	:= $(addprefix compat-,grp pwd spwd initgroups)
-libnss_compat-inhibit-o	= $(filter-out .os,$(object-suffixes))
-
+ifeq ($(build-obsolete-nsl),yes)
+libnsl-routines += nss-default
 libnss_nis-routines	:= $(addprefix nis-,$(databases)) nis-initgroups \
 			   nss-nis
 libnss_nis-inhibit-o	= $(filter-out .os,$(object-suffixes))
@@ -68,13 +78,26 @@ libnss_nisplus-routines	:= $(addprefix nisplus-,$(databases)) nisplus-parser \
 			   nss-nisplus nisplus-initgroups
 libnss_nisplus-inhibit-o = $(filter-out .os,$(object-suffixes))
 
+else # not $(build-obsolete-nsl)
+# Pretend that libnsl.so is a linker script, so that the symbolic link
+# is not installed.
+install-lib-ldscripts = libnsl.so
+$(inst_libdir)/libnsl.so:
+# Build only shared libnsl.
+libnsl-inhibit-o = $(filter-out .os,$(object-suffixes))
+
+endif # not $(build-obsolete-nsl)
+
+endif # have-GLIBC_2.28
+
 include ../Rules
 
 
-$(objpfx)libnss_compat.so: $(objpfx)libnsl.so$(libnsl.so-version)
+ifeq ($(build-obsolete-nsl),yes)
 $(objpfx)libnss_nis.so: $(objpfx)libnsl.so$(libnsl.so-version) \
 			$(common-objpfx)nss/libnss_files.so
 $(objpfx)libnss_nisplus.so: $(objpfx)libnsl.so$(libnsl.so-version)
+endif
 
 libnsl-libc = $(common-objpfx)linkobj/libc.so
 # Target-specific variable setting to link objects using deprecated
@@ -87,5 +110,7 @@ $(services:%=$(objpfx)libnss_%.so) $(objpfx)libnsl.so: \
 ifeq ($(build-shared),yes)
 $(others:%=$(objpfx)%): $(objpfx)libnsl.so$(libnsl.so-version)
 else
+ifeq ($(build-obsolete-nsl),yes)
 $(others:%=$(objpfx)%): $(objpfx)libnsl.a
+endif
 endif

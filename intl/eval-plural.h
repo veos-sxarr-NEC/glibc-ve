@@ -1,5 +1,5 @@
 /* Plural expression evaluation.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as published by
@@ -12,7 +12,7 @@
    GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef STATIC
 #define STATIC static
@@ -21,7 +21,6 @@
 /* Evaluate the plural expression and return an index value.  */
 STATIC
 unsigned long int
-internal_function
 plural_eval (const struct expression *pexp, unsigned long int n)
 {
   switch (pexp->nargs)

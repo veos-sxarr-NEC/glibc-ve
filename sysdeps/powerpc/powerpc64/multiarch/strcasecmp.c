@@ -1,5 +1,5 @@
-/* Multiple versions of strcasecmp.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+/* Multiple versions of strcasecmp
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,27 +14,23 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#if IS_IN (libc)
-# include <string.h>
-# define strcasecmp __strcasecmp_ppc
-extern __typeof (__strcasecmp) __strcasecmp_ppc attribute_hidden;
-extern __typeof (__strcasecmp) __strcasecmp_power7 attribute_hidden;
-#endif
-
-#include <string/strcasecmp.c>
-#undef strcasecmp
-
-#if IS_IN (libc)
-# include <shlib-compat.h>
-# include "init-arch.h"
+#include <string.h>
+#include <shlib-compat.h>
+#include "init-arch.h"
 
 extern __typeof (__strcasecmp) __libc_strcasecmp;
+
+extern __typeof (__strcasecmp) __strcasecmp_ppc attribute_hidden;
+extern __typeof (__strcasecmp) __strcasecmp_power7 attribute_hidden;
+extern __typeof (__strcasecmp) __strcasecmp_power8 attribute_hidden;
+
 libc_ifunc (__libc_strcasecmp,
-	    (hwcap & PPC_FEATURE_HAS_VSX)
-            ? __strcasecmp_power7
-            : __strcasecmp_ppc);
+	     (hwcap2 & PPC_FEATURE2_ARCH_2_07)
+             ? __strcasecmp_power8:
+	     (hwcap & PPC_FEATURE_HAS_VSX)
+             ? __strcasecmp_power7
+             : __strcasecmp_ppc);
 
 weak_alias (__libc_strcasecmp, strcasecmp)
-#endif

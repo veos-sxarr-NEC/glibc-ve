@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <dlfcn.h>
@@ -29,8 +29,7 @@
 
 
 wint_t
-__btowc (c)
-     int c;
+__btowc (int c)
 {
   const struct gconv_fcts *fcts;
 
@@ -47,15 +46,15 @@ __btowc (c)
   /* Get the conversion functions.  */
   fcts = get_gconv_fcts (_NL_CURRENT_DATA (LC_CTYPE));
   __gconv_btowc_fct btowc_fct = fcts->towc->__btowc_fct;
+#ifdef PTR_DEMANGLE
+  if (fcts->towc->__shlib_handle != NULL)
+    PTR_DEMANGLE (btowc_fct);
+#endif
 
   if (__builtin_expect (fcts->towc_nsteps == 1, 1)
       && __builtin_expect (btowc_fct != NULL, 1))
     {
       /* Use the shortcut function.  */
-#ifdef PTR_DEMANGLE
-      if (fcts->towc->__shlib_handle != NULL)
-	PTR_DEMANGLE (btowc_fct);
-#endif
       return DL_CALL_FCT (btowc_fct, (fcts->towc, (unsigned char) c));
     }
   else

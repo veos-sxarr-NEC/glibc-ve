@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,8 +13,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <sysdeps/unix/sysdep.h>
 #include <sysdeps/ve/sysdep.h>
@@ -26,6 +26,11 @@
 
 #define DO_CALL(syscall_name, args)					      \
   lea %s0,SYS_ify (syscall_name);					      \
+  or %s34,10,(0)1 ;          /* VLFA DELAY */
+  brgt.w  0,%s34,32;
+  fencei ;
+  subs.w.sx  %s34,%s34,(63)0;
+  br.l -24;
   monc;
 
 #define	r0		%s0	/* Normal return-value register.  */

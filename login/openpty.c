@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Zack Weinberg <zack@rabi.phys.columbia.edu>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -92,47 +92,69 @@ openpty (int *amaster, int *aslave, char *name,
   char _buf[512];
 #endif
   char *buf = _buf;
-  int master, slave;
+  int master, ret = -1, slave = -1;
+
+  *buf = '\0';
 
   master = getpt ();
   if (master == -1)
     return -1;
 
   if (grantpt (master))
-    goto fail;
+    goto on_error;
 
   if (unlockpt (master))
-    goto fail;
+    goto on_error;
 
-  if (pts_name (master, &buf, sizeof (_buf)))
-    goto fail;
-
-  slave = open (buf, O_RDWR | O_NOCTTY);
+#ifdef TIOCGPTPEER
+  /* Try to allocate slave fd solely based on master fd first. */
+  slave = ioctl (master, TIOCGPTPEER, O_RDWR | O_NOCTTY);
+#endif
   if (slave == -1)
     {
-      if (buf != _buf)
-	free (buf);
+      /* Fallback to path-based slave fd allocation in case kernel doesn't
+       * support TIOCGPTPEER.
+       */
+      if (pts_name (master, &buf, sizeof (_buf)))
+        goto on_error;
 
-      goto fail;
+      slave = open (buf, O_RDWR | O_NOCTTY);
+      if (slave == -1)
+        goto on_error;
     }
 
   /* XXX Should we ignore errors here?  */
-  if(termp)
+  if (termp)
     tcsetattr (slave, TCSAFLUSH, termp);
+#ifdef TIOCSWINSZ
   if (winp)
     ioctl (slave, TIOCSWINSZ, winp);
+#endif
 
   *amaster = master;
   *aslave = slave;
   if (name != NULL)
-    strcpy (name, buf);
+    {
+      if (*buf == '\0')
+        if (pts_name (master, &buf, sizeof (_buf)))
+          goto on_error;
+
+      strcpy (name, buf);
+    }
+
+  ret = 0;
+
+ on_error:
+  if (ret == -1) {
+    close (master);
+
+    if (slave != -1)
+      close (slave);
+  }
 
   if (buf != _buf)
     free (buf);
-  return 0;
 
- fail:
-  close (master);
-  return -1;
+  return ret;
 }
 libutil_hidden_def (openpty)

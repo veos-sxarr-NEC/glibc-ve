@@ -25,7 +25,9 @@ static char rcsid[] = "$NetBSD: $";
  *   Special cases:
  */
 
+#include <errno.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
 #include <float.h>
 
@@ -33,8 +35,8 @@ double __nexttoward(double x, long double y)
 {
 	int32_t hx,ix;
 	int64_t hy,iy;
-	u_int32_t lx;
-	u_int64_t ly;
+	uint32_t lx;
+	uint64_t ly;
 
 	EXTRACT_WORDS(hx,lx,x);
 	GET_LDOUBLE_WORDS64(hy,ly,y);
@@ -48,7 +50,7 @@ double __nexttoward(double x, long double y)
 	if((long double) x==y) return y;	/* x=y, return y */
 	if((ix|lx)==0) {			/* x == 0 */
 	    double u;
-	    INSERT_WORDS(x,(u_int32_t)((hy>>32)&0x80000000),1);/* return +-minsub */
+	    INSERT_WORDS(x,(uint32_t)((hy>>32)&0x80000000),1);/* return +-minsub */
 	    u = math_opt_barrier (x);
 	    u = u * u;
 	    math_force_eval (u);		/* raise underflow flag */
@@ -73,15 +75,14 @@ double __nexttoward(double x, long double y)
 	}
 	hy = hx&0x7ff00000;
 	if(hy>=0x7ff00000) {
-	  x = x+x;	/* overflow  */
-	  if (FLT_EVAL_METHOD != 0 && FLT_EVAL_METHOD != 1)
-	    /* Force conversion to double.  */
-	    asm ("" : "+m"(x));
-	  return x;
+	  double u = x+x;			/* overflow  */
+	  math_force_eval (u);
+	  __set_errno (ERANGE);
 	}
 	if(hy<0x00100000) {
 	    double u = x*x;			/* underflow */
 	    math_force_eval (u);		/* raise underflow flag */
+	    __set_errno (ERANGE);
 	}
 	INSERT_WORDS(x,hx,lx);
 	return x;

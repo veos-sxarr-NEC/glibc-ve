@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -30,10 +30,9 @@
 /* ANSI explicily requires setting errno to a positive value on failure. */
 
 long int
-_IO_ftell (fp)
-     _IO_FILE *fp;
+_IO_ftell (FILE *fp)
 {
-  _IO_off64_t pos;
+  off64_t pos;
   CHECK_FILE (fp, -1L);
   _IO_acquire_lock (fp);
   pos = _IO_seekoff_unlocked (fp, 0, _IO_seek_cur, 0);
@@ -45,23 +44,17 @@ _IO_ftell (fp)
   _IO_release_lock (fp);
   if (pos == _IO_pos_BAD)
     {
-#ifdef EIO
       if (errno == 0)
 	__set_errno (EIO);
-#endif
       return -1L;
     }
-  if ((_IO_off64_t) (long int) pos != pos)
+  if ((off64_t) (long int) pos != pos)
     {
-#ifdef EOVERFLOW
       __set_errno (EOVERFLOW);
-#endif
       return -1L;
     }
   return pos;
 }
 libc_hidden_def (_IO_ftell)
 
-#ifdef weak_alias
 weak_alias (_IO_ftell, ftell)
-#endif

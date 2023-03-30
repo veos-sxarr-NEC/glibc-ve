@@ -1,6 +1,6 @@
 /* Round argument to nearest integral value according to current rounding
    direction.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.d>, 2002.
 
@@ -16,15 +16,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <libm-alias-float.h>
 
 	.text
 ENTRY(__llrintf)
 	cvtss2si %xmm0,%rax
 	ret
 END(__llrintf)
-weak_alias (__llrintf, llrintf)
+libm_alias_float (__llrint, llrint)
+#ifndef __ILP32__
 strong_alias (__llrintf, __lrintf)
-weak_alias (__llrintf, lrintf)
+libm_alias_float (__llrint, lrint)
+#endif

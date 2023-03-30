@@ -77,6 +77,7 @@ tst-audit7-ENV = LD_AUDIT=$(objpfx)tst-auditmod7b.so
 #$(objpfx)tst-audit10: $(objpfx)tst-auditmod10a.so
 #$(objpfx)tst-audit10.out: $(objpfx)tst-auditmod10b.so
 tst-audit10-ENV = LD_AUDIT=$(objpfx)tst-auditmod10b.so
+tst-audit12-ENV = LD_AUDIT=$(objpfx)tst-auditmod12.so
 endif
 
 ifeq ($(subdir),csu)
@@ -107,4 +108,62 @@ $(objpfx)ldd: ../sysdeps/ve/ldd.bash.in $(common-objpfx)soversions.mk \
 	$(gen-ldd)
 	chmod 555 $@.new
 	mv -f $@.new $@
+
+define ldd-wrapper-script
+#!/bin/bash
+# Copyright (c) 2020 NEC Corporation.
+# All rights reserved.
+#
+# Description:
+# This wrapper scipt is responsible to execute the different
+# version of ldd binary provided by glibc-ve as per the VE_LINKER_VERSION
+# environment variable value and VE3 ldd existance.
+
+VE1_CMD_PATH="/opt/nec/ve/glibc/bin/ldd"
+VE3_CMD_PATH="/opt/nec/ve3/glibc/bin/ldd"
+ldd_arg="$$@"
+
+if [[ -x "$$VE3_CMD_PATH" ]]; then
+        exec $$VE3_CMD_PATH $$ldd_arg
+else
+        exec $$VE1_CMD_PATH $$ldd_arg
+fi
+endef
+
+$(objpfx)ve-ldd: $(common-objpfx)config.make
+	$(file >$@T,$(ldd-wrapper-script))
+	chmod a+x $@T
+	mv -f $@T $@
+
+define ldconfig-wrapper-script
+#!/bin/bash
+# Copyright (c) 2020 NEC Corporation.
+# All rights reserved.
+#
+# Description:
+# This wrapper scipt is responsible to execute the different
+# version of ldconfig provided by different version glibc-ve.
+
+VE1_CMD_PATH="/opt/nec/ve/glibc/sbin/ldconfig"
+VE3_CMD_PATH="/opt/nec/ve3/glibc/sbin/ldconfig"
+
+ldconfig_arg="$$@"
+
+arch=$$(find /sys/devices -iname ve_arch_class | head -1 | xargs cat)
+if test  "$$arch" = "ve1"; then
+  if [[ -x "$$VE1_CMD_PATH" ]]; then
+        $$VE1_CMD_PATH $$ldconfig_arg
+  fi
+else
+  if [[ -x "$$VE3_CMD_PATH" ]]; then
+        $$VE3_CMD_PATH $$ldconfig_arg
+  fi
+fi
+endef
+
+$(objpfx)ve-ldconfig: $(common-objpfx)config.make
+	$(file >$@T,$(ldconfig-wrapper-script))
+	chmod a+x $@T
+	mv -f $@T $@
+
 endif

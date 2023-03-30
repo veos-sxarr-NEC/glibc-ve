@@ -1,5 +1,5 @@
 /* setjmp for PowerPC64.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <stap-probe.h>
@@ -232,3 +232,14 @@ L(no_vmx):
 	blr
 #endif
 END (__sigsetjmp_symbol)
+
+#if defined SHARED && !IS_IN (rtld) && !defined __NO_VMX__
+/* When called from within libc we need a special version of __sigsetjmp
+   that saves r2 since the call won't go via a plt call stub.  See
+   bugz #269.  */
+ENTRY (__GI___sigsetjmp)
+	std r2,FRAME_TOC_SAVE(r1) /* Save the callers TOC in the save area.  */
+	CALL_MCOUNT 1
+	b JUMPTARGET (GLUE(__sigsetjmp_symbol,_ent))
+END (__GI___sigsetjmp)
+#endif

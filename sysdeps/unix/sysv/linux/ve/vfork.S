@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,12 +13,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
  /* __TODO_PORT_HCLT :
    1. SAVE program counter is required or not ?
-   2. callee saved register for storing PID */
+   2. In 2.31 No need to callee saved register for storing PID */
 
 #include <sysdep.h>
 #include <tcb-offsets.h>
@@ -26,32 +26,24 @@
 
 .section	.data
 		.align 8
-.set pid_clean,	 0x80000000
 .set verr,	 -4095
 
 ENTRY(__vfork)
 	/* Save return PC value into any GP Register.  We need a register that
 	   is preserved by the syscall and that we're allowed to destroy. */
 
-	/* Save the TCB-cached PID away in GP Register, and then negate the TCB
-           field.  But if it's zero, set it to 0x80000000 instead.  See
-           raise.c for the logic that relies on this value.  */
-	ldl.sx	%s63, PID_OFFSET(, %tp)
-	subs.w	%s0, 0, %s63
-	lea	%s1, pid_clean
-	cmov.w.eq	%s0, %s1, %s0
-	stl	%s0, PID_OFFSET(, %tp)
-
 	xor	%s46, %s46, %s46
 	ldl	%s46, SHM_OFFSET(, %tp) /*! fetch shared SHM offset */
 	or      %s0, SYS_ify(vfork), (0)1 /*Calling  vfork  directly,instead of using clone with arguments to do vfork system call*/
 	xor	%s2, %s2, %s2
 	shm.l	%s0, 0x0(%s46)
+	or %s34,10,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
 	monc
-	breq.l.t 0, %s0, 1f
-	/* Restore PID value, if we're the parent */
-	stl	%s63, PID_OFFSET(, %tp)
-1:
+
 	/* Restore PC */
 	lea %s62, verr
 	cmpu.l  %s47, %s62, %s0

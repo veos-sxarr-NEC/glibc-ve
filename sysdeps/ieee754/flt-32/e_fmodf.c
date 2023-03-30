@@ -21,6 +21,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const float one = 1.0, Zero[] = {0.0, -0.0,};
 
@@ -41,7 +42,7 @@ __ieee754_fmodf (float x, float y)
 	    return (x*y)/(x*y);
 	if(hx<hy) return x;			/* |x|<|y| return x */
 	if(hx==hy)
-	    return Zero[(u_int32_t)sx>>31];	/* |x|=|y| return x*0*/
+	    return Zero[(uint32_t)sx>>31];	/* |x|=|y| return x*0*/
 
     /* determine ix = ilogb(x) */
 	if(hx<0x00800000) {	/* subnormal x */
@@ -74,7 +75,7 @@ __ieee754_fmodf (float x, float y)
 	    if(hz<0){hx = hx+hx;}
 	    else {
 		if(hz==0)		/* return sign(x)*0 */
-		    return Zero[(u_int32_t)sx>>31];
+		    return Zero[(uint32_t)sx>>31];
 		hx = hz+hz;
 	    }
 	}
@@ -83,7 +84,7 @@ __ieee754_fmodf (float x, float y)
 
     /* convert back to floating value and restore the sign */
 	if(hx==0)			/* return sign(x)*0 */
-	    return Zero[(u_int32_t)sx>>31];
+	    return Zero[(uint32_t)sx>>31];
 	while(hx<0x00800000) {		/* normalize x */
 	    hx = hx+hx;
 	    iy -= 1;
@@ -99,4 +100,4 @@ __ieee754_fmodf (float x, float y)
 	}
 	return x;		/* exact output */
 }
-strong_alias (__ieee754_fmodf, __fmodf_finite)
+libm_alias_finite (__ieee754_fmodf, __fmodf)

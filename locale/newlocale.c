@@ -1,5 +1,5 @@
 /* Return a reference to locale information record.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,10 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <argz.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <errno.h>
 #include <locale.h>
 #include <stdlib.h>
@@ -39,13 +39,13 @@ __libc_rwlock_define (extern , __libc_setlocale_lock attribute_hidden)
   } while (0)
 
 
-__locale_t
-__newlocale (int category_mask, const char *locale, __locale_t base)
+locale_t
+__newlocale (int category_mask, const char *locale, locale_t base)
 {
   /* Intermediate memory for result.  */
   const char *newnames[__LC_LAST];
   struct __locale_struct result;
-  __locale_t result_ptr;
+  locale_t result_ptr;
   char *locale_path;
   size_t locale_path_len;
   const char *locpath_var;
@@ -86,7 +86,7 @@ __newlocale (int category_mask, const char *locale, __locale_t base)
      dataset using the C locale data.  */
   if (category_mask == 0)
     {
-      result_ptr = (__locale_t) malloc (sizeof (struct __locale_struct));
+      result_ptr = (locale_t) malloc (sizeof (struct __locale_struct));
       if (result_ptr == NULL)
 	return NULL;
       *result_ptr = result;
@@ -101,6 +101,7 @@ __newlocale (int category_mask, const char *locale, __locale_t base)
      by passing null and it can check the canonical locale archive.  */
   locale_path = NULL;
   locale_path_len = 0;
+
 #ifdef __ve__
   locpath_var = getenv ("VE_LOCPATH");
 #else
@@ -134,8 +135,7 @@ __newlocale (int category_mask, const char *locale, __locale_t base)
 	  for (cnt = 0; cnt < __LC_LAST; ++cnt)
 	    if (cnt != LC_ALL
 		&& (size_t) (cp - np) == _nl_category_name_sizes[cnt]
-		&& memcmp (np, (_nl_category_names.str
-				+ _nl_category_name_idxs[cnt]), cp - np) == 0)
+		&& memcmp (np, (_nl_category_names_get (cnt)), cp - np) == 0)
 	      break;
 
 	  if (cnt == __LC_LAST)

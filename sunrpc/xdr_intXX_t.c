@@ -1,4 +1,4 @@
-/* Copyright (c) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@vt.uni-paderborn.de>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <rpc/types.h>
 
@@ -22,6 +22,7 @@
 #include <rpc/xdr.h>
 
 #include <stdint.h>
+#include <shlib-compat.h>
 
 /* XDR 64bit integers */
 bool_t

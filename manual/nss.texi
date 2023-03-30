@@ -12,7 +12,7 @@ Network Information Service (NIS) and the Domain Name Service (DNS))
 became popular, and were hacked into the C library, usually with a fixed
 search order.
 
-@Theglibc{} contains a cleaner solution of this problem.  It is
+@Theglibc{} contains a cleaner solution to this problem.  It is
 designed after a method used by Sun Microsystems in the C library of
 @w{Solaris 2}.  @Theglibc{} follows their name and calls this
 scheme @dfn{Name Service Switch} (NSS).
@@ -46,7 +46,7 @@ The modules can be updated separately.
 The C library image is smaller.
 @end enumerate
 
-To fulfill the first goal above the ABI of the modules will be described
+To fulfill the first goal above, the ABI of the modules will be described
 below.  For getting the implementation of a new service right it is
 important to understand how the functions in the modules get called.
 They are in no way designed to be used by the programmer directly.
@@ -56,17 +56,21 @@ functions to access the databases.
 @noindent
 The databases available in the NSS are
 
+@cindex aliases
 @cindex ethers
 @cindex group
+@cindex gshadow
 @cindex hosts
+@cindex initgroups
 @cindex netgroup
 @cindex networks
-@cindex protocols
 @cindex passwd
+@cindex protocols
+@cindex publickey
 @cindex rpc
 @cindex services
 @cindex shadow
-@vtable @code
+@table @code
 @item aliases
 Mail aliases
 @comment @pxref{Mail Aliases}.
@@ -75,29 +79,35 @@ Ethernet numbers,
 @comment @pxref{Ethernet Numbers}.
 @item group
 Groups of users, @pxref{Group Database}.
+@item gshadow
+Group passphrase hashes and related information.
 @item hosts
 Host names and numbers, @pxref{Host Names}.
+@item initgroups
+Supplementary group access list.
 @item netgroup
 Network wide list of host and users, @pxref{Netgroup Database}.
 @item networks
 Network names and numbers, @pxref{Networks Database}.
+@item passwd
+User identities, @pxref{User Database}.
 @item protocols
 Network protocols, @pxref{Protocols Database}.
-@item passwd
-User passwords, @pxref{User Database}.
+@item publickey
+Public keys for Secure RPC.
 @item rpc
-Remote procedure call names and numbers,
+Remote procedure call names and numbers.
 @comment @pxref{RPC Database}.
 @item services
 Network services, @pxref{Services Database}.
 @item shadow
-Shadow user passwords,
-@comment @pxref{Shadow Password Database}.
-@end vtable
+User passphrase hashes and related information.
+@comment @pxref{Shadow Passphrase Database}.
+@end table
 
 @noindent
-There will be some more added later (@code{automount}, @code{bootparams},
-@code{netmasks}, and @code{publickey}).
+@c We currently don't implement automount, netmasks, or bootparams.
+More databases may be added later.
 
 @node NSS Configuration File, NSS Module Internals, NSS Basics, Name Service Switch
 @section The NSS Configuration File
@@ -106,7 +116,7 @@ There will be some more added later (@code{automount}, @code{bootparams},
 @cindex @file{nsswitch.conf}
 Somehow the NSS code must be told about the wishes of the user.  For
 this reason there is the file @file{/etc/nsswitch.conf}.  For each
-database this file contain a specification how the lookup process should
+database, this file contains a specification of how the lookup process should
 work.  The file could look like this:
 
 @example
@@ -141,7 +151,7 @@ the reaction on lookup result like @code{[NOTFOUND=return]}.
 The above example file mentions five different services: @code{files},
 @code{db}, @code{dns}, @code{nis}, and @code{nisplus}.  This does not
 mean these
-services are available on all sites and it does also not mean these are
+services are available on all sites and neither does it mean these are
 all the services which will ever be available.
 
 In fact, these names are simply strings which the NSS code uses to find
@@ -158,6 +168,10 @@ change frequently.  Normally the user should not have to be cognizant of
 these files since they should be placed in a directory where they are
 found automatically.  Only the names of all available services are
 important.
+
+Lastly, some system software may make use of the NSS configuration file
+to store their own configuration for similar purposes.  Examples of this
+include the @code{automount} service which is used by @code{autofs}.
 
 @node Actions in the NSS configuration, Notes on NSS Configuration File, Services in the NSS configuration, NSS Configuration File
 @subsection Actions in the NSS configuration
@@ -180,7 +194,7 @@ where
 
 The case of the keywords is insignificant.  The @var{status}
 values are the results of a call to a lookup function of a specific
-service.  They mean
+service.  They mean:
 
 @ftable @samp
 @item success
@@ -201,6 +215,50 @@ not allow queries.  The default action is @code{continue}.
 The service is temporarily unavailable.  This could mean a file is
 locked or a server currently cannot accept more connections.  The
 default action is @code{continue}.
+@end ftable
+
+@noindent
+The @var{action} values mean:
+
+@ftable @samp
+@item return
+
+If the status matches, stop the lookup process at this service
+specification.  If an entry is available, provide it to the application.
+If an error occurred, report it to the application.  In case of a prior
+@samp{merge} action, the data is combined with previous lookup results,
+as explained below.
+
+@item continue
+
+If the status matches, proceed with the lookup process at the next
+entry, discarding the result of the current lookup (and any merged
+data).  An exception is the @samp{initgroups} database and the
+@samp{success} status, where @samp{continue} acts like @code{merge}
+below.
+
+@item merge
+
+Proceed with the lookup process, retaining the current lookup result.
+This action is useful only with the @samp{success} status.  If a
+subsequent service lookup succeeds and has a matching @samp{return}
+specification, the results are merged, the lookup process ends, and the
+merged results are returned to the application.  If the following service
+has a matching @samp{merge} action, the lookup process continues,
+retaining the combined data from this and any previous lookups.
+
+After a @code{merge} action, errors from subsequent lookups are ignored,
+and the data gathered so far will be returned.
+
+The @samp{merge} only applies to the @samp{success} status.  It is
+currently implemented for the @samp{group} database and its group
+members field, @samp{gr_mem}.  If specified for other databases, it
+causes the lookup to fail (if the @var{status} matches).
+
+When processing @samp{merge} for @samp{group} membership, the group GID
+and name must be identical for both entries.  If only one or the other is
+a match, the behavior is undefined.
+
 @end ftable
 
 @noindent
@@ -274,13 +332,17 @@ The @code{passwd}, @code{group}, and @code{shadow} databases are
 traditionally handled in a special way.  The appropriate files in the
 @file{/etc} directory are read but if an entry with a name starting
 with a @code{+} character is found NIS is used.  This kind of lookup
-remains possible by using the special lookup service @code{compat}
-and the default value for the three databases above is
-@code{compat [NOTFOUND=return] files}.
+remains possible if @theglibc{} was configured with the
+@code{--enable-obsolete-nsl} option and the special lookup service
+@code{compat} is used.  If @theglibc{} was configured with the
+@code{--enable-obsolete-nsl} option the default value for the three
+databases above is @code{compat [NOTFOUND=return] files}.  If the
+@code{--enable-obsolete-nsl} option was not used the default value
+for the services is @code{files}.
 
-For all other databases the default value is
-@code{nis [NOTFOUND=return] files}.  This solution give the best
-chance to be correct since NIS and file based lookup is used.
+For all other databases the default value is @code{files} unless
+@theglibc{} was configured with @code{--enable-obsolete-rpc} option, in
+which case it the default value is @code{nis [NOTFOUND=return] files}.
 
 @cindex optimizing NSS
 A second point is that the user should try to optimize the lookup
@@ -316,7 +378,7 @@ interested in this topic should read about Dynamic Linking.
 @subsection The Naming Scheme of the NSS Modules
 
 @noindent
-The name of each function consist of various parts:
+The name of each function consists of various parts:
 
 @quotation
        _nss_@var{service}_@var{function}
@@ -349,7 +411,7 @@ functions.  I.e., if the user would call the @code{gethostbyname_r}
 function this also would end in the above function.  For all user
 interface functions the C library maps this call to a call to the
 reentrant function.  For reentrant functions this is trivial since the
-interface is (nearly) the same.  For the non-reentrant version The
+interface is (nearly) the same.  For the non-reentrant version the
 library keeps internal buffers which are used to replace the user
 supplied buffer.
 
@@ -379,7 +441,7 @@ not starting with @file{lib} but don't tell this to anybody.}
 Now we know about the functions contained in the modules.  It is now
 time to describe the types.  When we mentioned the reentrant versions of
 the functions above, this means there are some additional arguments
-(compared with the standard, non-reentrant version).  The prototypes for
+(compared with the standard, non-reentrant versions).  The prototypes for
 the non-reentrant and reentrant versions of our function above are:
 
 @smallexample
@@ -401,9 +463,10 @@ enum nss_status _nss_files_gethostbyname_r (const char *name,
 @end smallexample
 
 I.e., the interface function is in fact the reentrant function with the
-change of the return value and the omission of the @var{result}
-parameter.  While the user-level function returns a pointer to the
-result the reentrant function return an @code{enum nss_status} value:
+change of the return value, the omission of the @var{result} parameter,
+and the addition of the @var{errnop} parameter.  While the user-level
+function returns a pointer to the result the reentrant function return
+an @code{enum nss_status} value:
 
 @vtable @code
 @item NSS_STATUS_TRYAGAIN
@@ -430,7 +493,7 @@ necessary the source code should be examined to learn about the details.
 
 In case the interface function has to return an error it is important
 that the correct error code is stored in @code{*@var{errnop}}.  Some
-return status value have only one associated error code, others have
+return status values have only one associated error code, others have
 more.
 
 @multitable @columnfractions .3 .2 .50
@@ -448,40 +511,50 @@ The function should be called again with a larger buffer.
 @item
 @code{NSS_STATUS_NOTFOUND} @tab
         @code{ENOENT} @tab The requested entry is not available.
+
+@item
+@code{NSS_STATUS_NOTFOUND} @tab
+	@code{SUCCESS} @tab There are no entries.
+Use this to avoid returning errors for inactive services which may
+be enabled at a later time. This is not the same as the service
+being temporarily unavailable.
 @end multitable
 
 These are proposed values.  There can be other error codes and the
 described error codes can have different meaning.  @strong{With one
 exception:} when returning @code{NSS_STATUS_TRYAGAIN} the error code
 @code{ERANGE} @emph{must} mean that the user provided buffer is too
-small.  Everything is non-critical.
+small.  Everything else is non-critical.
+
+In statically linked programs, the main application and NSS modules do
+not share the same thread-local variable @code{errno}, which is the
+reason why there is an explicit @var{errnop} function argument.
 
 The above function has something special which is missing for almost all
 the other module functions.  There is an argument @var{h_errnop}.  This
 points to a variable which will be filled with the error code in case
-the execution of the function fails for some reason.  The reentrant
-function cannot use the global variable @var{h_errno};
-@code{gethostbyname} calls @code{gethostbyname_r} with the last argument
-set to @code{&h_errno}.
+the execution of the function fails for some reason.  (In statically
+linked programs, the thread-local variable @code{h_errno} is not shared
+with the main application.)
 
 The @code{get@var{XXX}by@var{YYY}} functions are the most important
 functions in the NSS modules.  But there are others which implement
 the other ways to access system databases (say for the
-password database, there are @code{setpwent}, @code{getpwent}, and
+user database, there are @code{setpwent}, @code{getpwent}, and
 @code{endpwent}).  These will be described in more detail later.
 Here we give a general way to determine the
 signature of the module function:
 
 @itemize @bullet
 @item
-the return value is @code{int};
+the return value is @code{enum nss_status};
 @item
-the name is as explained in @pxref{NSS Module Names};
+the name (@pxref{NSS Module Names});
 @item
 the first arguments are identical to the arguments of the non-reentrant
 function;
 @item
-the next three arguments are:
+the next four arguments are:
 
 @table @code
 @item STRUCT_TYPE *result_buf
@@ -492,11 +565,21 @@ pointer to a buffer where the function can store additional data for
 the result etc.
 @item size_t buflen
 length of the buffer pointed to by @var{buffer}.
+@item int *errnop
+the low-level error code to return to the application.  If the return
+value is not @code{NSS_STATUS_SUCCESS}, @code{*@var{errnop}} needs to be
+set to a non-zero value.  An NSS module should never set
+@code{*@var{errnop}} to zero.  The value @code{ERANGE} is special, as
+described above.
 @end table
 
 @item
 possibly a last argument @var{h_errnop}, for the host name and network
-name lookup functions.
+name lookup functions.  If the return value is not
+@code{NSS_STATUS_SUCCESS}, @code{*@var{h_errnop}} needs to be set to a
+non-zero value.  A generic error code is @code{NETDB_INTERNAL}, which
+instructs the caller to examine @code{*@var{errnop}} for further
+details.  (This includes the @code{ERANGE} special case.)
 @end itemize
 
 @noindent
@@ -515,7 +598,7 @@ here only important to remember that adding another database is
 independent from adding another service because a service need not
 support all databases or lookup functions.
 
-A designer/implementor of a new service is therefore free to choose the
+A designer/implementer of a new service is therefore free to choose the
 databases s/he is interested in and leave the rest for later (or
 completely aside).
 
@@ -581,7 +664,7 @@ general rules must be followed by all functions.
 In fact there are four kinds of different functions which may appear in
 the interface.  All derive from the traditional ones for system databases.
 @var{db} in the following table is normally an abbreviation for the
-database (e.g., it is @code{pw} for the password database).
+database (e.g., it is @code{pw} for the user database).
 
 @table @code
 @item enum nss_status _nss_@var{database}_set@var{db}ent (void)
@@ -602,7 +685,7 @@ This function simply closes all files which are still open or removes
 buffer caches.  If there are no files or buffers to remove this is again
 a simple noop.
 
-There normally is no return value different to @var{NSS_STATUS_SUCCESS}.
+There normally is no return value other than @var{NSS_STATUS_SUCCESS}.
 
 @item enum nss_status _nss_@var{database}_get@var{db}ent_r (@var{STRUCTURE} *result, char *buffer, size_t buflen, int *errnop)
 Since this function will be called several times in a row to retrieve
@@ -621,10 +704,11 @@ guaranteed that the same buffer will be passed for the next call of this
 function.  Therefore one must not misuse this buffer to save some state
 information from one call to another.
 
-Before the function returns the implementation should store the value of
-the local @var{errno} variable in the variable pointed to be
-@var{errnop}.  This is important to guarantee the module working in
-statically linked programs.
+Before the function returns with a failure code, the implementation
+should store the value of the local @code{errno} variable in the variable
+pointed to be @var{errnop}.  This is important to guarantee the module
+working in statically linked programs.  The stored value must not be
+zero.
 
 As explained above this function could also have an additional last
 argument.  This depends on the database used; it happens only for
@@ -635,7 +719,7 @@ more entries.  When the last entry was read it should return
 @code{NSS_STATUS_NOTFOUND}.  When the buffer given as an argument is too
 small for the data to be returned @code{NSS_STATUS_TRYAGAIN} should be
 returned.  When the service was not formerly initialized by a call to
-@code{_nss_@var{DATABASE}_set@var{db}ent} all return value allowed for
+@code{_nss_@var{DATABASE}_set@var{db}ent} all return values allowed for
 this function can also be returned here.
 
 @item enum nss_status _nss_@var{DATABASE}_get@var{db}by@var{XX}_r (@var{PARAMS}, @var{STRUCTURE} *result, char *buffer, size_t buflen, int *errnop)
@@ -646,17 +730,17 @@ interface functions.  All arguments given to the non-reentrant version
 are here described by @var{PARAMS}.
 
 The result must be stored in the structure pointed to by @var{result}.
-If there is additional data to return (say strings, where the
+If there are additional data to return (say strings, where the
 @var{result} structure only contains pointers) the function must use the
-@var{buffer} or length @var{buflen}.  There must not be any references
+@var{buffer} of length @var{buflen}.  There must not be any references
 to non-constant global data.
 
 The implementation of this function should honor the @var{stayopen}
 flag set by the @code{set@var{DB}ent} function whenever this makes sense.
 
-Before the function returns the implementation should store the value of
-the local @var{errno} variable in the variable pointed to be
-@var{errnop}.  This is important to guarantee the module working in
+Before the function returns, the implementation should store the value of
+the local @code{errno} variable in the variable pointed to by
+@var{errnop}.  This is important to guarantee the module works in
 statically linked programs.
 
 Again, this function takes an additional last argument for the

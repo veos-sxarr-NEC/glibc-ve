@@ -1,6 +1,6 @@
 /* Set flags signalling availability of kernel features based on given
    kernel version number.
-   Copyright (C) 2006-2015 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,22 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-
-/* PA-RISC 2.6.9 kernels had the first LWS CAS support */
-#define __ASSUME_LWS_CAS		1
-
-/* Support for the accept4 and recvmmsg syscalls was added in 2.6.34.  */
-#if __LINUX_KERNEL_VERSION >= 0x020622
-# define __ASSUME_ACCEPT4_SYSCALL	1
-# define __ASSUME_RECVMMSG_SYSCALL	1
-#endif
-
-/* Support for the sendmmsg syscall was added in 3.1.  */
-#if __LINUX_KERNEL_VERSION >= 0x030100
-# define __ASSUME_SENDMMSG_SYSCALL	1
-#endif
 
 /* Support for the utimes syscall was added in 3.14.  */
 #if __LINUX_KERNEL_VERSION >= 0x030e00
@@ -38,3 +24,14 @@
 #endif
 
 #include_next <kernel-features.h>
+
+#define __ASSUME_RECV_SYSCALL   1
+#define __ASSUME_SEND_SYSCALL	1
+
+/* Support for the execveat syscall was added in 4.0.  */
+#if __LINUX_KERNEL_VERSION < 0x040000
+# undef __ASSUME_EXECVEAT
+#endif
+
+#undef __ASSUME_CLONE_DEFAULT
+#define __ASSUME_CLONE_BACKWARDS 1

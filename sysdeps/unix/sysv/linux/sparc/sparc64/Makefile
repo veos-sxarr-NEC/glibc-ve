@@ -8,7 +8,7 @@ ifeq ($(subdir),stdlib)
 sysdep_routines += __start_context
 endif
 
-ifeq ($(subdir),nptl)
-CFLAGS-pause.c += -fexceptions
-CFLAGS-sigsuspend.c += -fexceptions
+ifeq ($(subdir),conform)
+# For bug 23821 (incorrect type of si_band).
+conformtest-xfail-conds += sparc64-linux
 endif

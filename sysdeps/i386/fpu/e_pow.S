@@ -1,5 +1,5 @@
 /* ix87 specific implementation of pow function.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,9 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <machine/asm.h>
+#include <i386-math-asm.h>
+#include <libm-alias-finite.h>
 
 	.section .rodata.cst8,"aM",@progbits,8
 
@@ -53,6 +55,7 @@ minfinity:
 mzero:
 	.byte 0, 0, 0, 0, 0, 0, 0, 0x80
 	ASM_SIZE_DIRECTIVE(minf_mzero)
+DEFINE_DBL_MIN
 
 #ifdef PIC
 # define MO(op) op##@GOTOFF(%ecx)
@@ -165,6 +168,10 @@ ENTRY(__ieee754_pow)
 	orl	%edx, %ecx
 	jnz	6b
 	fstp	%st(0)		// ST*x
+#ifdef	PIC
+	LOAD_PIC_REG (cx)
+#endif
+	DBL_NARROW_EVAL_UFLOW_NONNAN
 	ret
 
 	/* y is ±NAN */
@@ -257,6 +264,7 @@ ENTRY(__ieee754_pow)
 	cfi_adjust_cfa_offset (-8)
 292:	fscale			// +/- 2^fract(y*log2(x))*2^int(y*log2(x)) : int(y*log2(x))
 	fstp	%st(1)		// +/- 2^fract(y*log2(x))*2^int(y*log2(x))
+	DBL_NARROW_EVAL_UFLOW_NONNAN
 	ret
 
 
@@ -446,4 +454,4 @@ ENTRY(__ieee754_pow)
 	ret
 
 END(__ieee754_pow)
-strong_alias (__ieee754_pow, __pow_finite)
+libm_alias_finite (__ieee754_pow, __pow)

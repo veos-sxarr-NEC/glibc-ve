@@ -30,6 +30,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const long double
 one	= 1.0,
@@ -39,7 +40,7 @@ long double
 __ieee754_acoshl(long double x)
 {
 	long double t;
-	u_int32_t se,i0,i1;
+	uint32_t se,i0,i1;
 	GET_LDOUBLE_WORDS(se,i0,i1,x);
 	if(se<0x3fff || se & 0x8000) {	/* x < 1 */
 	    return (x-x)/(x-x);
@@ -52,10 +53,10 @@ __ieee754_acoshl(long double x)
 	    return 0.0;			/* acosh(1) = 0 */
 	} else if (se > 0x4000) {	/* 2**28 > x > 2 */
 	    t=x*x;
-	    return __ieee754_logl(2.0*x-one/(x+__ieee754_sqrtl(t-one)));
+	    return __ieee754_logl(2.0*x-one/(x+sqrtl(t-one)));
 	} else {			/* 1<x<2 */
 	    t = x-one;
-	    return __log1pl(t+__ieee754_sqrtl(2.0*t+t*t));
+	    return __log1pl(t+sqrtl(2.0*t+t*t));
 	}
 }
-strong_alias (__ieee754_acoshl, __acoshl_finite)
+libm_alias_finite (__ieee754_acoshl, __acoshl)

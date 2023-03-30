@@ -1,6 +1,12 @@
 #ifndef _RPC_SVC_H
 #include <sunrpc/rpc/svc.h>
 
+# ifndef _ISOMAC
+
+libc_hidden_proto (svc_pollfd)
+libc_hidden_proto (svc_max_pollfd)
+libc_hidden_proto (svc_fdset)
+
 libc_hidden_proto (xprt_register)
 libc_hidden_proto (xprt_unregister)
 libc_hidden_proto (svc_register)
@@ -37,4 +43,5 @@ libc_hidden_proto (svc_getreq_poll)
 
 extern void __svc_accept_failed (void) attribute_hidden;
 
+# endif /* !_ISOMAC */
 #endif

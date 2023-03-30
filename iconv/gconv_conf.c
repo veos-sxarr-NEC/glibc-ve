@@ -1,5 +1,5 @@
 /* Handle configuration data.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <ctype.h>
@@ -31,12 +31,19 @@
 #include <unistd.h>
 #include <sys/param.h>
 
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <gconv_int.h>
 
 
 /* This is the default path where we look for module lists.  */
 static const char default_gconv_path[] = GCONV_PATH;
+
+/* Type to represent search path.  */
+struct path_elem
+{
+  const char *name;
+  size_t len;
+};
 
 /* The path elements, as determined by the __gconv_get_path function.
    All path elements end in a slash.  */
@@ -99,7 +106,6 @@ const char *__gconv_path_envvar;
 
 /* Test whether there is already a matching module known.  */
 static int
-internal_function
 detect_conflict (const char *alias)
 {
   struct gconv_module *node = __gconv_modules_db;
@@ -183,7 +189,6 @@ add_alias (char *rp, void *modules)
 
 /* Insert a data structure for a new module in the search tree.  */
 static void
-internal_function
 insert_module (struct gconv_module *newp, int tobefreed)
 {
   struct gconv_module **rootp = &__gconv_modules_db;
@@ -242,7 +247,6 @@ insert_module (struct gconv_module *newp, int tobefreed)
 
 /* Add new module.  */
 static void
-internal_function
 add_module (char *rp, const char *directory, size_t dir_len, void **modules,
 	    size_t *nmodules, int modcounter)
 {
@@ -357,7 +361,6 @@ add_module (char *rp, const char *directory, size_t dir_len, void **modules,
 
 /* Read the next configuration file.  */
 static void
-internal_function
 read_conf_file (const char *filename, const char *directory, size_t dir_len,
 		void **modules, size_t *nmodules)
 {
@@ -378,7 +381,7 @@ read_conf_file (const char *filename, const char *directory, size_t dir_len,
 
   /* Process the known entries of the file.  Comments start with `#' and
      end with the end of the line.  Empty lines are ignored.  */
-  while (!feof_unlocked (fp))
+  while (!__feof_unlocked (fp))
     {
       char *rp, *endp, *word;
       ssize_t n = __getdelim (&line, &line_len, '\n', fp);
@@ -423,120 +426,115 @@ read_conf_file (const char *filename, const char *directory, size_t dir_len,
 }
 
 
-/* Determine the directories we are looking for data in.  */
-void
-internal_function
+/* Determine the directories we are looking for data in.  This function should
+   only be called from __gconv_read_conf.  */
+static void
 __gconv_get_path (void)
 {
   struct path_elem *result;
-  __libc_lock_define_initialized (static, lock);
 
-  __libc_lock_lock (lock);
+  /* This function is only ever called when __gconv_path_elem is NULL.  */
+  result = __gconv_path_elem;
+  assert (result == NULL);
 
-  /* Make sure there wasn't a second thread doing it already.  */
-  result = (struct path_elem *) __gconv_path_elem;
-  if (result == NULL)
+  /* Determine the complete path first.  */
+  char *gconv_path;
+  size_t gconv_path_len;
+  char *elem;
+  char *oldp;
+  char *cp;
+  int nelems;
+  char *cwd;
+  size_t cwdlen;
+
+  if (__gconv_path_envvar == NULL)
     {
-      /* Determine the complete path first.  */
-      char *gconv_path;
-      size_t gconv_path_len;
-      char *elem;
-      char *oldp;
-      char *cp;
-      int nelems;
-      char *cwd;
-      size_t cwdlen;
+      /* No user-defined path.  Make a modifiable copy of the
+         default path.  */
+      gconv_path = strdupa (default_gconv_path);
+      gconv_path_len = sizeof (default_gconv_path);
+      cwd = NULL;
+      cwdlen = 0;
+    }
+  else
+    {
+      /* Append the default path to the user-defined path.  */
+      size_t user_len = strlen (__gconv_path_envvar);
 
-      if (__gconv_path_envvar == NULL)
-	{
-	  /* No user-defined path.  Make a modifiable copy of the
-	     default path.  */
-	  gconv_path = strdupa (default_gconv_path);
-	  gconv_path_len = sizeof (default_gconv_path);
-	  cwd = NULL;
-	  cwdlen = 0;
-	}
-      else
-	{
-	  /* Append the default path to the user-defined path.  */
-	  size_t user_len = strlen (__gconv_path_envvar);
+      gconv_path_len = user_len + 1 + sizeof (default_gconv_path);
+      gconv_path = alloca (gconv_path_len);
+      __mempcpy (__mempcpy (__mempcpy (gconv_path, __gconv_path_envvar,
+                                       user_len),
+                            ":", 1),
+                 default_gconv_path, sizeof (default_gconv_path));
+      cwd = __getcwd (NULL, 0);
+      cwdlen = __glibc_unlikely (cwd == NULL) ? 0 : strlen (cwd);
+    }
+  assert (default_gconv_path[0] == '/');
 
-	  gconv_path_len = user_len + 1 + sizeof (default_gconv_path);
-	  gconv_path = alloca (gconv_path_len);
-	  __mempcpy (__mempcpy (__mempcpy (gconv_path, __gconv_path_envvar,
-					   user_len),
-				":", 1),
-		     default_gconv_path, sizeof (default_gconv_path));
-	  cwd = __getcwd (NULL, 0);
-	  cwdlen = strlen (cwd);
-	}
-      assert (default_gconv_path[0] == '/');
-
-      /* In a first pass we calculate the number of elements.  */
-      oldp = NULL;
-      cp = strchr (gconv_path, ':');
-      nelems = 1;
-      while (cp != NULL)
-	{
-	  if (cp != oldp + 1)
-	    ++nelems;
-	  oldp = cp;
-	  cp =  strchr (cp + 1, ':');
-	}
-
-      /* Allocate the memory for the result.  */
-      result = (struct path_elem *) malloc ((nelems + 1)
-					    * sizeof (struct path_elem)
-					    + gconv_path_len + nelems
-					    + (nelems - 1) * (cwdlen + 1));
-      if (result != NULL)
-	{
-	  char *strspace = (char *) &result[nelems + 1];
-	  int n = 0;
-
-	  /* Separate the individual parts.  */
-	  __gconv_max_path_elem_len = 0;
-	  elem = __strtok_r (gconv_path, ":", &gconv_path);
-	  assert (elem != NULL);
-	  do
-	    {
-	      result[n].name = strspace;
-	      if (elem[0] != '/')
-		{
-		  assert (cwd != NULL);
-		  strspace = __mempcpy (strspace, cwd, cwdlen);
-		  *strspace++ = '/';
-		}
-	      strspace = __stpcpy (strspace, elem);
-	      if (strspace[-1] != '/')
-		*strspace++ = '/';
-
-	      result[n].len = strspace - result[n].name;
-	      if (result[n].len > __gconv_max_path_elem_len)
-		__gconv_max_path_elem_len = result[n].len;
-
-	      *strspace++ = '\0';
-	      ++n;
-	    }
-	  while ((elem = __strtok_r (NULL, ":", &gconv_path)) != NULL);
-
-	  result[n].name = NULL;
-	  result[n].len = 0;
-	}
-
-      __gconv_path_elem = result ?: (struct path_elem *) &empty_path_elem;
-
-      free (cwd);
+  /* In a first pass we calculate the number of elements.  */
+  oldp = NULL;
+  cp = strchr (gconv_path, ':');
+  nelems = 1;
+  while (cp != NULL)
+    {
+      if (cp != oldp + 1)
+        ++nelems;
+      oldp = cp;
+      cp = strchr (cp + 1, ':');
     }
 
-  __libc_lock_unlock (lock);
+  /* Allocate the memory for the result.  */
+  result = malloc ((nelems + 1)
+                              * sizeof (struct path_elem)
+                              + gconv_path_len + nelems
+                              + (nelems - 1) * (cwdlen + 1));
+  if (result != NULL)
+    {
+      char *strspace = (char *) &result[nelems + 1];
+      int n = 0;
+
+      /* Separate the individual parts.  */
+      __gconv_max_path_elem_len = 0;
+      elem = __strtok_r (gconv_path, ":", &gconv_path);
+      assert (elem != NULL);
+      do
+        {
+          result[n].name = strspace;
+          if (elem[0] != '/')
+            {
+              assert (cwd != NULL);
+              strspace = __mempcpy (strspace, cwd, cwdlen);
+              *strspace++ = '/';
+            }
+          strspace = __stpcpy (strspace, elem);
+          if (strspace[-1] != '/')
+            *strspace++ = '/';
+
+          result[n].len = strspace - result[n].name;
+          if (result[n].len > __gconv_max_path_elem_len)
+            __gconv_max_path_elem_len = result[n].len;
+
+          *strspace++ = '\0';
+          ++n;
+        }
+      while ((elem = __strtok_r (NULL, ":", &gconv_path)) != NULL);
+
+      result[n].name = NULL;
+      result[n].len = 0;
+    }
+
+  __gconv_path_elem = result ?: (struct path_elem *) &empty_path_elem;
+
+  free (cwd);
 }
 
 
 /* Read all configuration files found in the user-specified and the default
-   path.  */
-void
-attribute_hidden
+   path.  This function should only be called once during the program's
+   lifetime.  It disregards locking and synchronization because its only
+   caller, __gconv_load_conf, handles this.  */
+static void
 __gconv_read_conf (void)
 {
   void *modules = NULL;
@@ -554,8 +552,7 @@ __gconv_read_conf (void)
 
 #ifndef STATIC_GCONV
   /* Find out where we have to look.  */
-  if (__gconv_path_elem == NULL)
-    __gconv_get_path ();
+  __gconv_get_path ();
 
   for (cnt = 0; __gconv_path_elem[cnt].name != NULL; ++cnt)
     {
@@ -606,6 +603,20 @@ __gconv_read_conf (void)
   __set_errno (save_errno);
 }
 
+
+/* This "once" variable is used to do a one-time load of the configuration.  */
+__libc_once_define (static, once);
+
+
+/* Read all configuration files found in the user-specified and the default
+   path, but do it only "once" using __gconv_read_conf to do the actual
+   work.  This is the function that must be called when reading iconv
+   configuration.  */
+void
+__gconv_load_conf (void)
+{
+  __libc_once (once, __gconv_read_conf);
+}
 
 
 /* Free all resources if necessary.  */

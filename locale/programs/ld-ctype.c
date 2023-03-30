@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.org>, 1995.
 
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -41,15 +41,6 @@
 #include "locfile.h"
 
 #include <assert.h>
-
-
-#ifdef PREDEFINED_CLASSES
-/* These are the extra bits not in wctype.h since these are not preallocated
-   classes.  */
-# define _ISwspecial1	(1 << 29)
-# define _ISwspecial2	(1 << 30)
-# define _ISwspecial3	(1 << 31)
-#endif
 
 
 /* The bit used for representing a special class.  */
@@ -337,26 +328,6 @@ ctype_startup (struct linereader *lr, struct localedef_t *locale,
 	  ctype_class_new (lr, ctype, "cntrl");
 	  ctype_class_new (lr, ctype, "punct");
 	  ctype_class_new (lr, ctype, "alnum");
-#ifdef PREDEFINED_CLASSES
-	  /* The following are extensions from ISO 14652.  */
-	  ctype_class_new (lr, ctype, "left_to_right");
-	  ctype_class_new (lr, ctype, "right_to_left");
-	  ctype_class_new (lr, ctype, "num_terminator");
-	  ctype_class_new (lr, ctype, "num_separator");
-	  ctype_class_new (lr, ctype, "segment_separator");
-	  ctype_class_new (lr, ctype, "block_separator");
-	  ctype_class_new (lr, ctype, "direction_control");
-	  ctype_class_new (lr, ctype, "sym_swap_layout");
-	  ctype_class_new (lr, ctype, "char_shape_selector");
-	  ctype_class_new (lr, ctype, "num_shape_selector");
-	  ctype_class_new (lr, ctype, "non_spacing");
-	  ctype_class_new (lr, ctype, "non_spacing_level3");
-	  ctype_class_new (lr, ctype, "normal_connect");
-	  ctype_class_new (lr, ctype, "r_connect");
-	  ctype_class_new (lr, ctype, "no_connect");
-	  ctype_class_new (lr, ctype, "no_connect-space");
-	  ctype_class_new (lr, ctype, "vowel_connect");
-#endif
 
 	  ctype->class_collection_max = charmap->mb_cur_max == 1 ? 256 : 512;
 	  ctype->class_collection
@@ -368,18 +339,13 @@ ctype_startup (struct linereader *lr, struct localedef_t *locale,
 	  ctype->last_map_idx = MAX_NR_CHARMAP;
 	  ctype_map_new (lr, ctype, "toupper", charmap);
 	  ctype_map_new (lr, ctype, "tolower", charmap);
-#ifdef PREDEFINED_CLASSES
-	  ctype_map_new (lr, ctype, "tosymmetric", charmap);
-#endif
 
 	  /* Fill first 256 entries in `toXXX' arrays.  */
 	  for (cnt = 0; cnt < 256; ++cnt)
 	    {
 	      ctype->map_collection[0][cnt] = cnt;
 	      ctype->map_collection[1][cnt] = cnt;
-#ifdef PREDEFINED_CLASSES
-	      ctype->map_collection[2][cnt] = cnt;
-#endif
+
 	      ctype->map256_collection[0][cnt] = cnt;
 	      ctype->map256_collection[1][cnt] = cnt;
 	    }
@@ -461,9 +427,8 @@ ctype_finish (struct localedef_t *locale, const struct charmap_t *charmap)
 	 empty one.  */
       if (ctype == NULL)
 	{
-	  if (! be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
-No definition for %s category found"), "LC_CTYPE"));
+	  record_warning (_("\
+No definition for %s category found"), "LC_CTYPE");
 	  ctype_startup (NULL, locale, charmap, NULL, 0);
 	  ctype = locale->categories[LC_CTYPE].ctype;
 	}
@@ -480,9 +445,8 @@ No definition for %s category found"), "LC_CTYPE"));
   ctype->codeset_name = charmap->code_set_name;
   if (ctype->codeset_name == NULL)
     {
-      if (! be_quiet)
-	WITH_CUR_LOCALE (error (0, 0, _("\
-No character set name specified in charmap")));
+      record_error (0, 0, _("\
+No character set name specified in charmap"));
       ctype->codeset_name = "//UNKNOWN//";
     }
 
@@ -509,13 +473,12 @@ No character set name specified in charmap")));
 			  {
 			    uint32_t value = ctype->charnames[cnt];
 
-			    if (!be_quiet)
-			      WITH_CUR_LOCALE (error (0, 0, _("\
+			    record_error (0, 0, _("\
 character L'\\u%0*x' in class `%s' must be in class `%s'"),
-						      value > 0xffff ? 8 : 4,
-						      value,
-						      valid_table[cls1].name,
-						      valid_table[cls2].name));
+					  value > 0xffff ? 8 : 4,
+					  value,
+					  valid_table[cls1].name,
+					  valid_table[cls2].name);
 			  }
 			break;
 
@@ -524,13 +487,12 @@ character L'\\u%0*x' in class `%s' must be in class `%s'"),
 			  {
 			    uint32_t value = ctype->charnames[cnt];
 
-			    if (!be_quiet)
-			      WITH_CUR_LOCALE (error (0, 0, _("\
+			    record_error (0, 0, _("\
 character L'\\u%0*x' in class `%s' must not be in class `%s'"),
-						      value > 0xffff ? 8 : 4,
-						      value,
-						      valid_table[cls1].name,
-						      valid_table[cls2].name));
+					  value > 0xffff ? 8 : 4,
+					  value,
+					  valid_table[cls1].name,
+					  valid_table[cls2].name);
 			  }
 			break;
 
@@ -539,8 +501,8 @@ character L'\\u%0*x' in class `%s' must not be in class `%s'"),
 			break;
 
 		      default:
-			WITH_CUR_LOCALE (error (5, 0, _("\
-internal error in %s, line %u"), __FUNCTION__, __LINE__));
+			record_error (5, 0, _("\
+internal error in %s, line %u"), __FUNCTION__, __LINE__);
 		      }
 		  }
 	}
@@ -567,12 +529,11 @@ internal error in %s, line %u"), __FUNCTION__, __LINE__));
 
 			    snprintf (buf, sizeof buf, "\\%Zo", cnt);
 
-			    if (!be_quiet)
-			      WITH_CUR_LOCALE (error (0, 0, _("\
+			    record_error (0, 0, _("\
 character '%s' in class `%s' must be in class `%s'"),
-						      buf,
-						      valid_table[cls1].name,
-						      valid_table[cls2].name));
+					  buf,
+					  valid_table[cls1].name,
+					  valid_table[cls2].name);
 			  }
 			break;
 
@@ -583,12 +544,11 @@ character '%s' in class `%s' must be in class `%s'"),
 
 			    snprintf (buf, sizeof buf, "\\%Zo", cnt);
 
-			    if (!be_quiet)
-			      WITH_CUR_LOCALE (error (0, 0, _("\
+			    record_error (0, 0, _("\
 character '%s' in class `%s' must not be in class `%s'"),
-						      buf,
-						      valid_table[cls1].name,
-						      valid_table[cls2].name));
+					  buf,
+					  valid_table[cls1].name,
+					  valid_table[cls2].name);
 			  }
 			break;
 
@@ -597,8 +557,8 @@ character '%s' in class `%s' must not be in class `%s'"),
 			break;
 
 		      default:
-			WITH_CUR_LOCALE (error (5, 0, _("\
-internal error in %s, line %u"), __FUNCTION__, __LINE__));
+			record_error (5, 0, _("\
+internal error in %s, line %u"), __FUNCTION__, __LINE__);
 		      }
 		  }
 	}
@@ -613,9 +573,8 @@ internal error in %s, line %u"), __FUNCTION__, __LINE__));
 	   (ELEM (ctype, class_collection, , space_value)
 	    & BITw (tok_blank)) == 0)))
     {
-      if (!be_quiet)
-	WITH_CUR_LOCALE (error (0, 0, _("<SP> character not in class `%s'"),
-				valid_table[cnt].name));
+      record_error (0, 0, _("<SP> character not in class `%s'"),
+		    valid_table[cnt].name);
     }
   else if (((cnt = BITPOS (tok_punct),
 	     (ELEM (ctype, class_collection, , space_value)
@@ -625,10 +584,9 @@ internal error in %s, line %u"), __FUNCTION__, __LINE__));
 		 & BITw (tok_graph))
 		!= 0)))
     {
-      if (!be_quiet)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+      record_error (0, 0, _("\
 <SP> character must not be in class `%s'"),
-				valid_table[cnt].name));
+				valid_table[cnt].name);
     }
   else
     ELEM (ctype, class_collection, , space_value) |= BITw (tok_print);
@@ -640,9 +598,8 @@ internal error in %s, line %u"), __FUNCTION__, __LINE__));
     space_seq = charmap_find_value (charmap, "U00000020", 9);
   if (space_seq == NULL || space_seq->nbytes != 1)
     {
-      if (!be_quiet)
-	WITH_CUR_LOCALE (error (0, 0, _("\
-character <SP> not defined in character map")));
+      record_error (0, 0, _("\
+character <SP> not defined in character map"));
     }
   else if (((cnt = BITPOS (tok_space),
 	     (ctype->class256_collection[space_seq->bytes[0]]
@@ -651,9 +608,8 @@ character <SP> not defined in character map")));
 		(ctype->class256_collection[space_seq->bytes[0]]
 		 & BIT (tok_blank)) == 0)))
     {
-      if (!be_quiet)
-	WITH_CUR_LOCALE (error (0, 0, _("<SP> character not in class `%s'"),
-				valid_table[cnt].name));
+       record_error (0, 0, _("<SP> character not in class `%s'"),
+		     valid_table[cnt].name);
     }
   else if (((cnt = BITPOS (tok_punct),
 	     (ctype->class256_collection[space_seq->bytes[0]]
@@ -662,10 +618,9 @@ character <SP> not defined in character map")));
 		(ctype->class256_collection[space_seq->bytes[0]]
 		 & BIT (tok_graph)) != 0)))
     {
-      if (!be_quiet)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+      record_error (0, 0, _("\
 <SP> character must not be in class `%s'"),
-				valid_table[cnt].name));
+		    valid_table[cnt].name);
     }
   else
     ctype->class256_collection[space_seq->bytes[0]] |= BIT (tok_print);
@@ -777,8 +732,8 @@ character <SP> not defined in character map")));
       assert (ctype->mbdigits_act == ctype->wcdigits_act);
       ctype->wcdigits_act -= ctype->mbdigits_act % 10;
       ctype->mbdigits_act -= ctype->mbdigits_act % 10;
-      WITH_CUR_LOCALE (error (0, 0, _("\
-`digit' category has not entries in groups of ten")));
+      record_error (0, 0, _("\
+`digit' category has not entries in groups of ten"));
     }
 
   /* Check the input digits.  There must be a multiple of ten available.
@@ -826,8 +781,8 @@ character <SP> not defined in character map")));
 	      if (ctype->mbdigits[cnt] == NULL)
 		{
 		  /* Hum, this ain't good.  */
-		  WITH_CUR_LOCALE (error (0, 0, _("\
-no input digits defined and none of the standard names in the charmap")));
+		  record_error (0, 0, _("\
+no input digits defined and none of the standard names in the charmap"));
 
 		  ctype->mbdigits[cnt] = obstack_alloc (&((struct charmap_t *) charmap)->mem_pool,
 							sizeof (struct charseq) + 1);
@@ -887,19 +842,19 @@ no input digits defined and none of the standard names in the charmap")));
   for (cnt = 0; cnt < 10; ++cnt)
     if (ctype->mboutdigits[cnt] == NULL)
       {
-	static struct charseq replace[2];
-
 	if (!warned)
 	  {
-	    WITH_CUR_LOCALE (error (0, 0, _("\
-not all characters used in `outdigit' are available in the charmap")));
+	    record_error (0, 0, _("\
+not all characters used in `outdigit' are available in the charmap"));
 	    warned = 1;
 	  }
 
-	replace[0].nbytes = 1;
-	replace[0].bytes[0] = '?';
-	replace[0].bytes[1] = '\0';
-	ctype->mboutdigits[cnt] = &replace[0];
+	static const struct charseq replace =
+	  {
+	     .nbytes = 1,
+	     .bytes = "?",
+	  };
+	ctype->mboutdigits[cnt] = (struct charseq *) &replace;
       }
 
   warned = 0;
@@ -908,8 +863,8 @@ not all characters used in `outdigit' are available in the charmap")));
       {
 	if (!warned)
 	  {
-	    WITH_CUR_LOCALE (error (0, 0, _("\
-not all characters used in `outdigit' are available in the repertoire")));
+	    record_error (0, 0, _("\
+not all characters used in `outdigit' are available in the repertoire"));
 	    warned = 1;
 	  }
 
@@ -1179,9 +1134,9 @@ ctype_class_new (struct linereader *lr, struct locale_ctype_t *ctype,
 
   if (ctype->nr_charclass == MAX_NR_CHARCLASS)
     /* Exit code 2 is prescribed in P1003.2b.  */
-    WITH_CUR_LOCALE (error (2, 0, _("\
+    record_error (2, 0, _("\
 implementation limit: no more than %Zd character classes allowed"),
-			    MAX_NR_CHARCLASS));
+		  MAX_NR_CHARCLASS);
 
   ctype->classnames[ctype->nr_charclass++] = name;
 }
@@ -1211,9 +1166,9 @@ ctype_map_new (struct linereader *lr, struct locale_ctype_t *ctype,
 
   if (ctype->map_collection_nr == MAX_NR_CHARMAP)
     /* Exit code 2 is prescribed in P1003.2b.  */
-    WITH_CUR_LOCALE (error (2, 0, _("\
+    record_error (2, 0, _("\
 implementation limit: no more than %d character maps allowed"),
-			    MAX_NR_CHARMAP));
+		  MAX_NR_CHARMAP);
 
   ctype->mapnames[cnt] = name;
 
@@ -1441,7 +1396,8 @@ charclass_symbolic_ellipsis (struct linereader *ldfile,
 		   (int) (now->val.str.lenmb - (cp - last_str)),
 		   from);
 
-	  get_character (now, charmap, repertoire, &seq, &wch);
+	  if (get_character (now, charmap, repertoire, &seq, &wch))
+	    goto invalid_range;
 
 	  if (seq != NULL && seq->nbytes == 1)
 	    /* Yep, we can store information about this byte sequence.  */
@@ -2269,24 +2225,10 @@ ctype_read (struct linereader *ldfile, struct localedef_t *result,
 		  break;
 	      if (cnt >= ctype->nr_charclass)
 		{
-#ifdef PREDEFINED_CLASSES
-		  if (now->val.str.lenmb == 8
-		      && memcmp ("special1", now->val.str.startmb, 8) == 0)
-		    class_bit = _ISwspecial1;
-		  else if (now->val.str.lenmb == 8
-		      && memcmp ("special2", now->val.str.startmb, 8) == 0)
-		    class_bit = _ISwspecial2;
-		  else if (now->val.str.lenmb == 8
-		      && memcmp ("special3", now->val.str.startmb, 8) == 0)
-		    class_bit = _ISwspecial3;
-		  else
-#endif
-		    {
-		      /* OK, it's a new class.  */
-		      ctype_class_new (ldfile, ctype, now->val.str.startmb);
+		  /* OK, it's a new class.  */
+		  ctype_class_new (ldfile, ctype, now->val.str.startmb);
 
-		      class_bit = _ISwbit (ctype->nr_charclass - 1);
-		    }
+		  class_bit = _ISwbit (ctype->nr_charclass - 1);
 		}
 	      else
 		{
@@ -2791,11 +2733,11 @@ with character code range values one must use the absolute ellipsis `...'"));
 			    {
 			      lr_error (ldfile, _("\
 %s: duplicate `default_missing' definition"), "LC_CTYPE");
-			      WITH_CUR_LOCALE (error_at_line (0, 0,
-							      ctype->default_missing_file,
-							      ctype->default_missing_lineno,
-							      _("\
-previous definition was here")));
+			      record_error_at_line (0, 0,
+						    ctype->default_missing_file,
+						    ctype->default_missing_lineno,
+						    _("\
+previous definition was here"));
 			    }
 			  else
 			    {
@@ -2874,31 +2816,6 @@ previous definition was here")));
 	      free (now->val.str.startmb);
 	      goto read_mapping;
             }
-#ifdef PREDEFINED_CLASSES
-	  if (strcmp (now->val.str.startmb, "special1") == 0)
-	    {
-	      class_bit = _ISwspecial1;
-	      free (now->val.str.startmb);
-	      goto read_charclass;
-	    }
-	  if (strcmp (now->val.str.startmb, "special2") == 0)
-	    {
-	      class_bit = _ISwspecial2;
-	      free (now->val.str.startmb);
-	      goto read_charclass;
-	    }
-	  if (strcmp (now->val.str.startmb, "special3") == 0)
-	    {
-	      class_bit = _ISwspecial3;
-	      free (now->val.str.startmb);
-	      goto read_charclass;
-	    }
-	  if (strcmp (now->val.str.startmb, "tosymmetric") == 0)
-	    {
-	      mapidx = 2;
-	      goto read_mapping;
-	    }
-#endif
 	  break;
 
 	case tok_end:
@@ -2958,15 +2875,14 @@ set_one_default (struct locale_ctype_t *ctype,
         }
       if (seq == NULL)
         {
-          if (!be_quiet)
-            WITH_CUR_LOCALE (error (0, 0, _("\
+          record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-                                    "LC_CTYPE", tmp));
+			"LC_CTYPE", tmp);
         }
       else if (seq->nbytes != 1)
-        WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-                                "LC_CTYPE", tmp));
+		      "LC_CTYPE", tmp);
       else
         ctype->class256_collection[seq->bytes[0]] |= bit;
 
@@ -3055,15 +2971,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U00000020", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<space>"));
+			"LC_CTYPE", "<space>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<space>"));
+		      "LC_CTYPE", "<space>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_space);
 
@@ -3075,15 +2990,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U0000000C", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<form-feed>"));
+				    "LC_CTYPE", "<form-feed>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<form-feed>"));
+		      "LC_CTYPE", "<form-feed>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_space);
 
@@ -3096,15 +3010,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U0000000A", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<newline>"));
+			"LC_CTYPE", "<newline>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<newline>"));
+		      "LC_CTYPE", "<newline>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_space);
 
@@ -3117,15 +3030,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U0000000D", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<carriage-return>"));
+			"LC_CTYPE", "<carriage-return>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<carriage-return>"));
+		      "LC_CTYPE", "<carriage-return>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_space);
 
@@ -3138,15 +3050,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U00000009", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<tab>"));
+			"LC_CTYPE", "<tab>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<tab>"));
+		      "LC_CTYPE", "<tab>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_space);
 
@@ -3159,15 +3070,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U0000000B", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<vertical-tab>"));
+			"LC_CTYPE", "<vertical-tab>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<vertical-tab>"));
+		      "LC_CTYPE", "<vertical-tab>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_space);
 
@@ -3199,15 +3109,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U00000020", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<space>"));
+			"LC_CTYPE", "<space>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<space>"));
+		      "LC_CTYPE", "<space>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_blank);
 
@@ -3220,15 +3129,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U00000009", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	   record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<tab>"));
+		         "LC_CTYPE", "<tab>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<tab>"));
+		      "LC_CTYPE", "<tab>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_blank);
 
@@ -3241,11 +3149,12 @@ set_class_defaults (struct locale_ctype_t *ctype,
         the keywords `upper', `lower', `alpha', `digit', `xdigit' and `punct',
 	shall belong to this character class."  [P1003.2, 2.5.2.1]  */
     {
-      unsigned long int mask = BIT (tok_upper) | BIT (tok_lower) |
-	BIT (tok_alpha) | BIT (tok_digit) | BIT (tok_xdigit) | BIT (tok_punct);
-      unsigned long int maskw = BITw (tok_upper) | BITw (tok_lower) |
-	BITw (tok_alpha) | BITw (tok_digit) | BITw (tok_xdigit) |
-	BITw (tok_punct);
+      unsigned long int mask = BIT (tok_upper) | BIT (tok_lower)
+	| BIT (tok_alpha) | BIT (tok_digit) | BIT (tok_xdigit)
+	| BIT (tok_punct);
+      unsigned long int maskw = BITw (tok_upper) | BITw (tok_lower)
+	| BITw (tok_alpha) | BITw (tok_digit) | BITw (tok_xdigit)
+	| BITw (tok_punct);
 
       for (size_t cnt = 0; cnt < ctype->class_collection_act; ++cnt)
 	if ((ctype->class_collection[cnt] & maskw) != 0)
@@ -3262,11 +3171,12 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	and the <space> character shall belong to this character class."
 	[P1003.2, 2.5.2.1]  */
     {
-      unsigned long int mask = BIT (tok_upper) | BIT (tok_lower) |
-	BIT (tok_alpha) | BIT (tok_digit) | BIT (tok_xdigit) | BIT (tok_punct);
-      unsigned long int maskw = BITw (tok_upper) | BITw (tok_lower) |
-	BITw (tok_alpha) | BITw (tok_digit) | BITw (tok_xdigit) |
-	BITw (tok_punct);
+      unsigned long int mask = BIT (tok_upper) | BIT (tok_lower)
+	| BIT (tok_alpha) | BIT (tok_digit) | BIT (tok_xdigit)
+	| BIT (tok_punct);
+      unsigned long int maskw = BITw (tok_upper) | BITw (tok_lower)
+	| BITw (tok_alpha) | BITw (tok_digit) | BITw (tok_xdigit)
+	| BITw (tok_punct);
       struct charseq *seq;
 
       for (size_t cnt = 0; cnt < ctype->class_collection_act; ++cnt)
@@ -3285,15 +3195,14 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	seq = charmap_find_value (charmap, "U00000020", 9);
       if (seq == NULL)
 	{
-	  if (!be_quiet)
-	    WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-				    "LC_CTYPE", "<space>"));
+			"LC_CTYPE", "<space>");
 	}
       else if (seq->nbytes != 1)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: character `%s' in charmap not representable with one byte"),
-				"LC_CTYPE", "<space>"));
+		      "LC_CTYPE", "<space>");
       else
 	ctype->class256_collection[seq->bytes[0]] |= BIT (tok_print);
 
@@ -3327,17 +3236,15 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	    }
 	  if (seq_from == NULL)
 	    {
-	      if (!be_quiet)
-		WITH_CUR_LOCALE (error (0, 0, _("\
+	      record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-					"LC_CTYPE", tmp));
+			    "LC_CTYPE", tmp);
 	    }
 	  else if (seq_from->nbytes != 1)
 	    {
-	      if (!be_quiet)
-		WITH_CUR_LOCALE (error (0, 0, _("\
+	      record_error (0, 0, _("\
 %s: character `%s' needed as default value not representable with one byte"),
-					"LC_CTYPE", tmp));
+			    "LC_CTYPE", tmp);
 	    }
 	  else
 	    {
@@ -3352,17 +3259,15 @@ set_class_defaults (struct locale_ctype_t *ctype,
 		}
 	      if (seq_to == NULL)
 		{
-		  if (!be_quiet)
-		    WITH_CUR_LOCALE (error (0, 0, _("\
+		  record_error (0, 0, _("\
 %s: character `%s' not defined while needed as default value"),
-					    "LC_CTYPE", tmp));
+				"LC_CTYPE", tmp);
 		}
 	      else if (seq_to->nbytes != 1)
 		{
-		  if (!be_quiet)
-		    WITH_CUR_LOCALE (error (0, 0, _("\
+		  record_error (0, 0, _("\
 %s: character `%s' needed as default value not representable with one byte"),
-					    "LC_CTYPE", tmp));
+				"LC_CTYPE", tmp);
 		}
 	      else
 		/* The index [0] is determined by the order of the
@@ -3394,9 +3299,9 @@ set_class_defaults (struct locale_ctype_t *ctype,
   if (ctype->outdigits_act != 10)
     {
       if (ctype->outdigits_act != 0)
-	WITH_CUR_LOCALE (error (0, 0, _("\
+	record_error (0, 0, _("\
 %s: field `%s' does not contain exactly ten entries"),
-				"LC_CTYPE", "outdigit"));
+		      "LC_CTYPE", "outdigit");
 
       for (size_t cnt = ctype->outdigits_act; cnt < 10; ++cnt)
 	{
@@ -3416,8 +3321,8 @@ set_class_defaults (struct locale_ctype_t *ctype,
 	  if (ctype->mboutdigits[cnt] == NULL)
 	    {
 	      /* Provide a replacement.  */
-	      WITH_CUR_LOCALE (error (0, 0, _("\
-no output digits defined and none of the standard names in the charmap")));
+	      record_error (0, 0, _("\
+no output digits defined and none of the standard names in the charmap"));
 
 	      ctype->mboutdigits[cnt] = obstack_alloc (&((struct charmap_t *) charmap)->mem_pool,
 						       sizeof (struct charseq)
@@ -3665,9 +3570,9 @@ translit_flatten (struct locale_ctype_t *ctype,
 
       if (other == NULL || other->categories[LC_CTYPE].ctype == NULL)
 	{
-	  WITH_CUR_LOCALE (error (0, 0, _("\
+	  record_error (0, 0, _("\
 %s: transliteration data from locale `%s' not available"),
-				  "LC_CTYPE", copy_locale));
+			"LC_CTYPE", copy_locale);
 	}
       else
 	{
@@ -3764,11 +3669,10 @@ allocate_arrays (struct locale_ctype_t *ctype, const struct charmap_t *charmap,
 	if (ctype->class_collection[idx] & _ISwbit (nr))
 	  wctype_table_add (t, ctype->charnames[idx]);
 
-      if (verbose)
-	WITH_CUR_LOCALE (fprintf (stderr, _("\
-%s: table for class \"%s\": %lu bytes\n"),
-				 "LC_CTYPE", ctype->classnames[nr],
-				 (unsigned long int) t->result_size));
+      record_verbose (stderr, _("\
+%s: table for class \"%s\": %lu bytes"),
+		      "LC_CTYPE", ctype->classnames[nr],
+		      (unsigned long int) t->result_size);
     }
 
   /* Room for table of mappings.  */
@@ -3829,11 +3733,10 @@ allocate_arrays (struct locale_ctype_t *ctype, const struct charmap_t *charmap,
 	  wctrans_table_add (t, ctype->charnames[idx],
 			     ctype->map_collection[nr][idx]);
 
-      if (verbose)
-	WITH_CUR_LOCALE (fprintf (stderr, _("\
-%s: table for map \"%s\": %lu bytes\n"),
-				 "LC_CTYPE", ctype->mapnames[nr],
-				 (unsigned long int) t->result_size));
+      record_verbose (stderr, _("\
+%s: table for map \"%s\": %lu bytes"),
+		      "LC_CTYPE", ctype->mapnames[nr],
+		      (unsigned long int) t->result_size);
     }
 
   /* Extra array for class and map names.  */
@@ -3954,9 +3857,8 @@ allocate_arrays (struct locale_ctype_t *ctype, const struct charmap_t *charmap,
     /* Set the width of L'\0' to 0.  */
     wcwidth_table_add (t, 0, 0);
 
-    if (verbose)
-      WITH_CUR_LOCALE (fprintf (stderr, _("%s: table for width: %lu bytes\n"),
-			       "LC_CTYPE", (unsigned long int) t->result_size));
+    record_verbose (stderr, _("%s: table for width: %lu bytes"),
+		    "LC_CTYPE", (unsigned long int) t->result_size);
   }
 
   /* Set MB_CUR_MAX.  */

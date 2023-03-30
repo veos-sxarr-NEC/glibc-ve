@@ -1,4 +1,4 @@
-/* Copyright (C) 2006-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2006-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    Contributed by MontaVista Software, Inc. (written by Nicolas Pitre)
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Thumb requires excessive IT insns here.  */
 #define NO_THUMB
@@ -70,7 +70,7 @@ ENTRY(memcpy)
 		subs	r2, r2, #4
 		blt	8f
 		ands	ip, r0, #3
-	PLD(	sfi_pld	r1, #0			)
+	PLD(	pld	[r1, #0]		)
 		bne	9f
 		ands	ip, r1, #3
 		bne	10f
@@ -97,19 +97,17 @@ ENTRY(memcpy)
 	CALGN(	bx	r4			)
 #endif
 
-	PLD(	sfi_pld	r1, #0			)
+	PLD(	pld	[r1, #0]		)
 2:	PLD(	subs	r2, r2, #96		)
-	PLD(	sfi_pld	r1, #28			)
+	PLD(	pld	[r1, #28]		)
 	PLD(	blt	4f			)
-	PLD(	sfi_pld	r1, #60			)
-	PLD(	sfi_pld	r1, #92			)
+	PLD(	pld	[r1, #60]		)
+	PLD(	pld	[r1, #92]		)
 
-3:	PLD(	sfi_pld	r1, #124		)
-4:		sfi_breg r1, \
-		ldmia	\B!, {r3, r4, r5, r6, r7, r8, ip, lr}
+3:	PLD(	pld	[r1, #124]		)
+4:		ldmia	r1!, {r3, r4, r5, r6, r7, r8, ip, lr}
 		subs	r2, r2, #32
-		sfi_breg r0, \
-		stmia	\B!, {r3, r4, r5, r6, r7, r8, ip, lr}
+		stmia	r0!, {r3, r4, r5, r6, r7, r8, ip, lr}
 		bge	3b
 	PLD(	cmn	r2, #96			)
 	PLD(	bge	4b			)
@@ -125,63 +123,59 @@ ENTRY(memcpy)
 		push	{r10}
 		cfi_adjust_cfa_offset (4)
 		cfi_rel_offset (r10, 0)
-		add	r10, pc, ip, lsl #(ARM_BX_ALIGN_LOG2 - 2)
+0:		add	r10, pc, ip, lsl #(ARM_BX_ALIGN_LOG2 - 2)
+		/* If alignment is not perfect, then there will be some
+		   padding (nop) instructions between this BX and label 6.
+		   The computation above assumed that two instructions
+		   later is exactly the right spot.  */
+		add	r10, #(6f - (0b + PC_OFS))
 		bx	r10
 #endif
 		.p2align ARM_BX_ALIGN_LOG2
 6:		nop
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	r3, [\B], #4
+		ldr	r3, [r1], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	r4, [\B], #4
+		ldr	r4, [r1], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	r5, [\B], #4
+		ldr	r5, [r1], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	r6, [\B], #4
+		ldr	r6, [r1], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	r7, [\B], #4
+		ldr	r7, [r1], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	r8, [\B], #4
+		ldr	r8, [r1], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r1, \
-		ldr	lr, [\B], #4
+		ldr	lr, [r1], #4
 
 #ifndef ARM_ALWAYS_BX
 		add	pc, pc, ip, lsl #(ARM_BX_ALIGN_LOG2 - 2)
 		nop
 #else
-		add	r10, pc, ip, lsl #(ARM_BX_ALIGN_LOG2 - 2)
+0:		add	r10, pc, ip, lsl #(ARM_BX_ALIGN_LOG2 - 2)
+		/* If alignment is not perfect, then there will be some
+		   padding (nop) instructions between this BX and label 66.
+		   The computation above assumed that two instructions
+		   later is exactly the right spot.  */
+		add	r10, #(66f - (0b + PC_OFS))
 		bx	r10
 #endif
 		.p2align ARM_BX_ALIGN_LOG2
-		nop
+66:		nop
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	r3, [\B], #4
+		str	r3, [r0], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	r4, [\B], #4
+		str	r4, [r0], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	r5, [\B], #4
+		str	r5, [r0], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	r6, [\B], #4
+		str	r6, [r0], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	r7, [\B], #4
+		str	r7, [r0], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	r8, [\B], #4
+		str	r8, [r0], #4
 		.p2align ARM_BX_ALIGN_LOG2
-		sfi_breg r0, \
-		str	lr, [\B], #4
+		str	lr, [r0], #4
 
 #ifdef ARM_ALWAYS_BX
 		pop	{r10}
@@ -199,18 +193,12 @@ ENTRY(memcpy)
 		cfi_restore (r8)
 
 8:		movs	r2, r2, lsl #31
-		sfi_breg r1, \
-		ldrbne	r3, [\B], #1
-		sfi_breg r1, \
-		ldrbcs	r4, [\B], #1
-		sfi_breg r1, \
-		ldrbcs	ip, [\B]
-		sfi_breg r0, \
-		strbne	r3, [\B], #1
-		sfi_breg r0, \
-		strbcs	r4, [\B], #1
-		sfi_breg r0, \
-		strbcs	ip, [\B]
+		ldrbne	r3, [r1], #1
+		ldrbcs	r4, [r1], #1
+		ldrbcs	ip, [r1]
+		strbne	r3, [r0], #1
+		strbcs	r4, [r0], #1
+		strbcs	ip, [r0]
 
 #if ((defined (__ARM_ARCH_4T__) && defined(__THUMB_INTERWORK__)) \
      || defined (ARM_ALWAYS_BX))
@@ -227,27 +215,20 @@ ENTRY(memcpy)
 
 9:		rsb	ip, ip, #4
 		cmp	ip, #2
-		sfi_breg r1, \
-		ldrbgt	r3, [\B], #1
-		sfi_breg r1, \
-		ldrbge	r4, [\B], #1
-		sfi_breg r1, \
-		ldrb	lr, [\B], #1
-		sfi_breg r0, \
-		strbgt	r3, [\B], #1
-		sfi_breg r0, \
-		strbge	r4, [\B], #1
+		ldrbgt	r3, [r1], #1
+		ldrbge	r4, [r1], #1
+		ldrb	lr, [r1], #1
+		strbgt	r3, [r0], #1
+		strbge	r4, [r0], #1
 		subs	r2, r2, ip
-		sfi_breg r0, \
-		strb	lr, [\B], #1
+		strb	lr, [r0], #1
 		blt	8b
 		ands	ip, r1, #3
 		beq	1b
 
 10:		bic	r1, r1, #3
 		cmp	ip, #2
-		sfi_breg r1, \
-		ldr	lr, [\B], #4
+		ldr	lr, [r1], #4
 		beq	17f
 		bgt	18f
 
@@ -271,20 +252,18 @@ ENTRY(memcpy)
 		cfi_rel_offset (r8, 12)
 		cfi_rel_offset (r10, 16)
 
-	PLD(	sfi_pld	r1, #0			)
+	PLD(	pld	[r1, #0]		)
 	PLD(	subs	r2, r2, #96		)
-	PLD(	sfi_pld	r1, #28			)
+	PLD(	pld	[r1, #28]		)
 	PLD(	blt	13f			)
-	PLD(	sfi_pld	r1, #60			)
-	PLD(	sfi_pld	r1, #92			)
+	PLD(	pld	[r1, #60]		)
+	PLD(	pld	[r1, #92]		)
 
-12:	PLD(	sfi_pld	r1, #124		)
-13:		sfi_breg r1, \
-		ldmia	\B!, {r4, r5, r6, r7}
+12:	PLD(	pld	[r1, #124]		)
+13:		ldmia	r1!, {r4, r5, r6, r7}
 		mov	r3, lr, PULL #\pull
 		subs	r2, r2, #32
-		sfi_breg r1, \
-		ldmia	\B!, {r8, r10, ip, lr}
+		ldmia	r1!, {r8, r10, ip, lr}
 		orr	r3, r3, r4, PUSH #\push
 		mov	r4, r4, PULL #\pull
 		orr	r4, r4, r5, PUSH #\push
@@ -300,8 +279,7 @@ ENTRY(memcpy)
 		orr	r10, r10, ip, PUSH #\push
 		mov	ip, ip, PULL #\pull
 		orr	ip, ip, lr, PUSH #\push
-		sfi_breg r0, \
-		stmia	\B!, {r3, r4, r5, r6, r7, r8, r10, ip}
+		stmia	r0!, {r3, r4, r5, r6, r7, r8, r10, ip}
 		bge	12b
 	PLD(	cmn	r2, #96			)
 	PLD(	bge	13b			)
@@ -318,12 +296,10 @@ ENTRY(memcpy)
 		beq	16f
 
 15:		mov	r3, lr, PULL #\pull
-		sfi_breg r1, \
-		ldr	lr, [\B], #4
+		ldr	lr, [r1], #4
 		subs	ip, ip, #4
 		orr	r3, r3, lr, PUSH #\push
-		sfi_breg r0, \
-		str	r3, [\B], #4
+		str	r3, [r0], #4
 		bgt	15b
 	CALGN(	cmp	r2, #0			)
 	CALGN(	bge	11b			)

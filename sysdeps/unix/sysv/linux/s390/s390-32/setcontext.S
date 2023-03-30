@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Martin Schwidefsky (schwidefsky@de.ibm.com).
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <features.h>
@@ -34,7 +34,7 @@ ENTRY(__setcontext)
 	lr	%r1,%r2
 
 	/* rt_sigprocmask (SIG_SETMASK, &sc->sc_mask, NULL, sigsetsize).  */
-	la      %r2,SIG_BLOCK
+	la      %r2,SIG_SETMASK
 	la	%r3,SC_MASK(%r1)
 	slr	%r4,%r4
 	lhi	%r5,_NSIG8

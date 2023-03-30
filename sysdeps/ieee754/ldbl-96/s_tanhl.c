@@ -42,8 +42,11 @@ static char rcsid[] = "$NetBSD: $";
  *	only tanhl(0)=0 is exact for finite argument.
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-ldouble.h>
 
 static const long double one=1.0, two=2.0, tiny = 1.0e-4900L;
 
@@ -51,7 +54,7 @@ long double __tanhl(long double x)
 {
 	long double t,z;
 	int32_t se;
-	u_int32_t j0,j1,ix;
+	uint32_t j0,j1,ix;
 
     /* High word of |x|. */
 	GET_LDOUBLE_WORDS(se,j0,j1,x);
@@ -69,7 +72,10 @@ long double __tanhl(long double x)
 	    if ((ix|j0|j1) == 0)
 		return x;		/* x == +- 0 */
 	    if (ix<0x3fc8)		/* |x|<2**-55 */
+	      {
+		math_check_force_underflow (x);
 		return x*(one+tiny);	/* tanh(small) = small */
+	      }
 	    if (ix>=0x3fff) {	/* |x|>=1  */
 		t = __expm1l(two*fabsl(x));
 		z = one - two/(t+two);
@@ -83,4 +89,4 @@ long double __tanhl(long double x)
 	}
 	return (se&0x8000)? -z: z;
 }
-weak_alias (__tanhl, tanhl)
+libm_alias_ldouble (__tanh, tanh)

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (C) 2000-2015 Free Software Foundation, Inc.
+# Copyright (C) 2000-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 # Contributed by Bruno Haible <haible@clisp.cons.org>, 2000.
 #
@@ -16,7 +16,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Checks that the iconv() implementation (in both directions) for the
 # stateless encodings agrees with the corresponding charmap table.
@@ -125,6 +125,7 @@ cat <<EOF |
   IBM855
   IBM856
   IBM857
+  IBM858
   IBM860
   IBM861
   IBM862
@@ -261,7 +262,7 @@ EOF
 while read charset charmap; do
   if test "$charset" = GB18030; then echo "This might take a while" 1>&2; fi
   case ${charset} in \#*) continue;; esac
-  echo -n "Testing ${charset}" 1>&2
+  printf %s "Testing ${charset}" 1>&2
   if ./tst-table.sh ${common_objpfx} ${objpfx} "${test_program_prefix}" \
       ${charset} ${charmap} < /dev/null; then
     echo 1>&2

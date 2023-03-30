@@ -1,2 +1,3 @@
 #define FUNC log1pl
-#include <s_atanl.c>
+#define float_type long double
+#include <s_log1p.c>

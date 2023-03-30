@@ -1,6 +1,6 @@
 /* Convert between lowlevel sigmask and libc representation of sigset_t.
    Generic version.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Joe Keane <jgk@jgk.org>.
 
@@ -16,9 +16,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Convert between an old-style 32-bit signal mask and a POSIX sigset_t.  */
+
+#include <sigsetops.h>
 
 /* Perform *SET = MASK.  Unused bits of *SET are set to 0.
    Returns zero for success or -1 for errors (from sigaddset/sigemptyset).  */

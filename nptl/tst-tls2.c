@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -29,13 +29,18 @@
 static pthread_t th[N];
 
 
+static int do_test (void);
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
+
 #define CB(n) \
 static void								      \
 cb##n (void)								      \
 {									      \
   if (th[n] != pthread_self ())						      \
     {									      \
-      write (STDOUT_FILENO, "wrong callback\n", 15);			      \
+      write_message ("wrong callback\n");				      \
       _exit (1);							      \
     }									      \
 }
@@ -67,7 +72,7 @@ handler (int sig)
 {
   if (sig != THE_SIG)
     {
-      write (STDOUT_FILENO, "wrong signal\n", 13);
+      write_message ("wrong signal\n");
       _exit (1);
     }
 
@@ -75,7 +80,7 @@ handler (int sig)
 
   if (sem_post (&s) != 0)
     {
-      write (STDOUT_FILENO, "sem_post failed\n", 16);
+      write_message ("sem_post failed\n");
       _exit (1);
     }
 }
@@ -199,7 +204,3 @@ do_test (void)
 
   return 0;
 }
-
-
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"

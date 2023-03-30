@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Philip Blundell <philb@gnu.org>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #define _ERRNO_H	1
@@ -28,16 +28,6 @@
    and the process ID of the new process to the old process.  */
 
 ENTRY (__vfork)
-	/* Save the PID value.  */
-	GET_TLS (r2)
-	NEGOFF_ADJ_BASE2 (r2, r0, PID_OFFSET) /* Save the TLS addr in r2.  */
-	ldr	r3, NEGOFF_OFF1 (r2, PID_OFFSET) /* Load the saved PID.  */
-	rsbs	r0, r3, #0		/* Negate it, and test for zero.  */
-	/* Use 0x80000000 if it was 0.  See raise.c for how this is used.  */
-	it	eq
-	moveq	r0, #0x80000000
-	str	r0, NEGOFF_OFF1 (r2, PID_OFFSET) /* Store the temp PID.  */
-
 	/* The DO_CALL macro saves r7 on the stack, to enable generation
 	   of ARM unwind info.  Since the stack is initially shared between
 	   parent and child of vfork, that saved value could be corrupted.
@@ -56,11 +46,6 @@ ENTRY (__vfork)
 	cfi_adjust_cfa_offset (-4)
 	mov	r7, ip
 	cfi_restore (r7)
-
-	/* Restore the old PID value in the parent.  */
-	cmp	r0, #0		/* If we are the parent... */
-	it	ne
-	strne	r3, NEGOFF_OFF1 (r2, PID_OFFSET) /* restore the saved PID.  */
 
 	cmn	a1, #4096
 	it	cc

@@ -1,5 +1,5 @@
 /* Quad-precision floating point sine on <-pi/4,pi/4>.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jj@ultra.linux.cz>
 
@@ -15,10 +15,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
 
 static const long double c[] = {
 #define ONE c[0]
@@ -81,19 +83,22 @@ __kernel_sinl(long double x, long double y, int iy)
 {
   long double h, l, z, sin_l, cos_l_m1;
   int64_t ix;
-  u_int32_t tix, hix, index;
+  uint32_t tix, hix, index;
   double xhi, hhi;
 
   xhi = ldbl_high (x);
   EXTRACT_WORDS64 (ix, xhi);
-  tix = ((u_int64_t)ix) >> 32;
+  tix = ((uint64_t)ix) >> 32;
   tix &= ~0x80000000;			/* tix = |x|'s high 32 bits */
   if (tix < 0x3fc30000)			/* |x| < 0.1484375 */
     {
       /* Argument is small enough to approximate it by a Chebyshev
 	 polynomial of degree 17.  */
       if (tix < 0x3c600000)		/* |x| < 2^-57 */
-	if (!((int)x)) return x;	/* generate inexact */
+	{
+	  math_check_force_underflow (x);
+	  if (!((int)x)) return x;	/* generate inexact */
+	}
       z = x * x;
       return x + (x * (z*(SIN1+z*(SIN2+z*(SIN3+z*(SIN4+
 		       z*(SIN5+z*(SIN6+z*(SIN7+z*SIN8)))))))));

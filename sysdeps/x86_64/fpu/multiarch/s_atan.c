@@ -1,22 +1,30 @@
-#if defined HAVE_FMA4_SUPPORT || defined HAVE_AVX_SUPPORT
-# include <init-arch.h>
-# include <math.h>
+/* Multiple versions of atan.
+   Copyright (C) 2017-2020 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
 
-extern double __atan_sse2 (double);
-extern double __atan_avx (double);
-# ifdef HAVE_FMA4_SUPPORT
-extern double __atan_fma4 (double);
-# else
-#  undef HAS_FMA4
-#  define HAS_FMA4 0
-#  define __atan_fma4 ((void *) 0)
-# endif
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
 
-libm_ifunc (atan, (HAS_FMA4 ? __atan_fma4 :
-		   HAS_AVX ? __atan_avx : __atan_sse2));
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
 
-# define atan __atan_sse2
-#endif
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <https://www.gnu.org/licenses/>.  */
 
+#include <libm-alias-double.h>
 
+extern double __redirect_atan (double);
+
+#define SYMBOL_NAME atan
+#include "ifunc-avx-fma4.h"
+
+libc_ifunc_redirected (__redirect_atan, __atan, IFUNC_SELECTOR ());
+libm_alias_double (__atan, atan)
+
+#define __atan __atan_sse2
 #include <sysdeps/ieee754/dbl-64/s_atan.c>

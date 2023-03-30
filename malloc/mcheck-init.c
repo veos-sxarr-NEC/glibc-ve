@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,13 +13,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* The object of this file should be installed as libmcheck.a,
    so one can do -lmcheck to turn on mcheck.  */
 
 #include <malloc.h>
 #include <mcheck.h>
+#include <shlib-compat.h>
 
 static void
 turn_on_mcheck (void)
@@ -28,3 +29,5 @@ turn_on_mcheck (void)
 }
 
 void (*__malloc_initialize_hook) (void) = turn_on_mcheck;
+compat_symbol_reference (libc, __malloc_initialize_hook,
+                         __malloc_initialize_hook, GLIBC_2_0);

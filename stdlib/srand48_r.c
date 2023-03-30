@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
@@ -14,15 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 #include <limits.h>
 
 int
-__srand48_r (seedval, buffer)
-     long int seedval;
-     struct drand48_data *buffer;
+__srand48_r (long int seedval, struct drand48_data *buffer)
 {
   /* The standards say we only have 32 bits.  */
   if (sizeof (long int) > 4)

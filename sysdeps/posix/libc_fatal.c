@@ -1,5 +1,5 @@
 /* Catastrophic failure reports.  Generic POSIX.1 version.
-   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+   Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <atomic.h>
 #include <errno.h>
@@ -45,16 +45,6 @@ writev_for_fatal (int fd, const struct iovec *iov, size_t niov, size_t total)
 }
 #endif
 
-#ifndef BEFORE_ABORT
-# define BEFORE_ABORT		before_abort
-static void
-before_abort (int do_abort __attribute__ ((unused)),
-              bool written __attribute__ ((unused)),
-              int fd __attribute__ ((unused)))
-{
-}
-#endif
-
 struct str_list
 {
   const char *str;
@@ -64,7 +54,7 @@ struct str_list
 
 /* Abort with an error message.  */
 void
-__libc_message (int do_abort, const char *fmt, ...)
+__libc_message (enum __libc_message_action action, const char *fmt, ...)
 {
   va_list ap;
   int fd = -1;
@@ -74,12 +64,6 @@ __libc_message (int do_abort, const char *fmt, ...)
 #ifdef FATAL_PREPARE
   FATAL_PREPARE;
 #endif
-
-  /* Open a descriptor for /dev/tty unless the user explicitly
-     requests errors on standard error.  */
-  const char *on_2 = __libc_secure_getenv ("LIBC_FATAL_STDERR_");
-  if (on_2 == NULL || *on_2 == '\0')
-    fd = open_not_cancel_2 (_PATH_TTY, O_RDWR | O_NOCTTY | O_NDELAY);
 
   if (fd == -1)
     fd = STDERR_FILENO;
@@ -124,7 +108,6 @@ __libc_message (int do_abort, const char *fmt, ...)
       ++nlist;
     }
 
-  bool written = false;
   if (nlist > 0)
     {
       struct iovec *iov = alloca (nlist * sizeof (struct iovec));
@@ -138,9 +121,9 @@ __libc_message (int do_abort, const char *fmt, ...)
 	  list = list->next;
 	}
 
-      written = WRITEV_FOR_FATAL (fd, iov, nlist, total);
+      WRITEV_FOR_FATAL (fd, iov, nlist, total);
 
-      if (do_abort)
+      if ((action & do_abort))
 	{
 	  total = ((total + 1 + GLRO(dl_pagesize) - 1)
 		   & ~(GLRO(dl_pagesize) - 1));
@@ -167,22 +150,17 @@ __libc_message (int do_abort, const char *fmt, ...)
 
   va_end (ap);
 
-  if (do_abort)
-    {
-      BEFORE_ABORT (do_abort, written, fd);
-
-      /* Kill the application.  */
-      abort ();
-    }
+  if ((action & do_abort))
+    /* Kill the application.  */
+    abort ();
 }
 
 
 void
-__libc_fatal (message)
-     const char *message;
+__libc_fatal (const char *message)
 {
   /* The loop is added only to keep gcc happy.  */
   while (1)
-    __libc_message (1, "%s", message);
+    __libc_message (do_abort, "%s", message);
 }
 libc_hidden_def (__libc_fatal)

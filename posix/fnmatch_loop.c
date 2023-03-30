@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdint.h>
 
@@ -28,24 +28,15 @@ struct STRUCT
    it matches, nonzero if not.  */
 static int FCT (const CHAR *pattern, const CHAR *string,
 		const CHAR *string_end, int no_leading_period, int flags,
-		struct STRUCT *ends, size_t alloca_used)
-     internal_function;
+		struct STRUCT *ends, size_t alloca_used);
 static int EXT (INT opt, const CHAR *pattern, const CHAR *string,
 		const CHAR *string_end, int no_leading_period, int flags,
-		size_t alloca_used)
-     internal_function;
-static const CHAR *END (const CHAR *patternp) internal_function;
+		size_t alloca_used);
+static const CHAR *END (const CHAR *patternp);
 
 static int
-internal_function
-FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
-     const CHAR *pattern;
-     const CHAR *string;
-     const CHAR *string_end;
-     int no_leading_period;
-     int flags;
-     struct STRUCT *ends;
-     size_t alloca_used;
+FCT (const CHAR *pattern, const CHAR *string, const CHAR *string_end,
+     int no_leading_period, int flags, struct STRUCT *ends, size_t alloca_used)
 {
   const CHAR *p = pattern, *n = string;
   UCHAR c;
@@ -503,26 +494,12 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 			  {
 			    int32_t table_size;
 			    const int32_t *symb_table;
-# if WIDE_CHAR_VERSION
-			    char str[c1];
-			    unsigned int strcnt;
-# else
-#  define str (startp + 1)
-# endif
 			    const unsigned char *extra;
 			    int32_t idx;
 			    int32_t elem;
-			    int32_t second;
-			    int32_t hash;
-
 # if WIDE_CHAR_VERSION
-			    /* We have to convert the name to a single-byte
-			       string.  This is possible since the names
-			       consist of ASCII characters and the internal
-			       representation is UCS4.  */
-			    for (strcnt = 0; strcnt < c1; ++strcnt)
-			      str[strcnt] = startp[1 + strcnt];
-#endif
+			    CHAR *wextra;
+# endif
 
 			    table_size =
 			      _NL_CURRENT_WORD (LC_COLLATE,
@@ -534,71 +511,54 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 			      _NL_CURRENT (LC_COLLATE,
 					   _NL_COLLATE_SYMB_EXTRAMB);
 
-			    /* Locate the character in the hashing table.  */
-			    hash = elem_hash (str, c1);
+			    for (elem = 0; elem < table_size; elem++)
+			      if (symb_table[2 * elem] != 0)
+				{
+				  idx = symb_table[2 * elem + 1];
+				  /* Skip the name of collating element.  */
+				  idx += 1 + extra[idx];
+# if WIDE_CHAR_VERSION
+				  /* Skip the byte sequence of the
+				     collating element.  */
+				  idx += 1 + extra[idx];
+				  /* Adjust for the alignment.  */
+				  idx = (idx + 3) & ~3;
 
-			    idx = 0;
-			    elem = hash % table_size;
-			    if (symb_table[2 * elem] != 0)
-			      {
-				second = hash % (table_size - 2) + 1;
+				  wextra = (CHAR *) &extra[idx + 4];
 
-				do
-				  {
-				    /* First compare the hashing value.  */
-				    if (symb_table[2 * elem] == hash
-					&& (c1
-					    == extra[symb_table[2 * elem + 1]])
-					&& memcmp (str,
-						   &extra[symb_table[2 * elem
-								     + 1]
-							  + 1], c1) == 0)
-				      {
-					/* Yep, this is the entry.  */
-					idx = symb_table[2 * elem + 1];
-					idx += 1 + extra[idx];
-					break;
-				      }
+				  if (/* Compare the length of the sequence.  */
+				      c1 == wextra[0]
+				      /* Compare the wide char sequence.  */
+				      && WMEMCMP (startp + 1, &wextra[1],
+						  c1) == 0)
+				    /* Yep, this is the entry.  */
+				    break;
+# else
+				  if (/* Compare the length of the sequence.  */
+				      c1 == extra[idx]
+				      /* Compare the byte sequence.  */
+				      && memcmp (startp + 1,
+						 &extra[idx + 1], c1) == 0)
+				    /* Yep, this is the entry.  */
+				    break;
+# endif
+				}
 
-				    /* Next entry.  */
-				    elem += second;
-				  }
-				while (symb_table[2 * elem] != 0);
-			      }
-
-			    if (symb_table[2 * elem] != 0)
+			    if (elem < table_size)
 			      {
 				/* Compare the byte sequence but only if
 				   this is not part of a range.  */
+				if (! is_range
+
 # if WIDE_CHAR_VERSION
-				int32_t *wextra;
-
-				idx += 1 + extra[idx];
-				/* Adjust for the alignment.  */
-				idx = (idx + 3) & ~3;
-
-				wextra = (int32_t *) &extra[idx + 4];
-# endif
-
-				if (! is_range)
-				  {
-# if WIDE_CHAR_VERSION
-				    for (c1 = 0;
-					 (int32_t) c1 < wextra[idx];
-					 ++c1)
-				      if (n[c1] != wextra[1 + c1])
-					break;
-
-				    if ((int32_t) c1 == wextra[idx])
-				      goto matched;
+				    && WMEMCMP (n, &wextra[1], c1) == 0
 # else
-				    for (c1 = 0; c1 < extra[idx]; ++c1)
-				      if (n[c1] != extra[1 + c1])
-					break;
-
-				    if (c1 == extra[idx])
-				      goto matched;
+				    && memcmp (n, &extra[idx + 1], c1) == 0
 # endif
+				    )
+				  {
+				    n += c1 - 1;
+				    goto matched;
 				  }
 
 				/* Get the collation sequence value.  */
@@ -606,9 +566,9 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 # if WIDE_CHAR_VERSION
 				cold = wextra[1 + wextra[idx]];
 # else
-				/* Adjust for the alignment.  */
 				idx += 1 + extra[idx];
-				idx = (idx + 3) & ~4;
+				/* Adjust for the alignment.  */
+				idx = (idx + 3) & ~3;
 				cold = *((int32_t *) &extra[idx]);
 # endif
 
@@ -618,10 +578,10 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 			      {
 				/* No valid character.  Match it as a
 				   single byte.  */
-				if (!is_range && *n == str[0])
+				if (!is_range && *n == startp[1])
 				  goto matched;
 
-				cold = str[0];
+				cold = startp[1];
 				c = *p++;
 			      }
 			    else
@@ -629,7 +589,6 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 			  }
 		      }
 		    else
-# undef str
 #endif
 		      {
 			c = FOLD (c);
@@ -721,25 +680,11 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 			      {
 				int32_t table_size;
 				const int32_t *symb_table;
-# if WIDE_CHAR_VERSION
-				char str[c1];
-				unsigned int strcnt;
-# else
-#  define str (startp + 1)
-# endif
 				const unsigned char *extra;
 				int32_t idx;
 				int32_t elem;
-				int32_t second;
-				int32_t hash;
-
 # if WIDE_CHAR_VERSION
-				/* We have to convert the name to a single-byte
-				   string.  This is possible since the names
-				   consist of ASCII characters and the internal
-				   representation is UCS4.  */
-				for (strcnt = 0; strcnt < c1; ++strcnt)
-				  str[strcnt] = startp[1 + strcnt];
+				CHAR *wextra;
 # endif
 
 				table_size =
@@ -752,71 +697,63 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 				  _NL_CURRENT (LC_COLLATE,
 					       _NL_COLLATE_SYMB_EXTRAMB);
 
-				/* Locate the character in the hashing
-				   table.  */
-				hash = elem_hash (str, c1);
-
-				idx = 0;
-				elem = hash % table_size;
-				if (symb_table[2 * elem] != 0)
-				  {
-				    second = hash % (table_size - 2) + 1;
-
-				    do
-				      {
-					/* First compare the hashing value.  */
-					if (symb_table[2 * elem] == hash
-					    && (c1
-						== extra[symb_table[2 * elem + 1]])
-					    && memcmp (str,
-						       &extra[symb_table[2 * elem + 1]
-							      + 1], c1) == 0)
-					  {
-					    /* Yep, this is the entry.  */
-					    idx = symb_table[2 * elem + 1];
-					    idx += 1 + extra[idx];
-					    break;
-					  }
-
-					/* Next entry.  */
-					elem += second;
-				      }
-				    while (symb_table[2 * elem] != 0);
-				  }
-
-				if (symb_table[2 * elem] != 0)
-				  {
-				    /* Compare the byte sequence but only if
-				       this is not part of a range.  */
+				for (elem = 0; elem < table_size; elem++)
+				  if (symb_table[2 * elem] != 0)
+				    {
+				      idx = symb_table[2 * elem + 1];
+				      /* Skip the name of collating
+					 element.  */
+				      idx += 1 + extra[idx];
 # if WIDE_CHAR_VERSION
-				    int32_t *wextra;
+				      /* Skip the byte sequence of the
+					 collating element.  */
+				      idx += 1 + extra[idx];
+				      /* Adjust for the alignment.  */
+				      idx = (idx + 3) & ~3;
 
-				    idx += 1 + extra[idx];
-				    /* Adjust for the alignment.  */
-				    idx = (idx + 3) & ~4;
+				      wextra = (CHAR *) &extra[idx + 4];
 
-				    wextra = (int32_t *) &extra[idx + 4];
+				      if (/* Compare the length of the
+					     sequence.  */
+					  c1 == wextra[0]
+					  /* Compare the wide char sequence.  */
+					  && WMEMCMP (startp + 1, &wextra[1],
+						      c1) == 0)
+					/* Yep, this is the entry.  */
+					break;
+# else
+				      if (/* Compare the length of the
+					     sequence.  */
+					  c1 == extra[idx]
+					  /* Compare the byte sequence.  */
+					  && memcmp (startp + 1,
+						     &extra[idx + 1], c1) == 0)
+					/* Yep, this is the entry.  */
+					break;
 # endif
+				    }
+
+				if (elem < table_size)
+				  {
 				    /* Get the collation sequence value.  */
 				    is_seqval = 1;
 # if WIDE_CHAR_VERSION
 				    cend = wextra[1 + wextra[idx]];
 # else
-				    /* Adjust for the alignment.  */
 				    idx += 1 + extra[idx];
-				    idx = (idx + 3) & ~4;
+				    /* Adjust for the alignment.  */
+				    idx = (idx + 3) & ~3;
 				    cend = *((int32_t *) &extra[idx]);
 # endif
 				  }
-				else if (symb_table[2 * elem] != 0 && c1 == 1)
+				else if (c1 == 1)
 				  {
-				    cend = str[0];
+				    cend = startp[1];
 				    c = *p++;
 				  }
 				else
 				  return FNM_NOMATCH;
 			      }
-# undef str
 			  }
 			else
 			  {
@@ -945,14 +882,13 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 		  }
 		else if (c == L('[') && *p == L('.'))
 		  {
-		    ++p;
 		    while (1)
 		      {
 			c = *++p;
-			if (c == '\0')
+			if (c == L('\0'))
 			  return FNM_NOMATCH;
 
-			if (*p == L('.') && p[1] == L(']'))
+			if (c == L('.') && p[1] == L(']'))
 			  break;
 		      }
 		    p += 2;
@@ -1007,7 +943,6 @@ FCT (pattern, string, string_end, no_leading_period, flags, ends, alloca_used)
 
 
 static const CHAR *
-internal_function
 END (const CHAR *pattern)
 {
   const CHAR *p = pattern;
@@ -1037,7 +972,12 @@ END (const CHAR *pattern)
       }
     else if ((*p == L('?') || *p == L('*') || *p == L('+') || *p == L('@')
 	      || *p == L('!')) && p[1] == L('('))
-      p = END (p + 1);
+      {
+	p = END (p + 1);
+	if (*p == L('\0'))
+	  /* This is an invalid pattern.  */
+	  return pattern;
+      }
     else if (*p == L(')'))
       break;
 
@@ -1046,7 +986,6 @@ END (const CHAR *pattern)
 
 
 static int
-internal_function
 EXT (INT opt, const CHAR *pattern, const CHAR *string, const CHAR *string_end,
      int no_leading_period, int flags, size_t alloca_used)
 {

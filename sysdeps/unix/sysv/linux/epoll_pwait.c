@@ -1,4 +1,4 @@
-/* Copyright (C) 2007-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
@@ -39,18 +39,8 @@ int epoll_pwait (int epfd, struct epoll_event *events,
 		 int maxevents, int timeout,
 		 const sigset_t *set)
 {
-  if (SINGLE_THREAD_P)
-    return INLINE_SYSCALL (epoll_pwait, 6, epfd, events, maxevents, timeout,
-			   set, _NSIG / 8);
-
-  int oldtype = LIBC_CANCEL_ASYNC ();
-
-  int result = INLINE_SYSCALL (epoll_pwait, 6, epfd, events, maxevents,
-			       timeout, set, _NSIG / 8);
-
-  LIBC_CANCEL_RESET (oldtype);
-
-  return result;
+  return SYSCALL_CANCEL (epoll_pwait, epfd, events, maxevents,
+			 timeout, set, _NSIG / 8);
 }
 
 #else

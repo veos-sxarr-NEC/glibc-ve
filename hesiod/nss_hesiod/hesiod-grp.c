@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Mark Kettenis <kettenis@phys.uva.nl>, 1997.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <errno.h>
@@ -25,8 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
-
-#include "nss_hesiod.h"
 
 /* Get the declaration of the parser function.  */
 #define ENTNAME grent
@@ -58,8 +56,7 @@ lookup (const char *name, const char *type, struct group *grp,
   size_t len;
   int olderr = errno;
 
-  context = _nss_hesiod_init ();
-  if (context == NULL)
+  if (hesiod_init (&context) < 0)
     return NSS_STATUS_UNAVAIL;
 
   list = hesiod_resolve (context, name, type);
@@ -179,8 +176,7 @@ _nss_hesiod_initgroups_dyn (const char *user, gid_t group, long int *start,
   gid_t *groups = *groupsp;
   int save_errno;
 
-  context = _nss_hesiod_init ();
-  if (context == NULL)
+  if (hesiod_init (&context) < 0)
     return NSS_STATUS_UNAVAIL;
 
   list = hesiod_resolve (context, user, "grplist");

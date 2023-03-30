@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,14 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SEMAPHORE_H
 # error "Never use <bits/semaphore.h> directly; include <semaphore.h> instead."
 #endif
 
 
-#define __SIZEOF_SEM_T	32
+#ifdef __ILP32__
+# define __SIZEOF_SEM_T	16
+#else
+# define __SIZEOF_SEM_T	32
+#endif
 
 
 /* Value returned if `sem_open' failed.  */
@@ -31,5 +35,5 @@
 typedef union
 {
   char __size[__SIZEOF_SEM_T];
-  long int __align;
+  long long int __align;
 } sem_t;

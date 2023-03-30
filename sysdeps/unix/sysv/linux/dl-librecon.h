@@ -1,5 +1,5 @@
 /* Optional code to distinguish library flavours.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2001.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DL_LIBRECON_H
 #define _DL_LIBRECON_H	1
@@ -28,7 +28,7 @@ _dl_osversion_init (char *assume_kernel)
 
   for (i = 0; i < 3; i++, p = q + 1)
     {
-      j = __strtoul_internal (p, &q, 0, 0);
+      j = _dl_strtoul (p, &q);
       if (j >= 255 || p == q || (i < 2 && *q && *q != '.'))
 	{
 	  osversion = 0;

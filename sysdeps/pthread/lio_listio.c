@@ -1,5 +1,5 @@
 /* Enqueue and list of read or write requests.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef lio_listio
 #include <aio.h>
@@ -35,7 +35,7 @@
 /* We need this special structure to handle asynchronous I/O.  */
 struct async_waitlist
   {
-    int counter;
+    unsigned int counter;
     struct sigevent sigev;
     struct waitlist list[0];
   };
@@ -61,7 +61,7 @@ lio_listio_internal (int mode, struct aiocb *const list[], int nent,
   struct sigevent defsigev;
   struct requestlist *requests[nent];
   int cnt;
-  volatile int total = 0;
+  volatile unsigned int total = 0;
   int result = 0;
 
   if (sig == NULL)
@@ -83,7 +83,7 @@ lio_listio_internal (int mode, struct aiocb *const list[], int nent,
 
 	requests[cnt] = __aio_enqueue_request ((aiocb_union *) list[cnt],
 					       (list[cnt]->aio_lio_opcode
-					        | LIO_OPCODE_BASE));
+						| LIO_OPCODE_BASE));
 
 	if (requests[cnt] != NULL)
 	  /* Successfully enqueued.  */
@@ -107,14 +107,7 @@ lio_listio_internal (int mode, struct aiocb *const list[], int nent,
       pthread_mutex_unlock (&__aio_requests_mutex);
 
       if (LIO_MODE (mode) == LIO_NOWAIT)
-	{
-#ifdef BROKEN_THREAD_SIGNALS
-	__aio_notify_only (sig,
-			   sig->sigev_notify == SIGEV_SIGNAL ? getpid () : 0);
-#else
 	__aio_notify_only (sig);
-#endif
-	}
 
       return result;
     }
@@ -140,9 +133,6 @@ lio_listio_internal (int mode, struct aiocb *const list[], int nent,
 	      waitlist[cnt].next = requests[cnt]->waiting;
 	      waitlist[cnt].counterp = &total;
 	      waitlist[cnt].sigevp = NULL;
-#ifdef BROKEN_THREAD_SIGNALS
-	      waitlist[cnt].caller_pid = 0;	/* Not needed.  */
-#endif
 	      requests[cnt]->waiting = &waitlist[cnt];
 	      ++total;
 	    }
@@ -190,9 +180,6 @@ lio_listio_internal (int mode, struct aiocb *const list[], int nent,
 	}
       else
 	{
-#ifdef BROKEN_THREAD_SIGNALS
-	  pid_t caller_pid = sig->sigev_notify == SIGEV_SIGNAL ? getpid () : 0;
-#endif
 	  total = 0;
 
 	  for (cnt = 0; cnt < nent; ++cnt)
@@ -209,9 +196,6 @@ lio_listio_internal (int mode, struct aiocb *const list[], int nent,
 		  waitlist->list[cnt].next = requests[cnt]->waiting;
 		  waitlist->list[cnt].counterp = &waitlist->counter;
 		  waitlist->list[cnt].sigevp = &waitlist->sigev;
-#ifdef BROKEN_THREAD_SIGNALS
-		  waitlist->list[cnt].caller_pid = caller_pid;
-#endif
 		  requests[cnt]->waiting = &waitlist->list[cnt];
 		  ++total;
 		}

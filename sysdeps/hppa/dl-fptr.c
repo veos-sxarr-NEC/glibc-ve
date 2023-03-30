@@ -1,5 +1,5 @@
 /* Manage function descriptors.  Generic version.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -28,6 +28,7 @@
 #include <dl-fptr.h>
 #include <dl-unmap-segments.h>
 #include <atomic.h>
+#include <libc-pointer-arith.h>
 
 #ifndef ELF_MACHINE_BOOT_FPTR_TABLE_LEN
 /* ELF_MACHINE_BOOT_FPTR_TABLE_LEN should be greater than the number of
@@ -181,24 +182,29 @@ make_fdesc (ElfW(Addr) ip, ElfW(Addr) gp)
 static inline ElfW(Addr) * __attribute__ ((always_inline))
 make_fptr_table (struct link_map *map)
 {
-  const ElfW(Sym) *symtab
-    = (const void *) D_PTR (map, l_info[DT_SYMTAB]);
+  const ElfW(Sym) *symtab = (const void *) D_PTR (map, l_info[DT_SYMTAB]);
   const char *strtab = (const void *) D_PTR (map, l_info[DT_STRTAB]);
   ElfW(Addr) *fptr_table;
   size_t size;
   size_t len;
+  const ElfW(Sym) *symtabend;
 
-  /* XXX Apparently the only way to find out the size of the dynamic
-     symbol section is to assume that the string table follows right
-     afterwards...  */
-  len = ((strtab - (char *) symtab)
+  /* Determine the end of the dynamic symbol table using the hash.  */
+  if (map->l_info[DT_HASH] != NULL)
+    symtabend = (symtab + ((Elf_Symndx *) D_PTR (map, l_info[DT_HASH]))[1]);
+  else
+  /* There is no direct way to determine the number of symbols in the
+     dynamic symbol table and no hash table is present.  The ELF
+     binary is ill-formed but what shall we do?  Use the beginning of
+     the string table which generally follows the symbol table.  */
+    symtabend = (const ElfW(Sym) *) strtab;
+
+  len = (((char *) symtabend - (char *) symtab)
 	 / map->l_info[DT_SYMENT]->d_un.d_val);
-  size = ((len * sizeof (fptr_table[0]) + GLRO(dl_pagesize) - 1)
-	  & -GLRO(dl_pagesize));
-  /* XXX We don't support here in the moment systems without MAP_ANON.
-     There probably are none for IA-64.  In case this is proven wrong
-     we will have to open /dev/null here and use the file descriptor
-     instead of the hard-coded -1.  */
+  size = ALIGN_UP (len * sizeof (fptr_table[0]), GLRO(dl_pagesize));
+
+  /* We don't support systems without MAP_ANON.  We avoid using malloc
+     because this might get called before malloc is setup.  */
   fptr_table = __mmap (NULL, size,
 		       PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,
 		       -1, 0);
@@ -315,23 +321,75 @@ _dl_unmap (struct link_map *map)
   map->l_mach.fptr_table = NULL;
 }
 
+extern ElfW(Addr) _dl_fixup (struct link_map *, ElfW(Word)) attribute_hidden;
+
+static inline Elf32_Addr
+elf_machine_resolve (void)
+{
+  Elf32_Addr addr;
+
+  asm ("b,l     1f,%0\n"
+"	addil	L'_dl_runtime_resolve - ($PIC_pcrel$0 - 1),%0\n"
+"1:	ldo	R'_dl_runtime_resolve - ($PIC_pcrel$0 - 5)(%%r1),%0\n"
+       : "=r" (addr) : : "r1");
+
+  return addr;
+}
+
+static inline int
+_dl_read_access_allowed (unsigned int *addr)
+{
+  int result;
+
+  asm ("proberi	(%1),3,%0" : "=r" (result) : "r" (addr) : );
+
+  return result;
+}
 
 ElfW(Addr)
 _dl_lookup_address (const void *address)
 {
   ElfW(Addr) addr = (ElfW(Addr)) address;
-  struct fdesc_table *t;
-  unsigned long int i;
+  unsigned int *desc, *gptr;
 
-  for (t = local.root; t != NULL; t = t->next)
-    {
-      i = (struct fdesc *) addr - &t->fdesc[0];
-      if (i < t->first_unused && addr == (ElfW(Addr)) &t->fdesc[i])
-	{
-	  addr = t->fdesc[i].ip;
-	  break;
-	}
-    }
+  /* Return ADDR if the least-significant two bits of ADDR are not consistent
+     with ADDR being a linker defined function pointer.  The normal value for
+     a code address in a backtrace is 3.  */
+  if (((unsigned int) addr & 3) != 2)
+    return addr;
 
-  return addr;
+  /* Handle special case where ADDR points to page 0.  */
+  if ((unsigned int) addr < 4096)
+    return addr;
+
+  /* Clear least-significant two bits from descriptor address.  */
+  desc = (unsigned int *) ((unsigned int) addr & ~3);
+  if (!_dl_read_access_allowed (desc))
+    return addr;
+
+  /* Load first word of candidate descriptor.  It should be a pointer
+     with word alignment and point to memory that can be read.  */
+  gptr = (unsigned int *) desc[0];
+  if (((unsigned int) gptr & 3) != 0
+      || !_dl_read_access_allowed (gptr))
+    return addr;
+
+  /* See if descriptor requires resolution.  The following trampoline is
+     used in each global offset table for function resolution:
+
+		ldw 0(r20),r22
+		bv r0(r22)
+		ldw 4(r20),r21
+     tramp:	b,l .-12,r20
+		depwi 0,31,2,r20
+		.word _dl_runtime_resolve
+		.word "_dl_runtime_resolve ltp"
+     got:	.word _DYNAMIC
+		.word "struct link map address" */
+  if (gptr[0] == 0xea9f1fdd			/* b,l .-12,r20     */
+      && gptr[1] == 0xd6801c1e			/* depwi 0,31,2,r20 */
+      && (ElfW(Addr)) gptr[2] == elf_machine_resolve ())
+    _dl_fixup ((struct link_map *) gptr[5], (ElfW(Word)) desc[1]);
+
+  return (ElfW(Addr)) desc[0];
 }

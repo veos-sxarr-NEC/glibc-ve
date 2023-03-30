@@ -1,5 +1,5 @@
 /* Implement __kernel_standard_l.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    Parts based on k_standard.c from fdlibm: */
 
@@ -31,10 +31,14 @@
  */
 
 #include <math.h>
-#include <math_private.h>
+#include <math-barriers.h>
+#include <math-svid-compat.h>
+#include <fenv.h>
 #include <float.h>
 #include <errno.h>
 
+
+#if LIBM_SVID_COMPAT || defined (__ve__)
 
 static double zero = 0.0;
 
@@ -47,31 +51,14 @@ __kernel_standard_l (long double x, long double y, int type)
 {
   double dx, dy;
   struct exception exc;
+  fenv_t env;
 
-  if (isfinite (x))
-    {
-      long double ax = fabsl (x);
-      if (ax > DBL_MAX)
-	dx = __copysignl (DBL_MAX, x);
-      else if (ax > 0 && ax < DBL_MIN)
-	dx = __copysignl (DBL_MIN, x);
-      else
-	dx = x;
-    }
-  else
-    dx = x;
-  if (isfinite (y))
-    {
-      long double ay = fabsl (y);
-      if (ay > DBL_MAX)
-	dy = __copysignl (DBL_MAX, y);
-      else if (ay > 0 && ay < DBL_MIN)
-	dy = __copysignl (DBL_MIN, y);
-      else
-	dy = y;
-    }
-  else
-    dy = y;
+  feholdexcept (&env);
+  dx = x;
+  dy = y;
+  math_force_eval (dx);
+  math_force_eval (dy);
+  fesetenv (&env);
 
   switch (type)
     {
@@ -85,14 +72,14 @@ __kernel_standard_l (long double x, long double y, int type)
 	{
 	  exc.retval = HUGE;
 	  y *= 0.5;
-	  if (x < zero && __rintl (y) != y)
+	  if (x < zero && rintl (y) != y)
 	    exc.retval = -HUGE;
 	}
       else
 	{
 	  exc.retval = HUGE_VAL;
 	  y *= 0.5;
-	  if (x < zero && __rintl (y) != y)
+	  if (x < zero && rintl (y) != y)
 	    exc.retval = -HUGE_VAL;
 	}
       if (_LIB_VERSION == _POSIX_)
@@ -109,7 +96,7 @@ __kernel_standard_l (long double x, long double y, int type)
       exc.name = (char *) "powl";
       exc.retval = zero;
       y *= 0.5;
-      if (x < zero && __rintl (y) != y)
+      if (x < zero && rintl (y) != y)
 	exc.retval = -zero;
       if (_LIB_VERSION == _POSIX_)
 	__set_errno (ERANGE);
@@ -121,3 +108,4 @@ __kernel_standard_l (long double x, long double y, int type)
       return __kernel_standard (dx, dy, type);
     }
 }
+#endif

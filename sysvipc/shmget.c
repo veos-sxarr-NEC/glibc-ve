@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, August 1995.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sys/shm.h>
 #include <errno.h>
@@ -23,10 +23,7 @@
    which is associated with KEY.  */
 
 int
-shmget (key, size, shmflg)
-     key_t key;
-     size_t size;
-     int shmflg;
+shmget (key_t key, size_t size, int shmflg)
 {
   __set_errno (ENOSYS);
   return -1;

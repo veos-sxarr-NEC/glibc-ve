@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2004.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread.h>
 #include <stdio.h>
@@ -96,7 +96,10 @@ do_test (void)
 
   for (i = 0; i < ROUNDS; ++i)
     {
-      pthread_cond_wait (&cond2, &mut);
+      /* Make sure we discard spurious wake-ups.  */
+      do
+	pthread_cond_wait (&cond2, &mut);
+      while (count != N);
 
       if (i & 1)
         pthread_mutex_unlock (&mut);

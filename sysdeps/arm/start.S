@@ -1,5 +1,5 @@
 /* Startup code for ARM & ELF
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This is the canonical entry point, usually the first thing in the text
    segment.
@@ -89,7 +89,7 @@ _start:
 	/* Push rtld_fini */
 	push { a1 }
 
-#ifdef SHARED
+#ifdef PIC
 	ldr sl, .L_GOT
 	adr a4, .L_GOT
 	add sl, sl, a4
@@ -127,7 +127,7 @@ _start:
 	/* should never get here....*/
 	bl abort
 
-#ifdef SHARED
+#ifdef PIC
 	.align 2
 .L_GOT:
 	.word _GLOBAL_OFFSET_TABLE_ - .L_GOT

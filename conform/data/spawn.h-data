@@ -1,4 +1,4 @@
-#if !defined ISO && !defined ISO99 && !defined ISO11 && !defined POSIX && !defined XPG3 && !defined XPG4 && !defined UNIX98
+#if !defined ISO && !defined ISO99 && !defined ISO11 && !defined POSIX && !defined XPG4 && !defined XPG42 && !defined UNIX98
 type posix_spawnattr_t
 type posix_spawn_file_actions_t
 # if defined XOPEN2K8 || defined POSIX2008
@@ -34,8 +34,8 @@ function int posix_spawn_file_actions_adddup2 (posix_spawn_file_actions_t*, int,
 function int posix_spawn_file_actions_addopen (posix_spawn_file_actions_t*, int, const char *, int, mode_t)
 function int posix_spawn_file_actions_destroy (posix_spawn_file_actions_t*)
 function int posix_spawn_file_actions_init (posix_spawn_file_actions_t*)
-function int posix_spawn (pid_t*, const char*, const posix_spawn_file_actions_t*, const posix_spawnattr_t*, char *const[], char *const[]);
-function int posix_spawnp (pid_t*, const char*, const posix_spawn_file_actions_t*, const posix_spawnattr_t*, char *const[], char *const[]);
+function int posix_spawn (pid_t*, const char*, const posix_spawn_file_actions_t*, const posix_spawnattr_t*, char *const[], char *const[])
+function int posix_spawnp (pid_t*, const char*, const posix_spawn_file_actions_t*, const posix_spawnattr_t*, char *const[], char *const[])
 
 allow-header sched.h
 allow-header signal.h

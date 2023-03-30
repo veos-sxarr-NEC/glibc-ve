@@ -1,5 +1,5 @@
-/* Multiple versions of expf
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+/* Multiple versions of expf.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,20 +14,29 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <init-arch.h>
+extern float __redirect_expf (float);
 
-extern double __ieee754_expf_sse2 (double);
-extern double __ieee754_expf_ia32 (double);
+#define SYMBOL_NAME expf
+#include "ifunc-sse2.h"
+#include <libm-alias-finite.h>
 
-double __ieee754_expf (double);
-libm_ifunc (__ieee754_expf,
-	    HAS_SSE2 ? __ieee754_expf_sse2 : __ieee754_expf_ia32);
+libc_ifunc_redirected (__redirect_expf, __expf, IFUNC_SELECTOR ());
 
-extern double __expf_finite_sse2 (double);
-extern double __expf_finite_ia32 (double);
+#include <libm-alias-float.h>
+#ifdef SHARED
+__hidden_ver1 (__expf_ia32, __GI___expf, __redirect_expf)
+  __attribute__ ((visibility ("hidden"))) __THROW;
 
-double __expf_finite (double);
-libm_ifunc (__expf_finite,
-	    HAS_SSE2 ? __expf_finite_sse2 : __expf_finite_ia32);
+versioned_symbol (libm, __expf, expf, GLIBC_2_27);
+libm_alias_float_other (__exp, exp)
+#else
+libm_alias_float (__exp, exp)
+#endif
+
+strong_alias (__expf, __ieee754_expf)
+libm_alias_finite (__ieee754_expf, __expf)
+
+#define __expf __expf_ia32
+#include <sysdeps/ieee754/flt-32/e_expf.c>

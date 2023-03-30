@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Roland McGrath <roland@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -64,8 +64,8 @@ thread_function (void * arg)
 #define N 5
 static const int t[N] = { 7, 6, 5, 4, 3 };
 
-int
-main (void)
+static int
+do_test (void)
 {
   pthread_t th[N];
   int i;
@@ -117,3 +117,5 @@ main (void)
 
   return result;
 }
+
+#include <support/test-driver.c>

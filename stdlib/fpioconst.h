@@ -1,5 +1,5 @@
 /* Header file for constants used in floating point <-> decimal conversions.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _FPIOCONST_H
 #define	_FPIOCONST_H
@@ -40,9 +40,23 @@
 #define DBL_MAX_10_EXP_LOG	8 /* = floor(log_2(DBL_MAX_10_EXP)) */
 #define FLT_MAX_10_EXP_LOG	5 /* = floor(log_2(FLT_MAX_10_EXP)) */
 
+/* On some machines, _Float128 may be ABI-distinct from long double (e.g
+   IBM extended precision).  */
+#include <bits/floatn.h>
+
+#if __HAVE_DISTINCT_FLOAT128
+# define FLT128_MAX_10_EXP_LOG	12 /* = floor(log_2(FLT128_MAX_10_EXP)) */
+#endif
+
 /* For strtold, we need powers of 10 up to floor (log_2 (LDBL_MANT_DIG
-   - LDBL_MIN_EXP + 2)).  */
-#if !defined __NO_LONG_DOUBLE_MATH && __LDBL_MAX_EXP__ > 1024
+   - LDBL_MIN_EXP + 2)).  When _Float128 is enabled in libm and it is
+   ABI-distinct from long double (e.g. on powerpc64le), we also need powers
+   of 10 up to floor (log_2 (FLT128_MANT_DIG - FLT128_MIN_EXP + 2)).  */
+#define FPIOCONST_HAVE_EXTENDED_RANGE \
+  ((!defined __NO_LONG_DOUBLE_MATH && __LDBL_MAX_EXP__ > 1024) \
+   || __HAVE_DISTINCT_FLOAT128)
+
+#if FPIOCONST_HAVE_EXTENDED_RANGE
 # define FPIOCONST_POW10_ARRAY_SIZE	15
 #else
 # define FPIOCONST_POW10_ARRAY_SIZE	11

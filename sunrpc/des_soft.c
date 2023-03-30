@@ -32,7 +32,8 @@ static char sccsid[] = "@(#)des_soft.c	2.2 88/08/10 4.0 RPCSRC; from 1.13 88/02/
  */
 
 #include <rpc/des_crypt.h>
-#include <abi-versions.h>
+#include <shlib-compat.h>
+
 /*
  * Table giving odd parity in the low bit for ASCII characters
  */
@@ -70,4 +71,4 @@ des_setparity (char *p)
       p++;
     }
 }
-libc_hidden_nolink_sunrpc (des_setparity, GLIBC_2_1)
+hidden_nolink (des_setparity, libc, GLIBC_2_1)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,18 +13,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _LINUX_X86_64_SYSDEP_H
 #define _LINUX_X86_64_SYSDEP_H 1
 
 /* There is some commonality.  */
+#include <sysdeps/unix/sysv/linux/sysdep.h>
 #include <sysdeps/unix/x86_64/sysdep.h>
 #include <tls.h>
 
-#if IS_IN (rtld)
-# include <dl-sysdep.h>		/* Defines RTLD_PRIVATE_ERRNO.  */
-#endif
+/* Defines RTLD_PRIVATE_ERRNO.  */
+#include <dl-sysdep.h>
 
 /* For Linux we can use the system call table in the header file
 	/usr/include/asm/unistd.h
@@ -32,16 +32,6 @@
    so we have to redefine the `SYS_ify' macro here.  */
 #undef SYS_ify
 #define SYS_ify(syscall_name)	__NR_##syscall_name
-
-/* This is a kludge to make syscalls.list find these under the names
-   pread and pwrite, since some kernel headers define those names
-   and some define the *64 names for the same system calls.  */
-#if !defined __NR_pread && defined __NR_pread64
-# define __NR_pread __NR_pread64
-#endif
-#if !defined __NR_pwrite && defined __NR_pwrite64
-# define __NR_pwrite __NR_pwrite64
-#endif
 
 /* This is to help the old kernel headers where __NR_semtimedop is not
    available.  */
@@ -109,7 +99,7 @@
 
 # define ret_ERRVAL ret
 
-# if defined PIC && defined RTLD_PRIVATE_ERRNO
+# if defined PIC && RTLD_PRIVATE_ERRNO
 #  define SYSCALL_SET_ERRNO			\
   lea rtld_errno(%rip), %RCX_LP;		\
   neg %eax;					\
@@ -217,33 +207,151 @@
 # undef INTERNAL_SYSCALL_DECL
 # define INTERNAL_SYSCALL_DECL(err) do { } while (0)
 
-# define INTERNAL_SYSCALL_NCS(name, err, nr, args...) \
-  ({									      \
-    unsigned long int resultvar;					      \
-    LOAD_ARGS_##nr (args)						      \
-    LOAD_REGS_##nr							      \
-    asm volatile (							      \
-    "syscall\n\t"							      \
-    : "=a" (resultvar)							      \
-    : "0" (name) ASM_ARGS_##nr : "memory", "cc", "r11", "cx");		      \
-    (long int) resultvar; })
-# undef INTERNAL_SYSCALL
-# define INTERNAL_SYSCALL(name, err, nr, args...) \
-  INTERNAL_SYSCALL_NCS (__NR_##name, err, nr, ##args)
+/* Registers clobbered by syscall.  */
+# define REGISTERS_CLOBBERED_BY_SYSCALL "cc", "r11", "cx"
 
-# define INTERNAL_SYSCALL_NCS_TYPES(name, err, nr, args...) \
-  ({									      \
-    unsigned long int resultvar;					      \
-    LOAD_ARGS_TYPES_##nr (args)						      \
-    LOAD_REGS_TYPES_##nr (args)						      \
-    asm volatile (							      \
-    "syscall\n\t"							      \
-    : "=a" (resultvar)							      \
-    : "0" (name) ASM_ARGS_##nr : "memory", "cc", "r11", "cx");		      \
-    (long int) resultvar; })
-# undef INTERNAL_SYSCALL_TYPES
-# define INTERNAL_SYSCALL_TYPES(name, err, nr, args...) \
-  INTERNAL_SYSCALL_NCS_TYPES (__NR_##name, err, nr, ##args)
+/* Create a variable 'name' based on type 'X' to avoid explicit types.
+   This is mainly used set use 64-bits arguments in x32.   */
+#define TYPEFY(X, name) __typeof__ ((X) - (X)) name
+/* Explicit cast the argument to avoid integer from pointer warning on
+   x32.  */
+#define ARGIFY(X) ((__typeof__ ((X) - (X))) (X))
+
+#undef INTERNAL_SYSCALL
+#define INTERNAL_SYSCALL(name, err, nr, args...)			\
+	internal_syscall##nr (SYS_ify (name), err, args)
+
+#undef INTERNAL_SYSCALL_NCS
+#define INTERNAL_SYSCALL_NCS(number, err, nr, args...)			\
+	internal_syscall##nr (number, err, args)
+
+#undef internal_syscall0
+#define internal_syscall0(number, err, dummy...)			\
+({									\
+    unsigned long int resultvar;					\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number)							\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
+
+#undef internal_syscall1
+#define internal_syscall1(number, err, arg1)				\
+({									\
+    unsigned long int resultvar;					\
+    TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
+    register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number), "r" (_a1)						\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
+
+#undef internal_syscall2
+#define internal_syscall2(number, err, arg1, arg2)			\
+({									\
+    unsigned long int resultvar;					\
+    TYPEFY (arg2, __arg2) = ARGIFY (arg2);			 	\
+    TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
+    register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
+    register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number), "r" (_a1), "r" (_a2)				\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
+
+#undef internal_syscall3
+#define internal_syscall3(number, err, arg1, arg2, arg3)		\
+({									\
+    unsigned long int resultvar;					\
+    TYPEFY (arg3, __arg3) = ARGIFY (arg3);			 	\
+    TYPEFY (arg2, __arg2) = ARGIFY (arg2);			 	\
+    TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
+    register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
+    register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
+    register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3)			\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
+
+#undef internal_syscall4
+#define internal_syscall4(number, err, arg1, arg2, arg3, arg4)		\
+({									\
+    unsigned long int resultvar;					\
+    TYPEFY (arg4, __arg4) = ARGIFY (arg4);			 	\
+    TYPEFY (arg3, __arg3) = ARGIFY (arg3);			 	\
+    TYPEFY (arg2, __arg2) = ARGIFY (arg2);			 	\
+    TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
+    register TYPEFY (arg4, _a4) asm ("r10") = __arg4;			\
+    register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
+    register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
+    register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3), "r" (_a4)		\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
+
+#undef internal_syscall5
+#define internal_syscall5(number, err, arg1, arg2, arg3, arg4, arg5)	\
+({									\
+    unsigned long int resultvar;					\
+    TYPEFY (arg5, __arg5) = ARGIFY (arg5);			 	\
+    TYPEFY (arg4, __arg4) = ARGIFY (arg4);			 	\
+    TYPEFY (arg3, __arg3) = ARGIFY (arg3);			 	\
+    TYPEFY (arg2, __arg2) = ARGIFY (arg2);			 	\
+    TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
+    register TYPEFY (arg5, _a5) asm ("r8") = __arg5;			\
+    register TYPEFY (arg4, _a4) asm ("r10") = __arg4;			\
+    register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
+    register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
+    register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3), "r" (_a4),		\
+      "r" (_a5)								\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
+
+#undef internal_syscall6
+#define internal_syscall6(number, err, arg1, arg2, arg3, arg4, arg5, arg6) \
+({									\
+    unsigned long int resultvar;					\
+    TYPEFY (arg6, __arg6) = ARGIFY (arg6);			 	\
+    TYPEFY (arg5, __arg5) = ARGIFY (arg5);			 	\
+    TYPEFY (arg4, __arg4) = ARGIFY (arg4);			 	\
+    TYPEFY (arg3, __arg3) = ARGIFY (arg3);			 	\
+    TYPEFY (arg2, __arg2) = ARGIFY (arg2);			 	\
+    TYPEFY (arg1, __arg1) = ARGIFY (arg1);			 	\
+    register TYPEFY (arg6, _a6) asm ("r9") = __arg6;			\
+    register TYPEFY (arg5, _a5) asm ("r8") = __arg5;			\
+    register TYPEFY (arg4, _a4) asm ("r10") = __arg4;			\
+    register TYPEFY (arg3, _a3) asm ("rdx") = __arg3;			\
+    register TYPEFY (arg2, _a2) asm ("rsi") = __arg2;			\
+    register TYPEFY (arg1, _a1) asm ("rdi") = __arg1;			\
+    asm volatile (							\
+    "syscall\n\t"							\
+    : "=a" (resultvar)							\
+    : "0" (number), "r" (_a1), "r" (_a2), "r" (_a3), "r" (_a4),		\
+      "r" (_a5), "r" (_a6)						\
+    : "memory", REGISTERS_CLOBBERED_BY_SYSCALL);			\
+    (long int) resultvar;						\
+})
 
 # undef INTERNAL_SYSCALL_ERROR_P
 # define INTERNAL_SYSCALL_ERROR_P(val, err) \
@@ -252,142 +360,17 @@
 # undef INTERNAL_SYSCALL_ERRNO
 # define INTERNAL_SYSCALL_ERRNO(val, err)	(-(val))
 
-# ifdef SHARED
-#  define INLINE_VSYSCALL(name, nr, args...) \
-  ({									      \
-    __label__ out;							      \
-    __label__ iserr;							      \
-    INTERNAL_SYSCALL_DECL (sc_err);					      \
-    long int sc_ret;							      \
-									      \
-    __typeof (__vdso_##name) vdsop = __vdso_##name;			      \
-    PTR_DEMANGLE (vdsop);						      \
-    if (vdsop != NULL)							      \
-      {									      \
-	sc_ret = vdsop (args);						      \
-	if (!INTERNAL_SYSCALL_ERROR_P (sc_ret, sc_err))			      \
-	  goto out;							      \
-	if (INTERNAL_SYSCALL_ERRNO (sc_ret, sc_err) != ENOSYS)		      \
-	  goto iserr;							      \
-      }									      \
-									      \
-    sc_ret = INTERNAL_SYSCALL (name, sc_err, nr, ##args);		      \
-    if (INTERNAL_SYSCALL_ERROR_P (sc_ret, sc_err))			      \
-      {									      \
-      iserr:								      \
-	__set_errno (INTERNAL_SYSCALL_ERRNO (sc_ret, sc_err));		      \
-	sc_ret = -1L;							      \
-      }									      \
-  out:									      \
-    sc_ret;								      \
-  })
-#  define INTERNAL_VSYSCALL(name, err, nr, args...) \
-  ({									      \
-    __label__ out;							      \
-    long int v_ret;							      \
-									      \
-    __typeof (__vdso_##name) vdsop = __vdso_##name;			      \
-    PTR_DEMANGLE (vdsop);						      \
-    if (vdsop != NULL)							      \
-      {									      \
-	v_ret = vdsop (args);						      \
-	if (!INTERNAL_SYSCALL_ERROR_P (v_ret, err)			      \
-	    || INTERNAL_SYSCALL_ERRNO (v_ret, err) != ENOSYS)		      \
-	  goto out;							      \
-      }									      \
-    v_ret = INTERNAL_SYSCALL (name, err, nr, ##args);			      \
-  out:									      \
-    v_ret;								      \
-  })
+# define VDSO_NAME  "LINUX_2.6"
+# define VDSO_HASH  61765110
 
-# else
-#  define INLINE_VSYSCALL(name, nr, args...) \
-  INLINE_SYSCALL (name, nr, ##args)
-#  define INTERNAL_VSYSCALL(name, err, nr, args...) \
-  INTERNAL_SYSCALL (name, err, nr, ##args)
-# endif
+/* List of system calls which are supported as vsyscalls.  */
+# define HAVE_CLOCK_GETTIME64_VSYSCALL  "__vdso_clock_gettime"
+# define HAVE_GETTIMEOFDAY_VSYSCALL     "__vdso_gettimeofday"
+# define HAVE_TIME_VSYSCALL             "__vdso_time"
+# define HAVE_GETCPU_VSYSCALL		"__vdso_getcpu"
+# define HAVE_CLOCK_GETRES64_VSYSCALL   "__vdso_clock_getres"
 
-# define LOAD_ARGS_0()
-# define LOAD_REGS_0
-# define ASM_ARGS_0
-
-# define LOAD_ARGS_TYPES_1(t1, a1)					   \
-  t1 __arg1 = (t1) (a1);						   \
-  LOAD_ARGS_0 ()
-# define LOAD_REGS_TYPES_1(t1, a1)					   \
-  register t1 _a1 asm ("rdi") = __arg1;					   \
-  LOAD_REGS_0
-# define ASM_ARGS_1	ASM_ARGS_0, "r" (_a1)
-# define LOAD_ARGS_1(a1)						   \
-  LOAD_ARGS_TYPES_1 (long int, a1)
-# define LOAD_REGS_1							   \
-  LOAD_REGS_TYPES_1 (long int, a1)
-
-# define LOAD_ARGS_TYPES_2(t1, a1, t2, a2)				   \
-  t2 __arg2 = (t2) (a2);						   \
-  LOAD_ARGS_TYPES_1 (t1, a1)
-# define LOAD_REGS_TYPES_2(t1, a1, t2, a2)				   \
-  register t2 _a2 asm ("rsi") = __arg2;					   \
-  LOAD_REGS_TYPES_1(t1, a1)
-# define ASM_ARGS_2	ASM_ARGS_1, "r" (_a2)
-# define LOAD_ARGS_2(a1, a2)						   \
-  LOAD_ARGS_TYPES_2 (long int, a1, long int, a2)
-# define LOAD_REGS_2							   \
-  LOAD_REGS_TYPES_2 (long int, a1, long int, a2)
-
-# define LOAD_ARGS_TYPES_3(t1, a1, t2, a2, t3, a3)			   \
-  t3 __arg3 = (t3) (a3);						   \
-  LOAD_ARGS_TYPES_2 (t1, a1, t2, a2)
-# define LOAD_REGS_TYPES_3(t1, a1, t2, a2, t3, a3)			   \
-  register t3 _a3 asm ("rdx") = __arg3;					   \
-  LOAD_REGS_TYPES_2(t1, a1, t2, a2)
-# define ASM_ARGS_3	ASM_ARGS_2, "r" (_a3)
-# define LOAD_ARGS_3(a1, a2, a3)					   \
-  LOAD_ARGS_TYPES_3 (long int, a1, long int, a2, long int, a3)
-# define LOAD_REGS_3							   \
-  LOAD_REGS_TYPES_3 (long int, a1, long int, a2, long int, a3)
-
-# define LOAD_ARGS_TYPES_4(t1, a1, t2, a2, t3, a3, t4, a4)		   \
-  t4 __arg4 = (t4) (a4);						   \
-  LOAD_ARGS_TYPES_3 (t1, a1, t2, a2, t3, a3)
-# define LOAD_REGS_TYPES_4(t1, a1, t2, a2, t3, a3, t4, a4)		   \
-  register t4 _a4 asm ("r10") = __arg4;					   \
-  LOAD_REGS_TYPES_3(t1, a2, t2, a2, t3, a3)
-# define ASM_ARGS_4	ASM_ARGS_3, "r" (_a4)
-# define LOAD_ARGS_4(a1, a2, a3, a4)					   \
-  LOAD_ARGS_TYPES_4 (long int, a1, long int, a2, long int, a3,		   \
-		     long int, a4)
-# define LOAD_REGS_4							   \
-  LOAD_REGS_TYPES_4 (long int, a1, long int, a2, long int, a3,		   \
-		     long int, a4)
-
-# define LOAD_ARGS_TYPES_5(t1, a1, t2, a2, t3, a3, t4, a4, t5, a5)	   \
-  t5 __arg5 = (t5) (a5);						   \
-  LOAD_ARGS_TYPES_4 (t1, a1, t2, a2, t3, a3, t4, a4)
-# define LOAD_REGS_TYPES_5(t1, a1, t2, a2, t3, a3, t4, a4, t5, a5)	   \
-  register t5 _a5 asm ("r8") = __arg5;					   \
-  LOAD_REGS_TYPES_4 (t1, a1, t2, a2, t3, a3, t4, a4)
-# define ASM_ARGS_5	ASM_ARGS_4, "r" (_a5)
-# define LOAD_ARGS_5(a1, a2, a3, a4, a5)				   \
-  LOAD_ARGS_TYPES_5 (long int, a1, long int, a2, long int, a3,		   \
-		     long int, a4, long int, a5)
-# define LOAD_REGS_5							   \
-  LOAD_REGS_TYPES_5 (long int, a1, long int, a2, long int, a3,		   \
-		     long int, a4, long int, a5)
-
-# define LOAD_ARGS_TYPES_6(t1, a1, t2, a2, t3, a3, t4, a4, t5, a5, t6, a6) \
-  t6 __arg6 = (t6) (a6);						   \
-  LOAD_ARGS_TYPES_5 (t1, a1, t2, a2, t3, a3, t4, a4, t5, a5)
-# define LOAD_REGS_TYPES_6(t1, a1, t2, a2, t3, a3, t4, a4, t5, a5, t6, a6) \
-  register t6 _a6 asm ("r9") = __arg6;					   \
-  LOAD_REGS_TYPES_5 (t1, a1, t2, a2, t3, a3, t4, a4, t5, a5)
-# define ASM_ARGS_6	ASM_ARGS_5, "r" (_a6)
-# define LOAD_ARGS_6(a1, a2, a3, a4, a5, a6)				   \
-  LOAD_ARGS_TYPES_6 (long int, a1, long int, a2, long int, a3,		   \
-		     long int, a4, long int, a5, long int, a6)
-# define LOAD_REGS_6							   \
-  LOAD_REGS_TYPES_6 (long int, a1, long int, a2, long int, a3,		   \
-		     long int, a4, long int, a5, long int, a6)
+# define SINGLE_THREAD_BY_GLOBAL		1
 
 #endif	/* __ASSEMBLER__ */
 
@@ -430,5 +413,14 @@
 						      pointer_guard)))
 # endif
 #endif
+
+/* How to pass the off{64}_t argument on p{readv,writev}{64}.  */
+#undef LO_HI_LONG
+#define LO_HI_LONG(val) (val), 0
+
+/* Each shadow stack slot takes 8 bytes.  Assuming that each stack
+   frame takes 256 bytes, this is used to compute shadow stack size
+   from stack size.  */
+#define STACK_SIZE_TO_SHADOW_STACK_SIZE_SHIFT 5
 
 #endif /* linux/x86_64/sysdep.h */

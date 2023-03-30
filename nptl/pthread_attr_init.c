@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,9 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -30,17 +29,18 @@ int __attr_list_lock = LLL_LOCK_INITIALIZER;
 
 
 int
-__pthread_attr_init_2_1 (attr)
-     pthread_attr_t *attr;
+__pthread_attr_init_2_1 (pthread_attr_t *attr)
 {
   struct pthread_attr *iattr;
+
+  ASSERT_TYPE_SIZE (pthread_attr_t, __SIZEOF_PTHREAD_ATTR_T);
+  ASSERT_PTHREAD_INTERNAL_SIZE (pthread_attr_t, struct pthread_attr);
 
   /* Many elements are initialized to zero so let us do it all at
      once.  This also takes care of clearing the bytes which are not
      internally used.  */
   memset (attr, '\0', __SIZEOF_PTHREAD_ATTR_T);
 
-  assert (sizeof (*attr) >= sizeof (struct pthread_attr));
   iattr = (struct pthread_attr *) attr;
 
   /* Default guard size specified by the standard.  */
@@ -48,14 +48,12 @@ __pthread_attr_init_2_1 (attr)
 
   return 0;
 }
-versioned_symbol (libpthread, __pthread_attr_init_2_1, pthread_attr_init,
-		  GLIBC_2_1);
+versioned_symbol (libc, __pthread_attr_init_2_1, pthread_attr_init, GLIBC_2_1);
 
 
-#if SHLIB_COMPAT(libpthread, GLIBC_2_0, GLIBC_2_1)
+#if SHLIB_COMPAT(libc, GLIBC_2_0, GLIBC_2_1)
 int
-__pthread_attr_init_2_0 (attr)
-     pthread_attr_t *attr;
+__pthread_attr_init_2_0 (pthread_attr_t *attr)
 {
   /* This code is specific to the old LinuxThread code which has a too
      small pthread_attr_t definition.  The struct looked like
@@ -82,6 +80,5 @@ __pthread_attr_init_2_0 (attr)
      old attribute structure.  */
   return 0;
 }
-compat_symbol (libpthread, __pthread_attr_init_2_0, pthread_attr_init,
-	       GLIBC_2_0);
+compat_symbol (libc, __pthread_attr_init_2_0, pthread_attr_init, GLIBC_2_0);
 #endif

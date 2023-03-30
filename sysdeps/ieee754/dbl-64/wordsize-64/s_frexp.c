@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gmail.com>, 2011.
 
@@ -14,11 +14,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <inttypes.h>
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-double.h>
 
 /*
  * for non-zero, finite x
@@ -55,12 +56,11 @@ __frexp (double x, int *eptr)
       ix = (ix & INT64_C (0x800fffffffffffff)) | INT64_C (0x3fe0000000000000);
       INSERT_WORDS64 (x, ix);
     }
+  else
+    /* Quiet signaling NaNs.  */
+    x += x;
 
   *eptr = e;
   return x;
 }
-weak_alias (__frexp, frexp)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__frexp, __frexpl)
-weak_alias (__frexp, frexpl)
-#endif
+libm_alias_double (__frexp, frexp)

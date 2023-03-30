@@ -1,5 +1,5 @@
 /* Inner loops of cache daemon.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -14,7 +14,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <assert.h>
@@ -46,9 +46,6 @@
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/poll.h>
-#ifdef HAVE_SENDFILE
-# include <sys/sendfile.h>
-#endif
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -59,7 +56,7 @@
 #include <resolv/resolv.h>
 
 #include <kernel-features.h>
-#include <libc-internal.h>
+#include <libc-diag.h>
 
 
 /* Support to run nscd as an unprivileged user */
@@ -106,11 +103,17 @@ const char *const serv2str[LASTREQ] =
   [GETFDNETGR] = "GETFDNETGR"
 };
 
+#ifdef PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
+# define RWLOCK_INITIALIZER PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
+#else
+# define RWLOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
+#endif
+
 /* The control data structures for the services.  */
 struct database_dyn dbs[lastdb] =
 {
   [pwddb] = {
-    .lock = PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP,
+    .lock = RWLOCK_INITIALIZER,
     .prune_lock = PTHREAD_MUTEX_INITIALIZER,
     .prune_run_lock = PTHREAD_MUTEX_INITIALIZER,
     .enabled = 0,
@@ -129,7 +132,7 @@ struct database_dyn dbs[lastdb] =
     .mmap_used = false
   },
   [grpdb] = {
-    .lock = PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP,
+    .lock = RWLOCK_INITIALIZER,
     .prune_lock = PTHREAD_MUTEX_INITIALIZER,
     .prune_run_lock = PTHREAD_MUTEX_INITIALIZER,
     .enabled = 0,
@@ -148,7 +151,7 @@ struct database_dyn dbs[lastdb] =
     .mmap_used = false
   },
   [hstdb] = {
-    .lock = PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP,
+    .lock = RWLOCK_INITIALIZER,
     .prune_lock = PTHREAD_MUTEX_INITIALIZER,
     .prune_run_lock = PTHREAD_MUTEX_INITIALIZER,
     .enabled = 0,
@@ -167,7 +170,7 @@ struct database_dyn dbs[lastdb] =
     .mmap_used = false
   },
   [servdb] = {
-    .lock = PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP,
+    .lock = RWLOCK_INITIALIZER,
     .prune_lock = PTHREAD_MUTEX_INITIALIZER,
     .prune_run_lock = PTHREAD_MUTEX_INITIALIZER,
     .enabled = 0,
@@ -186,7 +189,7 @@ struct database_dyn dbs[lastdb] =
     .mmap_used = false
   },
   [netgrdb] = {
-    .lock = PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP,
+    .lock = RWLOCK_INITIALIZER,
     .prune_lock = PTHREAD_MUTEX_INITIALIZER,
     .prune_run_lock = PTHREAD_MUTEX_INITIALIZER,
     .enabled = 0,
@@ -224,7 +227,6 @@ static struct
   [GETHOSTBYADDRv6] = { true, &dbs[hstdb] },
   [SHUTDOWN] = { false, NULL },
   [GETSTAT] = { false, NULL },
-  [SHUTDOWN] = { false, NULL },
   [GETFDPW] = { false, &dbs[pwddb] },
   [GETFDGR] = { false, &dbs[grpdb] },
   [GETFDHST] = { false, &dbs[hstdb] },
@@ -257,15 +259,6 @@ int inotify_fd = -1;
 static int nl_status_fd = -1;
 #endif
 
-#ifndef __ASSUME_SOCK_CLOEXEC
-/* Negative if SOCK_CLOEXEC is not supported, positive if it is, zero
-   before be know the result.  */
-static int have_sock_cloexec;
-#endif
-#ifndef __ASSUME_ACCEPT4
-static int have_accept4;
-#endif
-
 /* Number of times clients had to wait.  */
 unsigned long int client_queued;
 
@@ -286,26 +279,6 @@ writeall (int fd, const void *buf, size_t len)
   while (n > 0);
   return ret < 0 ? ret : len - n;
 }
-
-
-#ifdef HAVE_SENDFILE
-ssize_t
-sendfileall (int tofd, int fromfd, off_t off, size_t len)
-{
-  ssize_t n = len;
-  ssize_t ret;
-
-  do
-    {
-      ret = TEMP_FAILURE_RETRY (sendfile (tofd, fromfd, &off, n));
-      if (ret <= 0)
-	break;
-      n -= ret;
-    }
-  while (n > 0);
-  return ret < 0 ? ret : len - n;
-}
-#endif
 
 
 enum usekey
@@ -330,7 +303,8 @@ static int
 check_use (const char *data, nscd_ssize_t first_free, uint8_t *usemap,
 	   enum usekey use, ref_t start, size_t len)
 {
-  assert (len >= 2);
+  if (len < 2)
+    return 0;
 
   if (start > first_free || start + len > first_free
       || (start & BLOCK_ALIGN_M1))
@@ -504,13 +478,6 @@ fail:
 }
 
 
-#ifdef O_CLOEXEC
-# define EXTRA_O_FLAGS O_CLOEXEC
-#else
-# define EXTRA_O_FLAGS 0
-#endif
-
-
 /* Initialize database information structures.  */
 void
 nscd_init (void)
@@ -533,7 +500,7 @@ nscd_init (void)
 	if (dbs[cnt].persistent)
 	  {
 	    /* Try to open the appropriate file on disk.  */
-	    int fd = open (dbs[cnt].db_filename, O_RDWR | EXTRA_O_FLAGS);
+	    int fd = open (dbs[cnt].db_filename, O_RDWR | O_CLOEXEC);
 	    if (fd != -1)
 	      {
 		char *msg = NULL;
@@ -613,7 +580,7 @@ nscd_init (void)
 		    if (dbs[cnt].shared)
 		      {
 			dbs[cnt].ro_fd = open (dbs[cnt].db_filename,
-					       O_RDONLY | EXTRA_O_FLAGS);
+					       O_RDONLY | O_CLOEXEC);
 			if (dbs[cnt].ro_fd == -1)
 			  dbg_log (_("\
 cannot create read-only descriptor for \"%s\"; no mmap"),
@@ -653,23 +620,23 @@ cannot create read-only descriptor for \"%s\"; no mmap"),
 	    if (dbs[cnt].persistent)
 	      {
 		fd = open (dbs[cnt].db_filename,
-			   O_RDWR | O_CREAT | O_EXCL | O_TRUNC | EXTRA_O_FLAGS,
+			   O_RDWR | O_CREAT | O_EXCL | O_TRUNC | O_CLOEXEC,
 			   S_IRUSR | S_IWUSR);
 		if (fd != -1 && dbs[cnt].shared)
 		  ro_fd = open (dbs[cnt].db_filename,
-				O_RDONLY | EXTRA_O_FLAGS);
+				O_RDONLY | O_CLOEXEC);
 	      }
 	    else
 	      {
 		char fname[] = _PATH_NSCD_XYZ_DB_TMP;
-		fd = mkostemp (fname, EXTRA_O_FLAGS);
+		fd = mkostemp (fname, O_CLOEXEC);
 
 		/* We do not need the file name anymore after we
 		   opened another file descriptor in read-only mode.  */
 		if (fd != -1)
 		  {
 		    if (dbs[cnt].shared)
-		      ro_fd = open (fname, O_RDONLY | EXTRA_O_FLAGS);
+		      ro_fd = open (fname, O_RDONLY | O_CLOEXEC);
 
 		    unlink (fname);
 		  }
@@ -787,24 +754,6 @@ cannot create read-only descriptor for \"%s\"; no mmap"),
 	      }
 	  }
 
-#if !defined O_CLOEXEC || !defined __ASSUME_O_CLOEXEC
-	/* We do not check here whether the O_CLOEXEC provided to the
-	   open call was successful or not.  The two fcntl calls are
-	   only performed once each per process start-up and therefore
-	   is not noticeable at all.  */
-	if (paranoia
-	    && ((dbs[cnt].wr_fd != -1
-		 && fcntl (dbs[cnt].wr_fd, F_SETFD, FD_CLOEXEC) == -1)
-		|| (dbs[cnt].ro_fd != -1
-		    && fcntl (dbs[cnt].ro_fd, F_SETFD, FD_CLOEXEC) == -1)))
-	  {
-	    dbg_log (_("\
-cannot set socket to close on exec: %s; disabling paranoia mode"),
-		     strerror (errno));
-	    paranoia = 0;
-	  }
-#endif
-
 	if (dbs[cnt].head == NULL)
 	  {
 	    /* We do not use the persistent database.  Just
@@ -830,21 +779,7 @@ cannot set socket to close on exec: %s; disabling paranoia mode"),
       }
 
   /* Create the socket.  */
-#ifndef __ASSUME_SOCK_CLOEXEC
-  sock = -1;
-  if (have_sock_cloexec >= 0)
-#endif
-    {
-      sock = socket (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
-#ifndef __ASSUME_SOCK_CLOEXEC
-      if (have_sock_cloexec == 0)
-	have_sock_cloexec = sock != -1 || errno != EINVAL ? 1 : -1;
-#endif
-    }
-#ifndef __ASSUME_SOCK_CLOEXEC
-  if (have_sock_cloexec < 0)
-    sock = socket (AF_UNIX, SOCK_STREAM, 0);
-#endif
+  sock = socket (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
   if (sock < 0)
     {
       dbg_log (_("cannot open socket: %s"), strerror (errno));
@@ -859,28 +794,6 @@ cannot set socket to close on exec: %s; disabling paranoia mode"),
       dbg_log ("%s: %s", _PATH_NSCDSOCKET, strerror (errno));
       do_exit (errno == EACCES ? 4 : 1, 0, NULL);
     }
-
-#ifndef __ASSUME_SOCK_CLOEXEC
-  if (have_sock_cloexec < 0)
-    {
-      /* We don't want to get stuck on accept.  */
-      int fl = fcntl (sock, F_GETFL);
-      if (fl == -1 || fcntl (sock, F_SETFL, fl | O_NONBLOCK) == -1)
-	{
-	  dbg_log (_("cannot change socket to nonblocking mode: %s"),
-		   strerror (errno));
-	  do_exit (1, 0, NULL);
-	}
-
-      /* The descriptor needs to be closed on exec.  */
-      if (paranoia && fcntl (sock, F_SETFD, FD_CLOEXEC) == -1)
-	{
-	  dbg_log (_("cannot set socket to close on exec: %s"),
-		   strerror (errno));
-	  do_exit (1, 0, NULL);
-	}
-    }
-#endif
 
   /* Set permissions for the socket.  */
   chmod (_PATH_NSCDSOCKET, DEFFILEMODE);
@@ -922,31 +835,6 @@ cannot set socket to close on exec: %s; disabling paranoia mode"),
 	      /* Start the timestamp process.  */
 	      dbs[hstdb].head->extra_data[NSCD_HST_IDX_CONF_TIMESTAMP]
 		= __bump_nl_timestamp ();
-
-# ifndef __ASSUME_SOCK_CLOEXEC
-	      if (have_sock_cloexec < 0)
-		{
-		  /* We don't want to get stuck on accept.  */
-		  int fl = fcntl (nl_status_fd, F_GETFL);
-		  if (fl == -1
-		      || fcntl (nl_status_fd, F_SETFL, fl | O_NONBLOCK) == -1)
-		    {
-		      dbg_log (_("\
-cannot change socket to nonblocking mode: %s"),
-			       strerror (errno));
-		      do_exit (1, 0, NULL);
-		    }
-
-		  /* The descriptor needs to be closed on exec.  */
-		  if (paranoia
-		      && fcntl (nl_status_fd, F_SETFD, FD_CLOEXEC) == -1)
-		    {
-		      dbg_log (_("cannot set socket to close on exec: %s"),
-			       strerror (errno));
-		      do_exit (1, 0, NULL);
-		    }
-		}
-# endif
 	    }
 	}
     }
@@ -957,6 +845,44 @@ cannot change socket to nonblocking mode: %s"),
     finish_drop_privileges ();
 }
 
+#ifdef HAVE_INOTIFY
+#define TRACED_FILE_MASK (IN_DELETE_SELF | IN_CLOSE_WRITE | IN_MOVE_SELF)
+#define TRACED_DIR_MASK (IN_DELETE_SELF | IN_CREATE | IN_MOVED_TO | IN_MOVE_SELF)
+void
+install_watches (struct traced_file *finfo)
+{
+  /* Use inotify support if we have it.  */
+  if (finfo->inotify_descr[TRACED_FILE] < 0)
+    finfo->inotify_descr[TRACED_FILE] = inotify_add_watch (inotify_fd,
+							   finfo->fname,
+							   TRACED_FILE_MASK);
+  if (finfo->inotify_descr[TRACED_FILE] < 0)
+    {
+      dbg_log (_("disabled inotify-based monitoring for file `%s': %s"),
+		 finfo->fname, strerror (errno));
+      return;
+    }
+  dbg_log (_("monitoring file `%s` (%d)"),
+	   finfo->fname, finfo->inotify_descr[TRACED_FILE]);
+  /* Additionally listen for events in the file's parent directory.
+     We do this because the file to be watched might be
+     deleted and then added back again.  When it is added back again
+     we must re-add the watch.  We must also cover IN_MOVED_TO to
+     detect a file being moved into the directory.  */
+  if (finfo->inotify_descr[TRACED_DIR] < 0)
+    finfo->inotify_descr[TRACED_DIR] = inotify_add_watch (inotify_fd,
+							  finfo->dname,
+							  TRACED_DIR_MASK);
+  if (finfo->inotify_descr[TRACED_DIR] < 0)
+    {
+      dbg_log (_("disabled inotify-based monitoring for directory `%s': %s"),
+		 finfo->fname, strerror (errno));
+      return;
+    }
+  dbg_log (_("monitoring directory `%s` (%d)"),
+	   finfo->dname, finfo->inotify_descr[TRACED_DIR]);
+}
+#endif
 
 /* Register the file in FINFO as a traced file for the database DBS[DBIX].
 
@@ -981,30 +907,22 @@ register_traced_file (size_t dbidx, struct traced_file *finfo)
     return;
 
   if (__glibc_unlikely (debug_level > 0))
-    dbg_log (_("register trace file %s for database %s"),
+    dbg_log (_("monitoring file %s for database %s"),
 	     finfo->fname, dbnames[dbidx]);
 
 #ifdef HAVE_INOTIFY
-  if (inotify_fd < 0
-      || (finfo->inotify_descr = inotify_add_watch (inotify_fd, finfo->fname,
-						    IN_DELETE_SELF
-						    | IN_MODIFY)) < 0)
+  install_watches (finfo);
 #endif
+  struct stat64 st;
+  if (stat64 (finfo->fname, &st) < 0)
     {
-      /* We need the modification date of the file.  */
-      struct stat64 st;
-
-      if (stat64 (finfo->fname, &st) < 0)
-	{
-	  /* We cannot stat() the file, disable file checking.  */
-	  dbg_log (_("cannot stat() file `%s': %s"),
-		   finfo->fname, strerror (errno));
-	  return;
-	}
-
-      finfo->inotify_descr = -1;
-      finfo->mtime = st.st_mtime;
+      /* We cannot stat() the file. Set mtime to zero and try again later.  */
+      dbg_log (_("stat failed for file `%s'; will try again later: %s"),
+	       finfo->fname, strerror (errno));
+      finfo->mtime = 0;
     }
+  else
+    finfo->mtime = st.st_mtime;
 
   /* Queue up the file name.  */
   finfo->next = dbs[dbidx].traced_files;
@@ -1029,20 +947,27 @@ invalidate_cache (char *key, int fd)
   for (number = pwddb; number < lastdb; ++number)
     if (strcmp (key, dbnames[number]) == 0)
       {
-	if (number == hstdb)
+	struct traced_file *runp = dbs[number].traced_files;
+	while (runp != NULL)
 	  {
-	    struct traced_file *runp = dbs[hstdb].traced_files;
-	    while (runp != NULL)
-	      if (runp->call_res_init)
-		{
-		  res_init ();
-		  break;
-		}
-	      else
-		runp = runp->next;
+	    /* Make sure we reload from file when checking mtime.  */
+	    runp->mtime = 0;
+#ifdef HAVE_INOTIFY
+	    /* During an invalidation we try to reload the traced
+	       file watches.  This allows the user to re-sync if
+	       inotify events were lost.  Similar to what we do during
+	       pruning.  */
+	    install_watches (runp);
+#endif
+	    if (runp->call_res_init)
+	      {
+		res_init ();
+		break;
+	      }
+	    runp = runp->next;
 	  }
 	break;
-    }
+      }
 
   if (number == lastdb)
     {
@@ -1135,14 +1060,15 @@ cannot handle old request version %d; current version is %d"),
       if (debug_level > 0)
 	{
 #ifdef SO_PEERCRED
+	  char pbuf[sizeof ("/proc//exe") + 3 * sizeof (long int)];
 # ifdef PATH_MAX
 	  char buf[PATH_MAX];
 # else
 	  char buf[4096];
 # endif
 
-	  snprintf (buf, sizeof (buf), "/proc/%ld/exe", (long int) pid);
-	  ssize_t n = readlink (buf, buf, sizeof (buf) - 1);
+	  snprintf (pbuf, sizeof (pbuf), "/proc/%ld/exe", (long int) pid);
+	  ssize_t n = readlink (pbuf, buf, sizeof (buf) - 1);
 
 	  if (n <= 0)
 	    dbg_log (_("\
@@ -1214,35 +1140,8 @@ request from '%s' [%ld] not handled due to missing permission"),
       if (cached != NULL)
 	{
 	  /* Hurray it's in the cache.  */
-	  ssize_t nwritten;
-
-#ifdef HAVE_SENDFILE
-	  if (__glibc_likely (db->mmap_used))
-	    {
-	      assert (db->wr_fd != -1);
-	      assert ((char *) cached->data > (char *) db->data);
-	      assert ((char *) cached->data - (char *) db->head
-		      + cached->recsize
-		      <= (sizeof (struct database_pers_head)
-			  + db->head->module * sizeof (ref_t)
-			  + db->head->data_size));
-	      nwritten = sendfileall (fd, db->wr_fd,
-				      (char *) cached->data
-				      - (char *) db->head, cached->recsize);
-# ifndef __ASSUME_SENDFILE
-	      if (nwritten == -1 && errno == ENOSYS)
-		goto use_write;
-# endif
-	    }
-	  else
-# ifndef __ASSUME_SENDFILE
-	  use_write:
-# endif
-#endif
-	    nwritten = writeall (fd, cached->data, cached->recsize);
-
-	  if (nwritten != cached->recsize
-	      && __builtin_expect (debug_level, 0) > 0)
+	  if (writeall (fd, cached->data, cached->recsize) != cached->recsize
+	      && __glibc_unlikely (debug_level > 0))
 	    {
 	      /* We have problems sending the result.  */
 	      char buf[256];
@@ -1382,64 +1281,83 @@ request from '%s' [%ld] not handled due to missing permission"),
     }
 }
 
+static char *
+read_cmdline (size_t *size)
+{
+  int fd = open ("/proc/self/cmdline", O_RDONLY);
+  if (fd < 0)
+    return NULL;
+  size_t current = 0;
+  size_t limit = 1024;
+  char *buffer = malloc (limit);
+  if (buffer == NULL)
+    {
+      close (fd);
+      errno = ENOMEM;
+      return NULL;
+    }
+  while (1)
+    {
+      if (current == limit)
+	{
+	  char *newptr;
+	  if (2 * limit < limit
+	      || (newptr = realloc (buffer, 2 * limit)) == NULL)
+	    {
+	      free (buffer);
+	      close (fd);
+	      errno = ENOMEM;
+	      return NULL;
+	    }
+	  buffer = newptr;
+	  limit *= 2;
+	}
+
+      ssize_t n = TEMP_FAILURE_RETRY (read (fd, buffer + current,
+					    limit - current));
+      if (n == -1)
+	{
+	  int e = errno;
+	  free (buffer);
+	  close (fd);
+	  errno = e;
+	  return NULL;
+	}
+      if (n == 0)
+	break;
+      current += n;
+    }
+
+  close (fd);
+  *size = current;
+  return buffer;
+}
+
 
 /* Restart the process.  */
 static void
 restart (void)
 {
   /* First determine the parameters.  We do not use the parameters
-     passed to main() since in case nscd is started by running the
-     dynamic linker this will not work.  Yes, this is not the usual
-     case but nscd is part of glibc and we occasionally do this.  */
-  size_t buflen = 1024;
-  char *buf = alloca (buflen);
-  size_t readlen = 0;
-  int fd = open ("/proc/self/cmdline", O_RDONLY);
-  if (fd == -1)
+     passed to main because then nscd would use the system libc after
+     restarting even if it was started by a non-system dynamic linker
+     during glibc testing.  */
+  size_t readlen;
+  char *cmdline = read_cmdline (&readlen);
+  if (cmdline == NULL)
     {
       dbg_log (_("\
-cannot open /proc/self/cmdline: %s; disabling paranoia mode"),
-	       strerror (errno));
-
+cannot open /proc/self/cmdline: %m; disabling paranoia mode"));
       paranoia = 0;
       return;
     }
-
-  while (1)
-    {
-      ssize_t n = TEMP_FAILURE_RETRY (read (fd, buf + readlen,
-					    buflen - readlen));
-      if (n == -1)
-	{
-	  dbg_log (_("\
-cannot read /proc/self/cmdline: %s; disabling paranoia mode"),
-		   strerror (errno));
-
-	  close (fd);
-	  paranoia = 0;
-	  return;
-	}
-
-      readlen += n;
-
-      if (readlen < buflen)
-	break;
-
-      /* We might have to extend the buffer.  */
-      size_t old_buflen = buflen;
-      char *newp = extend_alloca (buf, buflen, 2 * buflen);
-      buf = memmove (newp, buf, old_buflen);
-    }
-
-  close (fd);
 
   /* Parse the command line.  Worst case scenario: every two
      characters form one parameter (one character plus NUL).  */
   char **argv = alloca ((readlen / 2 + 1) * sizeof (argv[0]));
   int argc = 0;
 
-  char *cp = buf;
-  while (cp < buf + readlen)
+  for (char *cp = cmdline; cp < cmdline + readlen;)
     {
       argv[argc++] = cp;
       cp = (char *) rawmemchr (cp, '\0') + 1;
@@ -1456,6 +1374,7 @@ cannot change to old UID: %s; disabling paranoia mode"),
 		   strerror (errno));
 
 	  paranoia = 0;
+	  free (cmdline);
 	  return;
 	}
 
@@ -1467,6 +1386,7 @@ cannot change to old GID: %s; disabling paranoia mode"),
 
 	  ignore_value (setuid (server_uid));
 	  paranoia = 0;
+	  free (cmdline);
 	  return;
 	}
     }
@@ -1484,6 +1404,7 @@ cannot change to old working directory: %s; disabling paranoia mode"),
 	  ignore_value (setgid (server_gid));
 	}
       paranoia = 0;
+      free (cmdline);
       return;
     }
 
@@ -1532,6 +1453,7 @@ cannot change to old working directory: %s; disabling paranoia mode"),
     dbg_log (_("cannot change current working directory to \"/\": %s"),
 	     strerror (errno));
   paranoia = 0;
+  free (cmdline);
 
   /* Reenable the databases.  */
   time_t now = time (NULL);
@@ -1704,16 +1626,6 @@ nscd_run_worker (void *p)
       /* We are done with the list.  */
       pthread_mutex_unlock (&readylist_lock);
 
-#ifndef __ASSUME_ACCEPT4
-      if (have_accept4 < 0)
-	{
-	  /* We do not want to block on a short read or so.  */
-	  int fl = fcntl (fd, F_GETFL);
-	  if (fl == -1 || fcntl (fd, F_SETFL, fl | O_NONBLOCK) == -1)
-	    goto close_and_out;
-	}
-#endif
-
       /* Now read the request.  */
       request_header req;
       if (__builtin_expect (TEMP_FAILURE_RETRY (read (fd, &req, sizeof (req)))
@@ -1880,11 +1792,28 @@ union __inev
   char buf[sizeof (struct inotify_event) + PATH_MAX];
 };
 
+/* Returns 0 if the file is there otherwise -1.  */
+int
+check_file (struct traced_file *finfo)
+{
+  struct stat64 st;
+  /* We could check mtime and if different re-add
+     the watches, and invalidate the database, but we
+     don't because we are called from inotify_check_files
+     which should be doing that work.  If sufficient inotify
+     events were lost then the next pruning or invalidation
+     will do the stat and mtime check.  We don't do it here to
+     keep the logic simple.  */
+  if (stat64 (finfo->fname, &st) < 0)
+    return -1;
+  return 0;
+}
+
 /* Process the inotify event in INEV. If the event matches any of the files
    registered with a database then mark that database as requiring its cache
    to be cleared. We indicate the cache needs clearing by setting
    TO_CLEAR[DBCNT] to true for the matching database.  */
-static inline void
+static void
 inotify_check_files (bool *to_clear, union __inev *inev)
 {
   /* Check which of the files changed.  */
@@ -1894,16 +1823,124 @@ inotify_check_files (bool *to_clear, union __inev *inev)
 
       while (finfo != NULL)
 	{
-	  /* Inotify event watch descriptor matches.  */
-	  if (finfo->inotify_descr == inev->i.wd)
+	  /* The configuration file was moved or deleted.
+	     We stop watching it at that point, and reinitialize.  */
+	  if (finfo->inotify_descr[TRACED_FILE] == inev->i.wd
+	      && ((inev->i.mask & IN_MOVE_SELF)
+		  || (inev->i.mask & IN_DELETE_SELF)
+		  || (inev->i.mask & IN_IGNORED)))
 	    {
-	      /* Mark cache as needing to be cleared and reinitialize.  */
+	      int ret;
+	      bool moved = (inev->i.mask & IN_MOVE_SELF) != 0;
+
+	      if (check_file (finfo) == 0)
+	        {
+		  dbg_log (_("ignored inotify event for `%s` (file exists)"),
+			   finfo->fname);
+		  return;
+		}
+
+	      dbg_log (_("monitored file `%s` was %s, removing watch"),
+		       finfo->fname, moved ? "moved" : "deleted");
+	      /* File was moved out, remove the watch.  Watches are
+		 automatically removed when the file is deleted.  */
+	      if (moved)
+		{
+		  ret = inotify_rm_watch (inotify_fd, inev->i.wd);
+		  if (ret < 0)
+		    dbg_log (_("failed to remove file watch `%s`: %s"),
+			     finfo->fname, strerror (errno));
+		}
+	      finfo->inotify_descr[TRACED_FILE] = -1;
 	      to_clear[dbcnt] = true;
 	      if (finfo->call_res_init)
 	        res_init ();
 	      return;
 	    }
+	  /* The configuration file was open for writing and has just closed.
+	     We reset the cache and reinitialize.  */
+	  if (finfo->inotify_descr[TRACED_FILE] == inev->i.wd
+	      && inev->i.mask & IN_CLOSE_WRITE)
+	    {
+	      /* Mark cache as needing to be cleared and reinitialize.  */
+	      dbg_log (_("monitored file `%s` was written to"), finfo->fname);
+	      to_clear[dbcnt] = true;
+	      if (finfo->call_res_init)
+	        res_init ();
+	      return;
+	    }
+	  /* The parent directory was moved or deleted.  We trigger one last
+	     invalidation.  At the next pruning or invalidation we may add
+	     this watch back if the file is present again.  */
+	  if (finfo->inotify_descr[TRACED_DIR] == inev->i.wd
+	      && ((inev->i.mask & IN_DELETE_SELF)
+		  || (inev->i.mask & IN_MOVE_SELF)
+		  || (inev->i.mask & IN_IGNORED)))
+	    {
+	      bool moved = (inev->i.mask & IN_MOVE_SELF) != 0;
+	      /* The directory watch may have already been removed
+		 but we don't know so we just remove it again and
+		 ignore the error.  Then we remove the file watch.
+		 Note: watches are automatically removed for deleted
+		 files.  */
+	      if (moved)
+		inotify_rm_watch (inotify_fd, inev->i.wd);
+	      if (finfo->inotify_descr[TRACED_FILE] != -1)
+		{
+		  dbg_log (_("monitored parent directory `%s` was %s, removing watch on `%s`"),
+			   finfo->dname, moved ? "moved" : "deleted", finfo->fname);
+		  if (inotify_rm_watch (inotify_fd, finfo->inotify_descr[TRACED_FILE]) < 0)
+		    dbg_log (_("failed to remove file watch `%s`: %s"),
+			     finfo->dname, strerror (errno));
+		}
+	      finfo->inotify_descr[TRACED_FILE] = -1;
+	      finfo->inotify_descr[TRACED_DIR] = -1;
+	      to_clear[dbcnt] = true;
+	      if (finfo->call_res_init)
+	        res_init ();
+	      /* Continue to the next entry since this might be the
+		 parent directory for multiple registered files and
+		 we want to remove watches for all registered files.  */
+	      continue;
+	    }
+	  /* The parent directory had a create or moved to event.  */
+	  if (finfo->inotify_descr[TRACED_DIR] == inev->i.wd
+	      && ((inev->i.mask & IN_MOVED_TO)
+		  || (inev->i.mask & IN_CREATE))
+	      && strcmp (inev->i.name, finfo->sfname) == 0)
+	    {
+	      /* We detected a directory change.  We look for the creation
+		 of the file we are tracking or the move of the same file
+		 into the directory.  */
+	      int ret;
+	      dbg_log (_("monitored file `%s` was %s, adding watch"),
+		       finfo->fname,
+		       inev->i.mask & IN_CREATE ? "created" : "moved into place");
+	      /* File was moved in or created.  Regenerate the watch.  */
+	      if (finfo->inotify_descr[TRACED_FILE] != -1)
+		inotify_rm_watch (inotify_fd,
+				  finfo->inotify_descr[TRACED_FILE]);
 
+	      ret = inotify_add_watch (inotify_fd,
+				       finfo->fname,
+				       TRACED_FILE_MASK);
+	      if (ret < 0)
+		dbg_log (_("failed to add file watch `%s`: %s"),
+			 finfo->fname, strerror (errno));
+
+	      finfo->inotify_descr[TRACED_FILE] = ret;
+
+	      /* The file is new or moved so mark cache as needing to
+		 be cleared and reinitialize.  */
+	      to_clear[dbcnt] = true;
+	      if (finfo->call_res_init)
+		res_init ();
+
+	      /* Done re-adding the watch.  Don't return, we may still
+		 have other files in this same directory, same watch
+		 descriptor, and need to process them.  */
+	    }
+	  /* Other events are ignored, and we move on to the next file.  */
 	  finfo = finfo->next;
         }
     }
@@ -1923,6 +1960,51 @@ clear_db_cache (bool *to_clear)
 	pthread_mutex_unlock (&dbs[dbcnt].prune_lock);
 	pthread_cond_signal (&dbs[dbcnt].prune_cond);
       }
+}
+
+int
+handle_inotify_events (void)
+{
+  bool to_clear[lastdb] = { false, };
+  union __inev inev;
+
+  /* Read all inotify events for files registered via
+     register_traced_file().  */
+  while (1)
+    {
+      /* Potentially read multiple events into buf.  */
+      ssize_t nb = TEMP_FAILURE_RETRY (read (inotify_fd,
+					     &inev.buf,
+					     sizeof (inev)));
+      if (nb < (ssize_t) sizeof (struct inotify_event))
+	{
+	  /* Not even 1 event.  */
+	  if (__glibc_unlikely (nb == -1 && errno != EAGAIN))
+	    return -1;
+	  /* Done reading events that are ready.  */
+	  break;
+	}
+      /* Process all events.  The normal inotify interface delivers
+	 complete events on a read and never a partial event.  */
+      char *eptr = &inev.buf[0];
+      ssize_t count;
+      while (1)
+	{
+	  /* Check which of the files changed.  */
+	  inotify_check_files (to_clear, &inev);
+	  count = sizeof (struct inotify_event) + inev.i.len;
+	  eptr += count;
+	  nb -= count;
+	  if (nb >= (ssize_t) sizeof (struct inotify_event))
+	    memcpy (&inev, eptr, nb);
+	  else
+	    break;
+	}
+      continue;
+    }
+  /* Actually perform the cache clearing.  */
+  clear_db_cache (to_clear);
+  return 0;
 }
 
 #endif
@@ -1983,24 +2065,8 @@ main_loop_poll (void)
 	  if (conns[0].revents != 0)
 	    {
 	      /* We have a new incoming connection.  Accept the connection.  */
-	      int fd;
-
-#ifndef __ASSUME_ACCEPT4
-	      fd = -1;
-	      if (have_accept4 >= 0)
-#endif
-		{
-		  fd = TEMP_FAILURE_RETRY (accept4 (sock, NULL, NULL,
+	      int fd = TEMP_FAILURE_RETRY (accept4 (sock, NULL, NULL,
 						    SOCK_NONBLOCK));
-#ifndef __ASSUME_ACCEPT4
-		  if (have_accept4 == 0)
-		    have_accept4 = fd != -1 || errno != ENOSYS ? 1 : -1;
-#endif
-		}
-#ifndef __ASSUME_ACCEPT4
-	      if (have_accept4 < 0)
-		fd = TEMP_FAILURE_RETRY (accept (sock, NULL, NULL));
-#endif
 
 	      /* Use the descriptor if we have not reached the limit.  */
 	      if (fd >= 0)
@@ -2031,42 +2097,20 @@ main_loop_poll (void)
 	    {
 	      if (conns[1].revents != 0)
 		{
-		  bool to_clear[lastdb] = { false, };
-		  union __inev inev;
-
-		  /* Read all inotify events for files registered via
-		     register_traced_file().  */
-		  while (1)
+		  int ret;
+		  ret = handle_inotify_events ();
+		  if (ret == -1)
 		    {
-		      ssize_t nb = TEMP_FAILURE_RETRY (read (inotify_fd, &inev,
-							     sizeof (inev)));
-		      if (nb < (ssize_t) sizeof (struct inotify_event))
-			{
-			  if (__builtin_expect (nb == -1 && errno != EAGAIN,
-						0))
-			    {
-			      /* Something went wrong when reading the inotify
-				 data.  Better disable inotify.  */
-			      dbg_log (_("\
-disabled inotify after read error %d"),
-				       errno);
-			      conns[1].fd = -1;
-			      firstfree = 1;
-			      if (nused == 2)
-				nused = 1;
-			      close (inotify_fd);
-			      inotify_fd = -1;
-			    }
-			  break;
-			}
-
-		      /* Check which of the files changed.  */
-		      inotify_check_files (to_clear, &inev);
+		      /* Something went wrong when reading the inotify
+			 data.  Better disable inotify.  */
+		      dbg_log (_("disabled inotify-based monitoring after read error %d"), errno);
+		      conns[1].fd = -1;
+		      firstfree = 1;
+		      if (nused == 2)
+			nused = 1;
+		      close (inotify_fd);
+		      inotify_fd = -1;
 		    }
-
-		  /* Actually perform the cache clearing.  */
-		  clear_db_cache (to_clear);
-
 		  --n;
 		}
 
@@ -2190,24 +2234,8 @@ main_loop_epoll (int efd)
 	if (revs[cnt].data.fd == sock)
 	  {
 	    /* A new connection.  */
-	    int fd;
-
-# ifndef __ASSUME_ACCEPT4
-	    fd = -1;
-	    if (have_accept4 >= 0)
-# endif
-	      {
-		fd = TEMP_FAILURE_RETRY (accept4 (sock, NULL, NULL,
+	    int fd = TEMP_FAILURE_RETRY (accept4 (sock, NULL, NULL,
 						  SOCK_NONBLOCK));
-# ifndef __ASSUME_ACCEPT4
-		if (have_accept4 == 0)
-		  have_accept4 = fd != -1 || errno != ENOSYS ? 1 : -1;
-# endif
-	      }
-# ifndef __ASSUME_ACCEPT4
-	    if (have_accept4 < 0)
-	      fd = TEMP_FAILURE_RETRY (accept (sock, NULL, NULL));
-# endif
 
 	    /* Use the descriptor if we have not reached the limit.  */
 	    if (fd >= 0)
@@ -2234,37 +2262,18 @@ main_loop_epoll (int efd)
 # ifdef HAVE_INOTIFY
 	else if (revs[cnt].data.fd == inotify_fd)
 	  {
-	    bool to_clear[lastdb] = { false, };
-	    union __inev inev;
-
-	    /* Read all inotify events for files registered via
-	       register_traced_file().  */
-	    while (1)
+	    int ret;
+	    ret = handle_inotify_events ();
+	    if (ret == -1)
 	      {
-		ssize_t nb = TEMP_FAILURE_RETRY (read (inotify_fd, &inev,
-						 sizeof (inev)));
-		if (nb < (ssize_t) sizeof (struct inotify_event))
-		  {
-		    if (__glibc_unlikely (nb == -1 && errno != EAGAIN))
-		      {
-			/* Something went wrong when reading the inotify
-			   data.  Better disable inotify.  */
-			dbg_log (_("disabled inotify after read error %d"),
-				 errno);
-			(void) epoll_ctl (efd, EPOLL_CTL_DEL, inotify_fd,
-					  NULL);
-			close (inotify_fd);
-			inotify_fd = -1;
-		      }
-		    break;
-		  }
-
-		/* Check which of the files changed.  */
-		inotify_check_files(to_clear, &inev);
+		/* Something went wrong when reading the inotify
+		   data.  Better disable inotify.  */
+		dbg_log (_("disabled inotify-based monitoring after read error %d"), errno);
+		(void) epoll_ctl (efd, EPOLL_CTL_DEL, inotify_fd, NULL);
+		close (inotify_fd);
+		inotify_fd = -1;
+		break;
 	      }
-
-	    /* Actually perform the cache clearing.  */
-	    clear_db_cache (to_clear);
 	  }
 # endif
 # ifdef HAVE_NETLINK
@@ -2301,7 +2310,9 @@ main_loop_epoll (int efd)
 	  no reply in too long of a time.  */
       time_t laststart = now - ACCEPT_TIMEOUT;
       assert (starttime[sock] == 0);
+# ifdef HAVE_INOTIFY
       assert (inotify_fd == -1 || starttime[inotify_fd] == 0);
+# endif
       assert (nl_status_fd == -1 || starttime[nl_status_fd] == 0);
       for (int cnt = highest; cnt > STDERR_FILENO; --cnt)
 	if (starttime[cnt] != 0 && starttime[cnt] < laststart)

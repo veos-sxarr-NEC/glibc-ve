@@ -33,7 +33,7 @@ do_test (void)
     "((((((((((.?))))))))))((((((((((.?))))))))))((((((((((.?))))))))))"
     "((((((((((.?))))))))))Log\\.13" };
 
-  int fd = open ("../ChangeLog.14", O_RDONLY);
+  int fd = open ("../ChangeLog.old/ChangeLog.14", O_RDONLY);
   if (fd < 0)
     {
       printf ("Couldn't open ChangeLog.14: %m\n");
@@ -244,6 +244,5 @@ do_test (void)
   return 0;
 }
 
-#define TIMEOUT 20
 #define TEST_FUNCTION do_test ()
 #include "../test-skeleton.c"

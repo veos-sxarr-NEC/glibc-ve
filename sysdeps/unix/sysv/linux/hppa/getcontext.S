@@ -1,5 +1,5 @@
 /* Get current user context.
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Helge Deller <deller@gmx.de>, 2008.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -129,9 +129,14 @@ ENTRY(__getcontext)
 	fstds	 %fr31, 0(%r1)
 
 	/* Prologue */
+	stw	%r2, -20(%sp)
+	.cfi_offset 2, -20
 	stwm	%r4, 64(%sp)
+	.cfi_def_cfa_offset -64
+	.cfi_offset 4, 0
 #ifdef PIC
 	stw	%r19, -32(%sp)
+	.cfi_offset 19, 32
 #endif
 
 	/* Set up the trampoline registers.
@@ -142,21 +147,26 @@ ENTRY(__getcontext)
 	stw	%r4, oR24(%r26)
 	stw	%r5, oR25(%r26)
 	stw	%r6, oR26(%r26)
+#ifdef PIC
+	addil	LT%__getcontext_ret, %r19
+	ldw     RT%__getcontext_ret(%r1), %r1
+#else
 	ldil	L%__getcontext_ret, %r1
 	ldo     R%__getcontext_ret(%r1), %r1
+#endif
 	stw	%r1, oR2(%r26)
 
 	/* Save the current signal mask.  */
 	/* sigprocmask(SIG_BLOCK, NULL, &ucp->uc_sigmask);  */
 	ldo	oSIGMASK(%r26), %r24
 	copy	%r0, %r25
-	bl	sigprocmask, %r2
+	bl	__sigprocmask, %r2
 	ldi	SIG_BLOCK, %r26
 
 	/* Epilogue */
 	ldw	-84(%sp), %r2
 #ifdef PIC
-	ldw	-96(%sp), %r19
+	ldw	-32(%sp), %r19
 #endif
 	bv	%r0(%r2)
 	ldwm	-64(%sp), %r4

@@ -23,6 +23,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const long double zero = 0.0L;
 
@@ -31,7 +32,7 @@ long double
 __ieee754_remainderl(long double x, long double p)
 {
 	int64_t hx,hp;
-	u_int64_t sx,lx,lp;
+	uint64_t sx,lx,lp;
 	long double p_half;
 	double xhi, xlo, phi, plo;
 
@@ -42,8 +43,14 @@ __ieee754_remainderl(long double x, long double p)
 	EXTRACT_WORDS64 (hp, phi);
 	EXTRACT_WORDS64 (lp, plo);
 	sx = hx&0x8000000000000000ULL;
+	lp ^= hp & 0x8000000000000000ULL;
 	hp &= 0x7fffffffffffffffLL;
+	lx ^= sx;
 	hx &= 0x7fffffffffffffffLL;
+	if (lp == 0x8000000000000000ULL)
+	  lp = 0;
+	if (lx == 0x8000000000000000ULL)
+	  lx = 0;
 
     /* purge off exception values */
 	if(hp==0) return (x*p)/(x*p);	/* p = 0 */
@@ -72,4 +79,4 @@ __ieee754_remainderl(long double x, long double p)
 	  x = -x;
 	return x;
 }
-strong_alias (__ieee754_remainderl, __remainderl_finite)
+libm_alias_finite (__ieee754_remainderl, __remainderl)

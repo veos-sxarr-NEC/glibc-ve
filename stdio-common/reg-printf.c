@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <limits.h>
 #include <printf.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 
 
 /* Array of functions indexed by format character.  */
@@ -32,16 +32,15 @@ __libc_lock_define_initialized (static, lock)
 
 int __register_printf_specifier (int, printf_function,
 				 printf_arginfo_size_function);
+libc_hidden_proto (__register_printf_specifier)
 int __register_printf_function (int, printf_function,
 				printf_arginfo_function);
 
 
 /* Register FUNC to be called to format SPEC specifiers.  */
 int
-__register_printf_specifier (spec, converter, arginfo)
-     int spec;
-     printf_function converter;
-     printf_arginfo_size_function arginfo;
+__register_printf_specifier (int spec, printf_function converter,
+			     printf_arginfo_size_function arginfo)
 {
   if (spec < 0 || spec > (int) UCHAR_MAX)
     {
@@ -74,15 +73,14 @@ __register_printf_specifier (spec, converter, arginfo)
 
   return result;
 }
+libc_hidden_def (__register_printf_specifier)
 weak_alias (__register_printf_specifier, register_printf_specifier)
 
 
 /* Register FUNC to be called to format SPEC specifiers.  */
 int
-__register_printf_function (spec, converter, arginfo)
-     int spec;
-     printf_function converter;
-     printf_arginfo_function arginfo;
+__register_printf_function (int spec, printf_function converter,
+			    printf_arginfo_function arginfo)
 {
   return __register_printf_specifier (spec, converter,
 				      (printf_arginfo_size_function*) arginfo);

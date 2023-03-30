@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <limits.h>
@@ -28,19 +28,13 @@
 char *__ttyname;
 
 static char *getttyname (int fd, dev_t mydev, ino_t myino,
-			 int save, int *dostat) internal_function;
+			 int save, int *dostat);
 
 
 libc_freeres_ptr (static char *getttyname_name);
 
 static char *
-internal_function
-getttyname (fd, mydev, myino, save, dostat)
-     int fd;
-     dev_t mydev;
-     ino_t myino;
-     int save;
-     int *dostat;
+getttyname (int fd, dev_t mydev, ino_t myino, int save, int *dostat)
 {
   static const char dev[] = "/dev";
   static size_t namelen;
@@ -101,8 +95,7 @@ getttyname (fd, mydev, myino, save, dostat)
 /* Return the pathname of the terminal FD is open on, or NULL on errors.
    The returned storage is good only until the next call to this function.  */
 char *
-ttyname (fd)
-     int fd;
+ttyname (int fd)
 {
   struct stat st;
   int dostat = 0;

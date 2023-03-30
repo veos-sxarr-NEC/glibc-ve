@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,8 +14,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#define FUNC roundf
-#define INSN "frinta"
-#include <s_frintf.c>
+#define NO_MATH_REDIRECT
+#include <math.h>
+#include <libm-alias-float.h>
+
+float
+__roundf (float x)
+{
+  return __builtin_roundf (x);
+}
+
+libm_alias_float (__round, round)

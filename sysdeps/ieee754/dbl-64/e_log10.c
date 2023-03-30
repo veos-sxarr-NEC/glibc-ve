@@ -45,6 +45,8 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <fix-int-fp-convert-zero.h>
+#include <libm-alias-finite.h>
 
 static const double two54 = 1.80143985094819840000e+16;         /* 0x43500000, 0x00000000 */
 static const double ivln10 = 4.34294481903251816668e-01;        /* 0x3FDBCB7B, 0x1526E50E */
@@ -56,7 +58,7 @@ __ieee754_log10 (double x)
 {
   double y, z;
   int32_t i, k, hx;
-  u_int32_t lx;
+  uint32_t lx;
 
   EXTRACT_WORDS (hx, lx, x);
 
@@ -64,7 +66,7 @@ __ieee754_log10 (double x)
   if (hx < 0x00100000)
     {                           /* x < 2**-1022  */
       if (__glibc_unlikely (((hx & 0x7fffffff) | lx) == 0))
-	return -two54 / (x - x);        /* log(+-0)=-inf */
+	return -two54 / fabs (x);	/* log(+-0)=-inf  */
       if (__glibc_unlikely (hx < 0))
 	return (x - x) / (x - x);       /* log(-#) = NaN */
       k -= 54;
@@ -74,12 +76,13 @@ __ieee754_log10 (double x)
   if (__glibc_unlikely (hx >= 0x7ff00000))
     return x + x;
   k += (hx >> 20) - 1023;
-  i = ((u_int32_t) k & 0x80000000) >> 31;
+  i = ((uint32_t) k & 0x80000000) >> 31;
   hx = (hx & 0x000fffff) | ((0x3ff - i) << 20);
   y = (double) (k + i);
+  if (FIX_INT_FP_CONVERT_ZERO && y == 0.0)
+    y = 0.0;
   SET_HIGH_WORD (x, hx);
   z = y * log10_2lo + ivln10 * __ieee754_log (x);
   return z + y * log10_2hi;
 }
-
-strong_alias (__ieee754_log10, __log10_finite)
+libm_alias_finite (__ieee754_log10, __log10)

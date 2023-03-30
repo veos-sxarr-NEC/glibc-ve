@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -31,11 +31,7 @@
 #define _IONBF 2 /* No buffering. */
 
 int
-_IO_setvbuf (fp, buf, mode, size)
-     _IO_FILE *fp;
-     char *buf;
-     int mode;
-     _IO_size_t size;
+_IO_setvbuf (FILE *fp, char *buf, int mode, size_t size)
 {
   int result;
   CHECK_FILE (fp, EOF);
@@ -43,7 +39,7 @@ _IO_setvbuf (fp, buf, mode, size)
   switch (mode)
     {
     case _IOFBF:
-      fp->_IO_file_flags &= ~(_IO_LINE_BUF|_IO_UNBUFFERED);
+      fp->_flags &= ~(_IO_LINE_BUF|_IO_UNBUFFERED);
       if (buf == NULL)
 	{
 	  if (fp->_IO_buf_base == NULL)
@@ -66,15 +62,15 @@ _IO_setvbuf (fp, buf, mode, size)
 		  result = EOF;
 		  goto unlock_return;
 		}
-	      fp->_IO_file_flags &= ~_IO_LINE_BUF;
+	      fp->_flags &= ~_IO_LINE_BUF;
 	    }
 	  result = 0;
 	  goto unlock_return;
 	}
       break;
     case _IOLBF:
-      fp->_IO_file_flags &= ~_IO_UNBUFFERED;
-      fp->_IO_file_flags |= _IO_LINE_BUF;
+      fp->_flags &= ~_IO_UNBUFFERED;
+      fp->_flags |= _IO_LINE_BUF;
       if (buf == NULL)
 	{
 	  result = 0;
@@ -82,8 +78,8 @@ _IO_setvbuf (fp, buf, mode, size)
 	}
       break;
     case _IONBF:
-      fp->_IO_file_flags &= ~_IO_LINE_BUF;
-      fp->_IO_file_flags |= _IO_UNBUFFERED;
+      fp->_flags &= ~_IO_LINE_BUF;
+      fp->_flags |= _IO_UNBUFFERED;
       buf = NULL;
       size = 0;
       break;
@@ -99,6 +95,4 @@ unlock_return:
 }
 libc_hidden_def (_IO_setvbuf)
 
-#ifdef weak_alias
 weak_alias (_IO_setvbuf, setvbuf)
-#endif

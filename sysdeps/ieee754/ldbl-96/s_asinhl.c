@@ -29,8 +29,11 @@ static char rcsid[] = "$NetBSD: $";
  *		  := signl(x)*log1pl(|x| + x^2/(1 + sqrtl(1+x^2)))
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-ldouble.h>
 
 static const long double
 one =  1.000000000000000000000e+00L, /* 0x3FFF, 0x00000000, 0x00000000 */
@@ -44,6 +47,7 @@ long double __asinhl(long double x)
 	GET_LDOUBLE_EXP(hx,x);
 	ix = hx&0x7fff;
 	if(__builtin_expect(ix< 0x3fde, 0)) {	/* |x|<2**-34 */
+	    math_check_force_underflow (x);
 	    if(huge+x>one) return x;	/* return x inexact except 0 */
 	}
 	if(__builtin_expect(ix>0x4020,0)) {		/* |x| > 2**34 */
@@ -52,12 +56,12 @@ long double __asinhl(long double x)
 	} else {
 	    long double xa = fabsl(x);
 	    if (ix>0x4000) {	/* 2**34 > |x| > 2.0 */
-		w = __ieee754_logl(2.0*xa+one/(__ieee754_sqrtl(xa*xa+one)+xa));
+		w = __ieee754_logl(2.0*xa+one/(sqrtl(xa*xa+one)+xa));
 	    } else {		/* 2.0 > |x| > 2**-28 */
 		t = xa*xa;
-		w =__log1pl(xa+t/(one+__ieee754_sqrtl(one+t)));
+		w =__log1pl(xa+t/(one+sqrtl(one+t)));
 	    }
 	}
-	return __copysignl(w, x);
+	return copysignl(w, x);
 }
-weak_alias (__asinhl, asinhl)
+libm_alias_ldouble (__asinh, asinh)

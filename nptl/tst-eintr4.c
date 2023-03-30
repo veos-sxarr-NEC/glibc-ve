@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -22,6 +22,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <support/check.h>
+#include <support/xthread.h>
 
 #include "eintr.c"
 
@@ -34,22 +36,13 @@ do_test (void)
   setup_eintr (SIGUSR1, &self);
 
   pthread_barrier_t b;
-  if (pthread_barrier_init (&b, NULL, 2) != 0)
-    {
-      puts ("barrier_init failed");
-      exit (1);
-    }
+  xpthread_barrier_init (&b, NULL, 2);
 
+  delayed_exit (1);
   /* This call must never return.  */
-  int e = pthread_barrier_wait (&b);
-
-  if (e == EINTR)
-    puts ("pthread_join returned with EINTR");
-
-  return 0;
+  xpthread_barrier_wait (&b);
+  puts ("error: pthread_barrier_wait returned");
+  return 1;
 }
 
-#define EXPECTED_SIGNAL SIGALRM
-#define TIMEOUT 1
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

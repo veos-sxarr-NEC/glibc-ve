@@ -1,5 +1,5 @@
 /* tcflush -- Flush pending data on termios file descriptor.  Linux version.
-   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+   Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <termios.h>
@@ -22,9 +22,7 @@
 
 /* Flush pending data on FD.  */
 int
-tcflush (fd, queue_selector)
-     int fd;
-     int queue_selector;
+tcflush (int fd, int queue_selector)
 {
   return __ioctl (fd, TCFLSH, queue_selector);
 }

@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -32,11 +32,9 @@
 #include <stdlib.h>
 
 
-_IO_FILE *
+FILE *
 attribute_compat_text_section
-_IO_old_fopen (filename, mode)
-     const char *filename;
-     const char *mode;
+_IO_old_fopen (const char *filename, const char *mode)
 {
   struct locked_FILE
   {
@@ -52,13 +50,10 @@ _IO_old_fopen (filename, mode)
   new_f->fp.file._file._lock = &new_f->lock;
 #endif
   _IO_old_init (&new_f->fp.file._file, 0);
-  _IO_JUMPS ((struct _IO_FILE_plus *) &new_f->fp) = &_IO_old_file_jumps;
-  _IO_old_file_init ((struct _IO_FILE_plus *) &new_f->fp);
-#if  !_IO_UNIFIED_JUMPTABLES
-  new_f->fp.vtable = NULL;
-#endif
-  if (_IO_old_file_fopen ((_IO_FILE *) &new_f->fp, filename, mode) != NULL)
-    return (_IO_FILE *) &new_f->fp;
+  _IO_JUMPS_FILE_plus (&new_f->fp) = &_IO_old_file_jumps;
+  _IO_old_file_init_internal ((struct _IO_FILE_plus *) &new_f->fp);
+  if (_IO_old_file_fopen ((FILE *) &new_f->fp, filename, mode) != NULL)
+    return (FILE *) &new_f->fp;
   _IO_un_link ((struct _IO_FILE_plus *) &new_f->fp);
   free (new_f);
   return NULL;

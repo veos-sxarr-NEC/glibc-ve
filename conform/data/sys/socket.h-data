@@ -1,4 +1,4 @@
-#if !defined ISO && !defined ISO99 && !defined ISO11 && !defined POSIX && !defined XPG3
+#if !defined ISO && !defined ISO99 && !defined ISO11 && !defined POSIX && !defined XPG4
 type socklen_t
 
 type sa_family_t
@@ -22,9 +22,10 @@ type {struct msghdr}
 element {struct msghdr} {void*} msg_name
 element {struct msghdr} socklen_t msg_namelen
 element {struct msghdr} {struct iovec*} msg_iov
-element {struct msghdr} int msg_iovlen
+// Bug 16919: wrong type for msg_iovlen and msg_controllen members.
+xfail-element {struct msghdr} int msg_iovlen
 element {struct msghdr} {void*} msg_control
-element {struct msghdr} socklen_t msg_controllen
+xfail-element {struct msghdr} socklen_t msg_controllen
 element {struct msghdr} int msg_flags
 
 type {struct iovec}
@@ -34,7 +35,8 @@ element {struct iovec} size_t iov_len
 
 type {struct cmsghdr}
 
-element {struct cmsghdr} socklen_t cmsg_len
+// Bug 16919: wrong type for cmsg_len member.
+xfail-element {struct cmsghdr} socklen_t cmsg_len
 element {struct cmsghdr} int cmsg_level
 element {struct cmsghdr} int cmsg_type
 
@@ -111,7 +113,7 @@ function int setsockopt (int, int, int, const void*, socklen_t)
 function int shutdown (int, int)
 function int socket (int, int, int)
 function int socketpair (int, int, int, int[2])
-#if !defined XPG4 && !defined UNIX98
+#if !defined XPG42 && !defined UNIX98
 function int sockatmark (int)
 #endif
 
@@ -134,4 +136,5 @@ allow MSG_*
 allow PF_*
 allow SCM_*
 allow SHUT_*
+allow *_t
 #endif

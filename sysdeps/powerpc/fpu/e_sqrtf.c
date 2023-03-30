@@ -1,5 +1,5 @@
 /* Single-precision floating point square root.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,15 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
+#include <fenv.h>
 #include <fenv_libc.h>
 #include <inttypes.h>
 #include <stdint.h>
 #include <sysdep.h>
 #include <ldsodefs.h>
+#include <libm-alias-finite.h>
 
 #ifndef _ARCH_PPCSQ
 static const float almost_half = 0.50000006;	/* 0.5 + 2^-24 */
@@ -87,26 +89,28 @@ __slow_ieee754_sqrtf (float x)
 	  /* Here we have three Newton-Raphson iterations each of a
 	     division and a square root and the remainder of the
 	     argument reduction, all interleaved.   */
-	  sd = -(sg * sg - sx);
+	  sd = -__builtin_fmaf (sg, sg, -sx);
 	  fsgi = (xi + 0x40000000) >> 1 & 0x7f800000;
 	  sy2 = sy + sy;
-	  sg = sy * sd + sg;	/* 16-bit approximation to sqrt(sx). */
-	  e = -(sy * sg - almost_half);
+	  sg = __builtin_fmaf (sy, sd, sg);	/* 16-bit approximation to
+						   sqrt(sx). */
+	  e = -__builtin_fmaf (sy, sg, -almost_half);
 	  SET_FLOAT_WORD (fsg, fsgi);
-	  sd = -(sg * sg - sx);
-	  sy = sy + e * sy2;
+	  sd = -__builtin_fmaf (sg, sg, -sx);
+	  sy = __builtin_fmaf (e, sy2, sy);
 	  if ((xi & 0x7f800000) == 0)
 	    goto denorm;
 	  shx = sx * fsg;
-	  sg = sg + sy * sd;	/* 32-bit approximation to sqrt(sx),
-				   but perhaps rounded incorrectly.  */
+	  sg = __builtin_fmaf (sy, sd, sg);	/* 32-bit approximation to
+						   sqrt(sx), but perhaps
+						   rounded incorrectly.  */
 	  sy2 = sy + sy;
 	  g = sg * fsg;
-	  e = -(sy * sg - almost_half);
-	  d = -(g * sg - shx);
-	  sy = sy + e * sy2;
+	  e = -__builtin_fmaf (sy, sg, -almost_half);
+	  d = -__builtin_fmaf (g, sg, -shx);
+	  sy = __builtin_fmaf (e, sy2, sy);
 	  fesetenv_register (fe);
-	  return g + sy * d;
+	  return __builtin_fmaf (sy, d, g);
 	denorm:
 	  /* For denormalised numbers, we normalise, calculate the
 	     square root, and return an adjusted result.  */
@@ -135,7 +139,7 @@ __slow_ieee754_sqrtf (float x)
 float
 __ieee754_sqrtf (float x)
 {
-  double z;
+  float z;
 
 #ifdef _ARCH_PPCSQ
   asm ("fsqrts	%0,%1\n" :"=f" (z):"f" (x));
@@ -145,4 +149,4 @@ __ieee754_sqrtf (float x)
 
   return z;
 }
-strong_alias (__ieee754_sqrtf, __sqrtf_finite)
+libm_alias_finite (__ieee754_sqrtf, __sqrtf)

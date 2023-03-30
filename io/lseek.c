@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -21,10 +21,7 @@
 
 /* Seek to OFFSET on FD, starting from WHENCE.  */
 off_t
-__libc_lseek (fd, offset, whence)
-     int fd;
-     off_t offset;
-     int whence;
+__libc_lseek (int fd, off_t offset, int whence)
 {
   if (fd < 0)
     {

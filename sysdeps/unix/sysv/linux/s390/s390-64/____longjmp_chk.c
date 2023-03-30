@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sysdep.h>
@@ -34,7 +34,7 @@
     {									\
       uintptr_t cur_sp;							\
       uintptr_t new_sp = env->__gregs[9];				\
-      __asm ("lgr %0, %%r15" : "=r" (cur_sp));				\
+      __asm__ ("lgr %0, %%r15" : "=r" (cur_sp));			\
       new_sp ^= guard;							\
       if (new_sp < cur_sp)						\
 	{								\

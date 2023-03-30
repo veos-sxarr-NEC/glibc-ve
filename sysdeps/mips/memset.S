@@ -1,4 +1,4 @@
-/* Copyright (C) 2013-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifdef ANDROID_CHANGES
 # include "machine/asm.h"
@@ -24,7 +24,7 @@
 # include <regdef.h>
 # include <sys/asm.h>
 # define PREFETCH_STORE_HINT PREFETCH_HINT_PREPAREFORSTORE
-#elif _COMPILING_NEWLIB
+#elif defined _COMPILING_NEWLIB
 # include "machine/asm.h"
 # include "machine/regdef.h"
 # define PREFETCH_STORE_HINT PREFETCH_HINT_PREPAREFORSTORE
@@ -54,13 +54,6 @@
 # endif
 #endif
 
-#if __mips_isa_rev > 5
-# if (PREFETCH_STORE_HINT == PREFETCH_HINT_PREPAREFORSTORE)
-#  undef PREFETCH_STORE_HINT
-#  define PREFETCH_STORE_HINT PREFETCH_HINT_STORE_STREAMED
-# endif
-# define R6_CODE
-#endif
 
 /* Some asm.h files do not have the L macro definition.  */
 #ifndef L
@@ -159,6 +152,14 @@
 # define PREFETCH_FOR_STORE(offset, reg)
 #endif
 
+#if __mips_isa_rev > 5
+# if (PREFETCH_STORE_HINT == PREFETCH_HINT_PREPAREFORSTORE)
+#  undef PREFETCH_STORE_HINT
+#  define PREFETCH_STORE_HINT PREFETCH_HINT_STORE_STREAMED
+# endif
+# define R6_CODE
+#endif
+
 /* Allow the routine to be named something else if desired.  */
 #ifndef MEMSET_NAME
 # define MEMSET_NAME memset
@@ -170,14 +171,14 @@
 
 #ifdef USE_DOUBLE
 # define C_ST	sd
-# if __MIPSEB
+# ifdef __MIPSEB
 #  define C_STHI	sdl	/* high part is left in big-endian	*/
 # else
 #  define C_STHI	sdr	/* high part is right in little-endian	*/
 # endif
 #else
 # define C_ST	sw
-# if __MIPSEB
+# ifdef __MIPSEB
 #  define C_STHI	swl	/* high part is left in big-endian	*/
 # else
 #  define C_STHI	swr	/* high part is right in little-endian	*/
@@ -369,7 +370,7 @@ L(skip_pref):
 	move	a2,t8
 
 /* Here we have dest word-aligned but less than 64-bytes or 128 bytes to go.
-   Check for a 32(64) byte chunk and copy if if there is one.  Otherwise
+   Check for a 32(64) byte chunk and copy if there is one.  Otherwise
    jump down to L(chk1w) to handle the tail end of the copy.  */
 L(chkw):
 	andi	t8,a2,NSIZEMASK	/* is there a 32-byte/64-byte chunk.  */

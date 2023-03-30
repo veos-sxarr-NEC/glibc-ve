@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -30,7 +30,8 @@
 #include <sys/stat.h>
 #include "semaphoreP.h"
 #include <shm-directory.h>
-
+#include <futex-internal.h>
+#include <libc-lock.h>
 
 /* Comparison function for search of existing mapping.  */
 int
@@ -79,7 +80,8 @@ check_add_mapping (const char *name, size_t namelen, int fd, sem_t *existing)
       fake->dev = st.st_dev;
       fake->ino = st.st_ino;
 
-      struct inuse_sem **foundp = tfind (fake, &__sem_mappings, __sem_search);
+      struct inuse_sem **foundp = __tfind (fake, &__sem_mappings,
+					   __sem_search);
       if (foundp != NULL)
 	{
 	  /* There is already a mapping.  Use it.  */
@@ -108,7 +110,7 @@ check_add_mapping (const char *name, size_t namelen, int fd, sem_t *existing)
 
 	      /* Insert the new value.  */
 	      if (existing != MAP_FAILED
-		  && tsearch (newp, &__sem_mappings, __sem_search) != NULL)
+		  && __tsearch (newp, &__sem_mappings, __sem_search) != NULL)
 		/* Successful.  */
 		result = existing;
 	      else
@@ -140,8 +142,23 @@ sem_open (const char *name, int oflag, ...)
   int fd;
   sem_t *result;
 
+  /* Check that shared futexes are supported.  */
+  int err = futex_supports_pshared (PTHREAD_PROCESS_SHARED);
+  if (err != 0)
+    {
+      __set_errno (err);
+      return SEM_FAILED;
+    }
+
   /* Create the name of the final file in local variable SHM_NAME.  */
   SHM_GET_NAME (EINVAL, SEM_FAILED, SEM_SHM_PREFIX);
+
+  /* Disable asynchronous cancellation.  */
+#ifdef __libc_ptf_call
+  int state;
+  __libc_ptf_call (__pthread_setcancelstate,
+                   (PTHREAD_CANCEL_DISABLE, &state), 0);
+#endif
 
   /* If the semaphore object has to exist simply open it.  */
   if ((oflag & O_CREAT) == 0 || (oflag & O_EXCL) == 0)
@@ -183,7 +200,8 @@ sem_open (const char *name, int oflag, ...)
       if (value > SEM_VALUE_MAX)
 	{
 	  __set_errno (EINVAL);
-	  return SEM_FAILED;
+	  result = SEM_FAILED;
+	  goto out;
 	}
 
       /* Create the initial file content.  */
@@ -199,8 +217,11 @@ sem_open (const char *name, int oflag, ...)
       sem.newsem.value = value << SEM_VALUE_SHIFT;
       sem.newsem.nwaiters = 0;
 #endif
+      /* pad is used as a mutex on pre-v9 sparc and ignored otherwise.  */
+      sem.newsem.pad = 0;
+
       /* This always is a shared semaphore.  */
-      sem.newsem.private = LLL_SHARED;
+      sem.newsem.private = FUTEX_SHARED;
 
       /* Initialize the remaining bytes as well.  */
       memset ((char *) &sem.initsem + sizeof (struct new_sem), '\0',
@@ -221,7 +242,10 @@ sem_open (const char *name, int oflag, ...)
 	     mode cannot later be set since then we cannot apply the
 	     file create mask.  */
 	  if (__mktemp (tmpfname) == NULL)
-	    return SEM_FAILED;
+	    {
+	      result = SEM_FAILED;
+	      goto out;
+	    }
 
 	  /* Open the file.  Make sure we do not overwrite anything.  */
 	  fd = __libc_open (tmpfname, O_RDWR | O_CREAT | O_EXCL, mode);
@@ -235,19 +259,29 @@ sem_open (const char *name, int oflag, ...)
 		  __set_errno (EAGAIN);
 		}
 
-	      return SEM_FAILED;
+	      result = SEM_FAILED;
+	      goto out;
 	    }
 
 	  /* We got a file.  */
 	  break;
 	}
 
+#ifdef __ve__
+      if (TEMP_FAILURE_RETRY (write (fd, &sem.initsem, sizeof (sem_t)))
+	  == sizeof (sem_t)
+	  /* Map the sem_t structure from the file.  */
+	  && (result = (sem_t *) mmap (NULL, sizeof (sem_t),
+				       PROT_READ | PROT_WRITE, MAP_SHARED,
+				       fd, 0)) != MAP_FAILED)
+#else
       if (TEMP_FAILURE_RETRY (__libc_write (fd, &sem.initsem, sizeof (sem_t)))
 	  == sizeof (sem_t)
 	  /* Map the sem_t structure from the file.  */
 	  && (result = (sem_t *) mmap (NULL, sizeof (sem_t),
 				       PROT_READ | PROT_WRITE, MAP_SHARED,
 				       fd, 0)) != MAP_FAILED)
+#endif
 	{
 	  /* Create the file.  Don't overwrite an existing file.  */
 	  if (link (tmpfname, shm_name) != 0)
@@ -295,6 +329,11 @@ sem_open (const char *name, int oflag, ...)
       __libc_close (fd);
       errno = save;
     }
+
+out:
+#ifdef __libc_ptf_call
+  __libc_ptf_call (__pthread_setcancelstate, (state, NULL), 0);
+#endif
 
   return result;
 }

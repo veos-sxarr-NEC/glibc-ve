@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -29,23 +29,21 @@
 #include <limits.h>
 
 int
-_IO_puts (str)
-     const char *str;
+_IO_puts (const char *str)
 {
   int result = EOF;
-  _IO_size_t len = strlen (str);
-  _IO_acquire_lock (_IO_stdout);
+  size_t len = strlen (str);
+  _IO_acquire_lock (stdout);
 
-  if ((_IO_vtable_offset (_IO_stdout) != 0
-       || _IO_fwide (_IO_stdout, -1) == -1)
-      && _IO_sputn (_IO_stdout, str, len) == len
-      && _IO_putc_unlocked ('\n', _IO_stdout) != EOF)
+  if ((_IO_vtable_offset (stdout) != 0
+       || _IO_fwide (stdout, -1) == -1)
+      && _IO_sputn (stdout, str, len) == len
+      && _IO_putc_unlocked ('\n', stdout) != EOF)
     result = MIN (INT_MAX, len + 1);
 
-  _IO_release_lock (_IO_stdout);
+  _IO_release_lock (stdout);
   return result;
 }
 
-#ifdef weak_alias
 weak_alias (_IO_puts, puts)
-#endif
+libc_hidden_def (_IO_puts)

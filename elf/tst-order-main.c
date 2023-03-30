@@ -2,9 +2,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-int
-main( int argc, char *argv[] )
+static int
+do_test (void)
 {
   printf( "main\n" );
   exit(EXIT_SUCCESS);
 }
+
+#include <support/test-driver.c>

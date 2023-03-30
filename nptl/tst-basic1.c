@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,13 +14,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
 
+
+static int do_test (void);
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
 
 static pid_t pid;
 
@@ -29,7 +34,7 @@ tf (void *a)
 {
   if (getpid () != pid)
     {
-      write (2, "pid mismatch\n", 13);
+      write_message ("pid mismatch\n");
       _exit (1);
     }
 
@@ -49,7 +54,7 @@ do_test (void)
   for (i = 0; i < N; ++i)
     if (pthread_create (&t[i], NULL, tf, (void *) (long int) (i + 1)) != 0)
       {
-	write (2, "create failed\n", 14);
+	write_message ("create failed\n");
 	_exit (1);
       }
     else
@@ -66,7 +71,7 @@ do_test (void)
 	}
       else if (r != (void *) (long int) (i + 1))
 	{
-	  write (2, "result wrong\n", 13);
+	  write_message ("result wrong\n");
 	  _exit (1);
 	}
       else
@@ -75,7 +80,3 @@ do_test (void)
 
   return 0;
 }
-
-
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"

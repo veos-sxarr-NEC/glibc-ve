@@ -1,4 +1,5 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* mmap - map files or devices into memory.  Linux version.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 1999.
 
@@ -14,47 +15,55 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <string.h>
-
 #include <sysdep.h>
-#include <sys/syscall.h>
+#include <mmap_internal.h>
 
-/* This is always 12, even on architectures where PAGE_SHIFT != 12.  */
-#if MMAP2_PAGE_SHIFT == -1
-static int page_shift;
+#ifdef __NR_mmap2
+/* To avoid silent truncation of offset when using mmap2, do not accept
+   offset larger than 1 << (page_shift + off_t bits).  For archictures with
+   32 bits off_t and page size of 4096 it would be 1^44.  */
+# define MMAP_OFF_HIGH_MASK \
+  ((-(MMAP2_PAGE_UNIT << 1) << (8 * sizeof (off_t) - 1)))
 #else
-# ifndef MMAP2_PAGE_SHIFT
-#  define MMAP2_PAGE_SHIFT 12
-# endif
-#define page_shift MMAP2_PAGE_SHIFT
+/* Some ABIs might use __NR_mmap while having sizeof (off_t) smaller than
+   sizeof (off64_t) (currently only MIPS64n32).  For this case just set
+   zero the higher bits so mmap with large offset does not fail.  */
+# define MMAP_OFF_HIGH_MASK  0x0
 #endif
 
+#define MMAP_OFF_MASK (MMAP_OFF_HIGH_MASK | MMAP_OFF_LOW_MASK)
+
+/* An architecture may override this.  */
+#ifndef MMAP_PREPARE
+# define MMAP_PREPARE(addr, len, prot, flags, fd, offset)
+#endif
 
 void *
 __mmap64 (void *addr, size_t len, int prot, int flags, int fd, off64_t offset)
 {
-#if MMAP2_PAGE_SHIFT == -1
-  if (page_shift == 0)
-    {
-      int page_size = __getpagesize ();
-      page_shift = __ffs (page_size) - 1;
-    }
+  MMAP_CHECK_PAGE_UNIT ();
+
+  if (offset & MMAP_OFF_MASK)
+    return (void *) INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
+
+  MMAP_PREPARE (addr, len, prot, flags, fd, offset);
+#ifdef __NR_mmap2
+  return (void *) MMAP_CALL (mmap2, addr, len, prot, flags, fd,
+			     (off_t) (offset / MMAP2_PAGE_UNIT));
+#else
+  return (void *) MMAP_CALL (mmap, addr, len, prot, flags, fd, offset);
 #endif
-  if (offset & ((1 << page_shift) - 1))
-    {
-      __set_errno (EINVAL);
-      return MAP_FAILED;
-    }
-  void *result;
-  result = (void *)
-    INLINE_SYSCALL (mmap2, 6, addr,
-		    len, prot, flags, fd,
-		    (off_t) (offset >> page_shift));
-  return result;
 }
 weak_alias (__mmap64, mmap64)
+libc_hidden_def (__mmap64)
+
+#ifdef __OFF_T_MATCHES_OFF64_T
+weak_alias (__mmap64, mmap)
+weak_alias (__mmap64, __mmap)
+libc_hidden_def (__mmap)
+#endif

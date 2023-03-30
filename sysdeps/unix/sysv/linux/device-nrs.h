@@ -1,5 +1,5 @@
 /* Device numbers of devices used in the implementation.  Linux version.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _DEVICE_NRS_H
 #define _DEVICE_NRS_H	1
@@ -39,7 +39,7 @@
 
 /* Test whether given device is a tty.  */
 #define DEV_TTY_P(statp) \
-  ({ int __dev_major = major ((statp)->st_rdev);			      \
+  ({ int __dev_major = __gnu_dev_major ((statp)->st_rdev);		      \
      __dev_major >= DEV_TTY_LOW_MAJOR && __dev_major <= DEV_TTY_HIGH_MAJOR; })
 
 #endif	/* device-nrs.h */

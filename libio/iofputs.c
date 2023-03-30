@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,11 +28,9 @@
 #include <string.h>
 
 int
-_IO_fputs (str, fp)
-      const char *str;
-      _IO_FILE *fp;
+_IO_fputs (const char *str, FILE *fp)
 {
-  _IO_size_t len = strlen (str);
+  size_t len = strlen (str);
   int result = EOF;
   CHECK_FILE (fp, EOF);
   _IO_acquire_lock (fp);
@@ -44,11 +42,12 @@ _IO_fputs (str, fp)
 }
 libc_hidden_def (_IO_fputs)
 
-#ifdef weak_alias
 weak_alias (_IO_fputs, fputs)
+libc_hidden_weak (fputs)
 
 # ifndef _IO_MTSAFE_IO
+strong_alias (_IO_fputs, __fputs_unlocked)
+libc_hidden_def (__fputs_unlocked)
 weak_alias (_IO_fputs, fputs_unlocked)
 libc_hidden_ver (_IO_fputs, fputs_unlocked)
 # endif
-#endif

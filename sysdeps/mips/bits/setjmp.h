@@ -1,5 +1,5 @@
 /* Define the machine-dependent type `jmp_buf'.  MIPS version.
-   Copyright (C) 1992-2015 Free Software Foundation, Inc.
+   Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _MIPS_BITS_SETJMP_H
 #define _MIPS_BITS_SETJMP_H 1
@@ -29,19 +29,19 @@ typedef struct __jmp_buf_internal_tag
   {
 #if _MIPS_SIM == _ABIO32
     /* Program counter.  */
-    __ptr_t __pc;
+    void *__pc;
 
     /* Stack pointer.  */
-    __ptr_t __sp;
+    void *__sp;
 
     /* Callee-saved registers s0 through s7.  */
     int __regs[8];
 
     /* The frame pointer.  */
-    __ptr_t __fp;
+    void *__fp;
 
     /* The global pointer.  */
-    __ptr_t __gp;
+    void *__gp;
 #else
     /* Program counter.  */
     __extension__ long long __pc;

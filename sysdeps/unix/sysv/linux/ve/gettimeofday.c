@@ -1,5 +1,5 @@
 /* gettimeofday - get the time.  Linux/x86 version.
-   Copyright (C) 2015 Free Software Foundation, Inc.
+   Copyright (C) 2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,9 +15,10 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
-#include <sys/time.h>
+#define VE_GETTIMEOFDAY 1
+#include <time.h>
 # include <sysdep.h>
 # include <errno.h>
 
@@ -28,7 +29,7 @@ static struct timeval base_tv = {0};
 static struct timeval prev_tv = {0};
 static struct timezone base_tz = {0};
 static uint64_t base_stm = 0ULL;
-static volatile int lock = LLL_LOCK_INITIALIZER;
+static int lock = LLL_LOCK_INITIALIZER;
 
 ssize_t _ve_get_ve_info(const char *name, char *buffer, size_t size)
 {
@@ -167,7 +168,7 @@ __gettimeofday (struct timeval *tv, struct timezone *tz)
 }
 
 
-libc_hidden_def (__gettimeofday);
+//libc_hidden_def (__gettimeofday);
 
 weak_alias (__gettimeofday, gettimeofday);
-libc_hidden_weak (gettimeofday);
+//libc_hidden_weak (gettimeofday);

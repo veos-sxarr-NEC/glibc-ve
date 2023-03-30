@@ -10,6 +10,22 @@
 #include <stdlib.h>
 #include "crypt.h"
 
+/* This file tests the deprecated setkey/encrypt interface.  */
+#include <shlib-compat.h>
+#if TEST_COMPAT (libcrypt, GLIBC_2_0, GLIBC_2_28)
+
+#define libcrypt_version_reference(symbol, version) \
+  _libcrypt_version_reference (symbol, VERSION_libcrypt_##version)
+#define _libcrypt_version_reference(symbol, version) \
+  __libcrypt_version_reference (symbol, version)
+#define __libcrypt_version_reference(symbol, version) \
+  __asm__ (".symver " #symbol ", " #symbol "@" #version)
+
+extern void setkey (const char *);
+extern void encrypt (const char *, int);
+libcrypt_version_reference (setkey, GLIBC_2_0);
+libcrypt_version_reference (encrypt, GLIBC_2_0);
+
 int totfails = 0;
 
 int main (int argc, char *argv[]);
@@ -17,7 +33,8 @@ void get8 (char *cp);
 void put8 (char *cp);
 void good_bye (void) __attribute__ ((noreturn));
 
-void good_bye ()
+void
+good_bye (void)
 {
   if(totfails == 0) {
     printf("Passed DES validation suite\n");
@@ -29,9 +46,7 @@ void good_bye ()
 }
 
 int
-main(argc, argv)
-     int argc;
-     char *argv[];
+main (int argc, char *argv[])
 {
 	char key[64],plain[64],cipher[64],answer[64];
 	int i;
@@ -80,8 +95,7 @@ main(argc, argv)
 	good_bye();
 }
 void
-get8(cp)
-char *cp;
+get8 (char *cp)
 {
 	int i,j,t;
 
@@ -95,8 +109,7 @@ char *cp;
 	}
 }
 void
-put8(cp)
-char *cp;
+put8 (char *cp)
 {
 	int i,j,t;
 
@@ -107,3 +120,13 @@ char *cp;
 	  printf("%02x", t);
 	}
 }
+
+#else /* encrypt and setkey are not available.  */
+
+int
+main (void)
+{
+  return 77; /* UNSUPPORTED */
+}
+
+#endif

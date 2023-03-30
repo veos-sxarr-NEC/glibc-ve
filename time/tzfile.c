@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <limits.h>
@@ -25,8 +25,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <stdint.h>
+#include <alloc_buffer.h>
 
-#define	NOID
 #include <timezone/tzfile.h>
 
 int __use_tzfile;
@@ -36,7 +36,7 @@ static time_t tzfile_mtime;
 
 struct ttinfo
   {
-    long int offset;		/* Seconds east of GMT.  */
+    int offset;			/* Seconds east of GMT.  */
     unsigned char isdst;	/* Used to set tm_isdst.  */
     unsigned char idx;		/* Index into `zone_names'.  */
     unsigned char isstd;	/* Transition times are in standard time.  */
@@ -45,14 +45,12 @@ struct ttinfo
 
 struct leap
   {
-    time_t transition;		/* Time the transition takes effect.  */
+    __time64_t transition;	/* Time the transition takes effect.  */
     long int change;		/* Seconds of correction to apply.  */
   };
 
-static void compute_tzname_max (size_t) internal_function;
-
 static size_t num_transitions;
-libc_freeres_ptr (static time_t *transitions);
+libc_freeres_ptr (static __time64_t *transitions);
 static unsigned char *type_idxs;
 static size_t num_types;
 static struct ttinfo *types;
@@ -108,16 +106,12 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
   struct tzhead tzhead;
   size_t chars;
   size_t i;
-  size_t total_size;
-  size_t types_idx;
-  size_t leaps_idx;
   int was_using_tzfile = __use_tzfile;
   int trans_width = 4;
-  size_t tzspec_len;
   char *new = NULL;
 
-  if (sizeof (time_t) != 4 && sizeof (time_t) != 8)
-    abort ();
+  _Static_assert (sizeof (__time64_t) == 8,
+		  "__time64_t must be eight bytes");
 
   __use_tzfile = 0;
 
@@ -171,10 +165,7 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
 
   /* Get information about the file we are actually using.  */
   if (fstat64 (__fileno (f), &st) != 0)
-    {
-      fclose (f);
-      goto ret_free_transitions;
-    }
+    goto lose;
 
   free ((void *) transitions);
   transitions = NULL;
@@ -200,9 +191,10 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
   num_isstd = (size_t) decode (tzhead.tzh_ttisstdcnt);
   num_isgmt = (size_t) decode (tzhead.tzh_ttisgmtcnt);
 
-  /* For platforms with 64-bit time_t we use the new format if available.  */
-  if (sizeof (time_t) == 8 && trans_width == 4
-      && tzhead.tzh_version[0] != '\0')
+  if (__glibc_unlikely (num_isstd > num_types || num_isgmt > num_types))
+    goto lose;
+
+  if (trans_width == 4 && tzhead.tzh_version[0] != '\0')
     {
       /* We use the 8-byte format.  */
       trans_width = 8;
@@ -220,33 +212,10 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
       goto read_again;
     }
 
-  if (__builtin_expect (num_transitions
-			> ((SIZE_MAX - (__alignof__ (struct ttinfo) - 1))
-			   / (sizeof (time_t) + 1)), 0))
-    goto lose;
-  total_size = num_transitions * (sizeof (time_t) + 1);
-  total_size = ((total_size + __alignof__ (struct ttinfo) - 1)
-		& ~(__alignof__ (struct ttinfo) - 1));
-  types_idx = total_size;
-  if (__builtin_expect (num_types
-			> (SIZE_MAX - total_size) / sizeof (struct ttinfo), 0))
-    goto lose;
-  total_size += num_types * sizeof (struct ttinfo);
-  if (__glibc_unlikely (chars > SIZE_MAX - total_size))
-    goto lose;
-  total_size += chars;
-  if (__builtin_expect (__alignof__ (struct leap) - 1
-			> SIZE_MAX - total_size, 0))
-    goto lose;
-  total_size = ((total_size + __alignof__ (struct leap) - 1)
-		& ~(__alignof__ (struct leap) - 1));
-  leaps_idx = total_size;
-  if (__builtin_expect (num_leaps
-			> (SIZE_MAX - total_size) / sizeof (struct leap), 0))
-    goto lose;
-  total_size += num_leaps * sizeof (struct leap);
-  tzspec_len = 0;
-  if (sizeof (time_t) == 8 && trans_width == 8)
+  /* Compute the size of the POSIX time zone specification in the
+     file.  */
+  size_t tzspec_len;
+  if (trans_width == 8)
     {
       off_t rem = st.st_size - __ftello (f);
       if (__builtin_expect (rem < 0
@@ -267,46 +236,70 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
       if (__glibc_unlikely (tzspec_len == 0 || tzspec_len - 1 < num_isgmt))
 	goto lose;
       tzspec_len -= num_isgmt + 1;
-      if (__glibc_unlikely (SIZE_MAX - total_size < tzspec_len))
+      if (tzspec_len == 0)
 	goto lose;
     }
-  if (__glibc_unlikely (SIZE_MAX - total_size - tzspec_len < extra))
-    goto lose;
+  else
+    tzspec_len = 0;
 
-  /* Allocate enough memory including the extra block requested by the
-     caller.  */
-  transitions = (time_t *) malloc (total_size + tzspec_len + extra);
-  if (transitions == NULL)
-    goto lose;
+  /* The file is parsed into a single heap allocation, comprising of
+     the following arrays:
 
-  type_idxs = (unsigned char *) transitions + (num_transitions
-					       * sizeof (time_t));
-  types = (struct ttinfo *) ((char *) transitions + types_idx);
-  zone_names = (char *) types + num_types * sizeof (struct ttinfo);
-  leaps = (struct leap *) ((char *) transitions + leaps_idx);
-  if (sizeof (time_t) == 8 && trans_width == 8)
-    tzspec = (char *) leaps + num_leaps * sizeof (struct leap) + extra;
+     __time64_t transitions[num_transitions];
+     struct leap leaps[num_leaps];
+     struct ttinfo types[num_types];
+     unsigned char type_idxs[num_types];
+     char zone_names[chars];
+     char tzspec[tzspec_len];
+     char extra_array[extra]; // Stored into *pextras if requested.
+
+     The piece-wise allocations from buf below verify that no
+     overflow/wraparound occurred in these computations.
+
+     The order of the suballocations is important for alignment
+     purposes.  __time64_t outside a struct may require more alignment
+     then inside a struct on some architectures, so it must come
+     first. */
+  _Static_assert (__alignof (__time64_t) >= __alignof (struct leap),
+		  "alignment of __time64_t");
+  _Static_assert (__alignof (struct leap) >= __alignof (struct ttinfo),
+		  "alignment of struct leap");
+  struct alloc_buffer buf;
+  {
+    size_t total_size = (num_transitions * sizeof (__time64_t)
+			 + num_leaps * sizeof (struct leap)
+			 + num_types * sizeof (struct ttinfo)
+			 + num_transitions /* type_idxs */
+			 + chars /* zone_names */
+			 + tzspec_len + extra);
+    transitions = malloc (total_size);
+    if (transitions == NULL)
+      goto lose;
+    buf = alloc_buffer_create (transitions, total_size);
+  }
+
+  /* The address of the first allocation is already stored in the
+     pointer transitions.  */
+  (void) alloc_buffer_alloc_array (&buf, __time64_t, num_transitions);
+  leaps = alloc_buffer_alloc_array (&buf, struct leap, num_leaps);
+  types = alloc_buffer_alloc_array (&buf, struct ttinfo, num_types);
+  type_idxs = alloc_buffer_alloc_array (&buf, unsigned char, num_transitions);
+  zone_names = alloc_buffer_alloc_array (&buf, char, chars);
+  if (trans_width == 8)
+    tzspec = alloc_buffer_alloc_array (&buf, char, tzspec_len);
   else
     tzspec = NULL;
   if (extra > 0)
-    *extrap = (char *) &leaps[num_leaps];
+    *extrap = alloc_buffer_alloc_array (&buf, char, extra);
+  if (alloc_buffer_has_failed (&buf))
+    goto lose;
 
-  if (sizeof (time_t) == 4 || __builtin_expect (trans_width == 8, 1))
-    {
-      if (__builtin_expect (__fread_unlocked (transitions, trans_width + 1,
-					      num_transitions, f)
-			    != num_transitions, 0))
+  if (__glibc_unlikely (__fread_unlocked (transitions, trans_width,
+					  num_transitions, f)
+			!= num_transitions)
+      || __glibc_unlikely (__fread_unlocked (type_idxs, 1, num_transitions, f)
+			   != num_transitions))
 	goto lose;
-    }
-  else
-    {
-      if (__builtin_expect (__fread_unlocked (transitions, 4,
-					      num_transitions, f)
-			    != num_transitions, 0)
-	  || __builtin_expect (__fread_unlocked (type_idxs, 1, num_transitions,
-						 f) != num_transitions, 0))
-	goto lose;
-    }
 
   /* Check for bogus indices in the data file, so we can hereafter
      safely use type_idxs[T] as indices into `types' and never crash.  */
@@ -314,19 +307,17 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
     if (__glibc_unlikely (type_idxs[i] >= num_types))
       goto lose;
 
-  if ((BYTE_ORDER != BIG_ENDIAN && (sizeof (time_t) == 4 || trans_width == 4))
-      || (BYTE_ORDER == BIG_ENDIAN && sizeof (time_t) == 8
-	  && trans_width == 4))
+  if (trans_width == 4)
     {
       /* Decode the transition times, stored as 4-byte integers in
-	 network (big-endian) byte order.  We work from the end of
-	 the array so as not to clobber the next element to be
-	 processed when sizeof (time_t) > 4.  */
+	 network (big-endian) byte order.  We work from the end of the
+	 array so as not to clobber the next element to be
+	 processed.  */
       i = num_transitions;
       while (i-- > 0)
 	transitions[i] = decode ((char *) transitions + i * 4);
     }
-  else if (BYTE_ORDER != BIG_ENDIAN && sizeof (time_t) == 8)
+  else if (BYTE_ORDER != BIG_ENDIAN)
     {
       /* Decode the transition times, stored as 8-byte integers in
 	 network (big-endian) byte order.  */
@@ -342,16 +333,16 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
 					      sizeof (x), f) != sizeof (x),
 			    0))
 	goto lose;
-      c = getc_unlocked (f);
+      c = __getc_unlocked (f);
       if (__glibc_unlikely ((unsigned int) c > 1u))
 	goto lose;
       types[i].isdst = c;
-      c = getc_unlocked (f);
+      c = __getc_unlocked (f);
       if (__glibc_unlikely ((size_t) c > chars))
 	/* Bogus index in data file.  */
 	goto lose;
       types[i].idx = c;
-      types[i].offset = (long int) decode (x);
+      types[i].offset = decode (x);
     }
 
   if (__glibc_unlikely (__fread_unlocked (zone_names, 1, chars, f) != chars))
@@ -363,10 +354,10 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
       if (__builtin_expect (__fread_unlocked (x, 1, trans_width, f)
 			    != trans_width, 0))
 	goto lose;
-      if (sizeof (time_t) == 4 || trans_width == 4)
-	leaps[i].transition = (time_t) decode (x);
+      if (trans_width == 4)
+	leaps[i].transition = decode (x);
       else
-	leaps[i].transition = (time_t) decode64 (x);
+	leaps[i].transition = decode64 (x);
 
       if (__glibc_unlikely (__fread_unlocked (x, 1, 4, f) != 4))
 	goto lose;
@@ -375,7 +366,7 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
 
   for (i = 0; i < num_isstd; ++i)
     {
-      int c = getc_unlocked (f);
+      int c = __getc_unlocked (f);
       if (__glibc_unlikely (c == EOF))
 	goto lose;
       types[i].isstd = c != 0;
@@ -385,7 +376,7 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
 
   for (i = 0; i < num_isgmt; ++i)
     {
-      int c = getc_unlocked (f);
+      int c = __getc_unlocked (f);
       if (__glibc_unlikely (c == EOF))
 	goto lose;
       types[i].isgmt = c != 0;
@@ -394,53 +385,16 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
     types[i++].isgmt = 0;
 
   /* Read the POSIX TZ-style information if possible.  */
-  if (sizeof (time_t) == 8 && tzspec != NULL)
+  if (tzspec != NULL)
     {
+      assert (tzspec_len > 0);
       /* Skip over the newline first.  */
-      if (getc_unlocked (f) != '\n'
+      if (__getc_unlocked (f) != '\n'
 	  || (__fread_unlocked (tzspec, 1, tzspec_len - 1, f)
 	      != tzspec_len - 1))
 	tzspec = NULL;
       else
 	tzspec[tzspec_len - 1] = '\0';
-    }
-  else if (sizeof (time_t) == 4 && tzhead.tzh_version[0] != '\0')
-    {
-      /* Get the TZ string.  */
-      if (__builtin_expect (__fread_unlocked ((void *) &tzhead,
-					      sizeof (tzhead), 1, f) != 1, 0)
-	  || (memcmp (tzhead.tzh_magic, TZ_MAGIC, sizeof (tzhead.tzh_magic))
-	      != 0))
-	goto lose;
-
-      size_t num_transitions2 = (size_t) decode (tzhead.tzh_timecnt);
-      size_t num_types2 = (size_t) decode (tzhead.tzh_typecnt);
-      size_t chars2 = (size_t) decode (tzhead.tzh_charcnt);
-      size_t num_leaps2 = (size_t) decode (tzhead.tzh_leapcnt);
-      size_t num_isstd2 = (size_t) decode (tzhead.tzh_ttisstdcnt);
-      size_t num_isgmt2 = (size_t) decode (tzhead.tzh_ttisgmtcnt);
-
-      /* Position the stream before the second header.  */
-      size_t to_skip = (num_transitions2 * (8 + 1)
-			+ num_types2 * 6
-			+ chars2
-			+ num_leaps2 * 12
-			+ num_isstd2
-			+ num_isgmt2);
-      off_t off;
-      if (fseek (f, to_skip, SEEK_CUR) != 0
-	  || (off = __ftello (f)) < 0
-	  || st.st_size < off + 2)
-	goto lose;
-
-      tzspec_len = st.st_size - off - 1;
-      char *tzstr = alloca (tzspec_len);
-      if (getc_unlocked (f) != '\n'
-	  || (__fread_unlocked (tzstr, 1, tzspec_len - 1, f)
-	      != tzspec_len - 1))
-	goto lose;
-      tzstr[tzspec_len - 1] = '\0';
-      tzspec = __tzstring (tzstr);
     }
 
   /* Don't use an empty TZ string.  */
@@ -451,7 +405,8 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
 
   /* First "register" all timezone names.  */
   for (i = 0; i < num_types; ++i)
-    (void) __tzstring (&zone_names[types[i].idx]);
+    if (__tzstring (&zone_names[types[i].idx]) == NULL)
+      goto ret_free_transitions;
 
   /* Find the standard and daylight time offsets used by the rule file.
      We choose the offsets in the types of each flavor that are
@@ -482,8 +437,6 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
     }
   if (__tzname[1] == NULL)
     __tzname[1] = __tzname[0];
-
-  compute_tzname_max (chars);
 
   if (num_transitions == 0)
     /* Use the first rule (which should also be the only one).  */
@@ -536,7 +489,7 @@ __tzfile_read (const char *file, size_t extra, char **extrap)
 
 void
 __tzfile_default (const char *std, const char *dst,
-		  long int stdoff, long int dstoff)
+		  int stdoff, int dstoff)
 {
   size_t stdlen = strlen (std) + 1;
   size_t dstlen = strlen (dst) + 1;
@@ -615,11 +568,15 @@ __tzfile_default (const char *std, const char *dst,
   /* Set the timezone.  */
   __timezone = -types[0].offset;
 
-  compute_tzname_max (stdlen + dstlen);
+  /* Invalidate the tzfile attribute cache to force rereading
+     TZDEFRULES the next time it is used.  */
+  tzfile_dev = 0;
+  tzfile_ino = 0;
+  tzfile_mtime = 0;
 }
 
 void
-__tzfile_compute (time_t timer, int use_localtime,
+__tzfile_compute (__time64_t timer, int use_localtime,
 		  long int *leap_correct, int *leap_hit,
 		  struct tm *tp)
 {
@@ -674,7 +631,7 @@ __tzfile_compute (time_t timer, int use_localtime,
 
 	  /* Convert to broken down structure.  If this fails do not
 	     use the string.  */
-	  if (__glibc_unlikely (! __offtime (&timer, 0, tp)))
+	  if (__glibc_unlikely (! __offtime (timer, 0, tp)))
 	    goto use_last;
 
 	  /* Use the rules from the TZ string to compute the change.  */
@@ -698,10 +655,12 @@ __tzfile_compute (time_t timer, int use_localtime,
 	     then pick the type of the transition before it.  */
 	  size_t lo = 0;
 	  size_t hi = num_transitions - 1;
-	  /* Assume that DST is changing twice a year and guess initial
-	     search spot from it.
-	     Half of a gregorian year has on average 365.2425 * 86400 / 2
-	     = 15778476 seconds.  */
+	  /* Assume that DST is changing twice a year and guess
+	     initial search spot from it.  Half of a gregorian year
+	     has on average 365.2425 * 86400 / 2 = 15778476 seconds.
+	     The value i can be truncated if size_t is smaller than
+	     __time64_t, but this is harmless because it is just
+	     a guess.  */
 	  i = (transitions[num_transitions - 1] - timer) / 15778476;
 	  if (i < num_transitions)
 	    {
@@ -805,9 +764,9 @@ __tzfile_compute (time_t timer, int use_localtime,
   /* Apply its correction.  */
   *leap_correct = leaps[i].change;
 
-  if (timer == leaps[i].transition && /* Exactly at the transition time.  */
-      ((i == 0 && leaps[i].change > 0) ||
-       leaps[i].change > leaps[i - 1].change))
+  if (timer == leaps[i].transition /* Exactly at the transition time.  */
+      && ((i == 0 && leaps[i].change > 0)
+	  || leaps[i].change > leaps[i - 1].change))
     {
       *leap_hit = 1;
       while (i > 0
@@ -818,22 +777,4 @@ __tzfile_compute (time_t timer, int use_localtime,
 	  --i;
 	}
     }
-}
-
-static void
-internal_function
-compute_tzname_max (size_t chars)
-{
-  const char *p;
-
-  p = zone_names;
-  do
-    {
-      const char *start = p;
-      while (*p != '\0')
-	++p;
-      if ((size_t) (p - start) > __tzname_cur_max)
-	__tzname_cur_max = p - start;
-    }
-  while (++p < &zone_names[chars]);
 }

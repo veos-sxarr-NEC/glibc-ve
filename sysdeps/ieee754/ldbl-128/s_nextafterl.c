@@ -24,13 +24,16 @@ static char rcsid[] = "$NetBSD: $";
  *   Special cases:
  */
 
+#include <errno.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
-long double __nextafterl(long double x, long double y)
+_Float128 __nextafterl(_Float128 x, _Float128 y)
 {
 	int64_t hx,hy,ix,iy;
-	u_int64_t lx,ly;
+	uint64_t lx,ly;
 
 	GET_LDOUBLE_WORDS64(hx,lx,x);
 	GET_LDOUBLE_WORDS64(hy,ly,y);
@@ -42,7 +45,7 @@ long double __nextafterl(long double x, long double y)
 	   return x+y;
 	if(x==y) return y;		/* x=y, return y */
 	if((ix|lx)==0) {			/* x == 0 */
-	    long double u;
+	    _Float128 u;
 	    SET_LDOUBLE_WORDS64(x,hy&0x8000000000000000ULL,1);/* return +-minsubnormal */
 	    u = math_opt_barrier (x);
 	    u = u * u;
@@ -68,16 +71,18 @@ long double __nextafterl(long double x, long double y)
 	}
 	hy = hx&0x7fff000000000000LL;
 	if(hy==0x7fff000000000000LL) {
-	    long double u = x + x;		/* overflow  */
+	    _Float128 u = x + x;		/* overflow  */
 	    math_force_eval (u);
+	    __set_errno (ERANGE);
 	}
 	if(hy==0) {
-	    long double u = x*x;		/* underflow */
+	    _Float128 u = x*x;		/* underflow */
 	    math_force_eval (u);		/* raise underflow flag */
+	    __set_errno (ERANGE);
 	}
 	SET_LDOUBLE_WORDS64(x,hx,lx);
 	return x;
 }
-weak_alias (__nextafterl, nextafterl)
+libm_alias_ldouble (__nextafter, nextafter)
 strong_alias (__nextafterl, __nexttowardl)
 weak_alias (__nextafterl, nexttowardl)

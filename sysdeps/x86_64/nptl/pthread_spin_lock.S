@@ -1,4 +1,4 @@
-/* Copyright (C) 2012-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <lowlevellock.h>
+#include <sysdep.h>
 
-	.globl	pthread_spin_lock
-	.type	pthread_spin_lock,@function
-	.align	16
-pthread_spin_lock:
+ENTRY(pthread_spin_lock)
 1:	LOCK
 	decl	0(%rdi)
 	jne	2f
@@ -33,4 +31,4 @@ pthread_spin_lock:
 	cmpl	$0, 0(%rdi)
 	jg	1b
 	jmp	2b
-	.size	pthread_spin_lock,.-pthread_spin_lock
+END(pthread_spin_lock)

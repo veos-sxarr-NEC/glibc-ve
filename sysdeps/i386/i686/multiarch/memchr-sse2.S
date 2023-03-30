@@ -1,5 +1,5 @@
 /* Optimized memchr with sse2 without bsf
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if IS_IN (libc)
 
@@ -117,9 +117,13 @@ L(crosscache):
 
 # ifndef USE_AS_RAWMEMCHR
 	jnz	L(match_case2_prolog1)
-	lea	-16(%edx), %edx
-	add	%ecx, %edx
-	jle	L(return_null)
+        /* "ecx" is less than 16.  Calculate "edx + ecx - 16" by using
+	   "edx - (16 - ecx)" instead of "(edx + ecx) - 16" to void
+	   possible addition overflow.  */
+	neg	%ecx
+	add	$16, %ecx
+	sub	%ecx, %edx
+	jbe	L(return_null)
 	lea	16(%edi), %edi
 # else
 	jnz	L(match_case1_prolog1)

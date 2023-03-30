@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,11 +13,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <stdlib.h>
 #include <resolv.h>
 
@@ -47,6 +47,11 @@
 |*								   *|
 \*******************************************************************/
 
+
+#ifdef HANDLE_DIGITS_DOTS
+# include <resolv/resolv_context.h>
+#endif
+
 /* To make the real sources a bit prettier.  */
 #define REENTRANT_NAME APPEND_R (FUNCTION_NAME)
 #define APPEND_R(name) APPEND_R1 (name)
@@ -74,7 +79,8 @@
 /* Prototype for reentrant version we use here.  */
 extern int INTERNAL (REENTRANT_NAME) (ADD_PARAMS, LOOKUP_TYPE *resbuf,
 				      char *buffer, size_t buflen,
-				      LOOKUP_TYPE **result H_ERRNO_PARM);
+				      LOOKUP_TYPE **result H_ERRNO_PARM)
+     attribute_hidden;
 
 /* We need to protect the dynamic buffer handling.  */
 __libc_lock_define_initialized (static, lock);
@@ -93,6 +99,19 @@ FUNCTION_NAME (ADD_PARAMS)
   int h_errno_tmp = 0;
 #endif
 
+#ifdef HANDLE_DIGITS_DOTS
+  /* Wrap both __nss_hostname_digits_dots and the actual lookup
+     function call in the same context.  */
+  struct resolv_context *res_ctx = __resolv_context_get ();
+  if (res_ctx == NULL)
+    {
+# if NEED_H_ERRNO
+      __set_h_errno (NETDB_INTERNAL);
+# endif
+      return NULL;
+    }
+#endif
+
   /* Get lock.  */
   __libc_lock_lock (lock);
 
@@ -105,9 +124,9 @@ FUNCTION_NAME (ADD_PARAMS)
 #ifdef HANDLE_DIGITS_DOTS
   if (buffer != NULL)
     {
-      if (__nss_hostname_digits_dots (name, &resbuf, &buffer,
-				      &buffer_size, 0, &result, NULL, AF_VAL,
-				      H_ERRNO_VAR_P))
+      if (__nss_hostname_digits_dots_context
+	  (res_ctx, name, &resbuf, &buffer, &buffer_size, 0, &result, NULL,
+	   AF_VAL, H_ERRNO_VAR_P))
 	goto done;
     }
 #endif
@@ -142,6 +161,10 @@ done:
 #endif
   /* Release lock.  */
   __libc_lock_unlock (lock);
+
+#ifdef HANDLE_DIGITS_DOTS
+  __resolv_context_put (res_ctx);
+#endif
 
 #ifdef NEED_H_ERRNO
   if (h_errno_tmp != 0)

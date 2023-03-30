@@ -1,4 +1,4 @@
-/* Copyright (C) 2012-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Test that secure_getenv works by invoking the test as a SGID
    program with a group ID from the supplementary group list.  This
@@ -30,18 +30,25 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <support/support.h>
+#include <support/test-driver.h>
+
 static char MAGIC_ARGUMENT[] = "run-actual-test";
 #define MAGIC_STATUS 19
-
-static const char *test_dir;
 
 /* Return a GID which is not our current GID, but is present in the
    supplementary group list.  */
 static gid_t
 choose_gid (void)
 {
-  const int count = 64;
-  gid_t groups[count];
+  int count = getgroups (0, NULL);
+  if (count < 0)
+    {
+      printf ("getgroups: %m\n");
+      exit (1);
+    }
+  gid_t *groups;
+  groups = xcalloc (count, sizeof (*groups));
   int ret = getgroups (count, groups);
   if (ret < 0)
     {
@@ -49,12 +56,17 @@ choose_gid (void)
       exit (1);
     }
   gid_t current = getgid ();
+  gid_t not_current = 0;
   for (int i = 0; i < ret; ++i)
     {
       if (groups[i] != current)
-	return groups[i];
+        {
+          not_current = groups[i];
+          break;
+        }
     }
-  return 0;
+  free (groups);
+  return not_current;
 }
 
 
@@ -64,25 +76,15 @@ choose_gid (void)
 static int
 run_executable_sgid (gid_t target)
 {
-  char *dirname = 0;
-  char *execname = 0;
+  char *dirname = xasprintf ("%s/secure-getenv.%jd",
+			     test_dir, (intmax_t) getpid ());
+  char *execname = xasprintf ("%s/bin", dirname);
   int infd = -1;
   int outfd = -1;
   int ret = -1;
-  if (asprintf (&dirname, "%s/secure-getenv.%jd",
-		test_dir, (intmax_t) getpid ()) < 0)
-    {
-      printf ("asprintf: %m\n");
-      goto err;
-    }
   if (mkdir (dirname, 0700) < 0)
     {
       printf ("mkdir: %m\n");
-      goto err;
-    }
-  if (asprintf (&execname, "%s/bin", dirname) < 0)
-    {
-      printf ("asprintf: %m\n");
       goto err;
     }
   infd = open ("/proc/self/exe", O_RDONLY);
@@ -247,6 +249,5 @@ alternative_main (int argc, char **argv)
     }
 }
 
-#define PREPARE(argc, argv) alternative_main(argc, argv)
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
+#define PREPARE alternative_main
+#include <support/test-driver.c>

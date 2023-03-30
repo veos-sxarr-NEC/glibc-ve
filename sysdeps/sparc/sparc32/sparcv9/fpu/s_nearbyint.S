@@ -1,7 +1,7 @@
 /* Round float to int floating-point values without generating
    an inexact exception, sparc32 v9 version.
 
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David S. Miller <davem@davemloft.net>, 2013.
 
@@ -17,10 +17,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <math_ldbl_opt.h>
+#include <libm-alias-double.h>
 
 	/* We pop constants into the FPU registers using the incoming
 	   argument stack slots, since this avoid having to use any PIC
@@ -36,20 +37,21 @@
 #define SIGN_BIT	%f12			/* -0.0 */
 
 ENTRY (__nearbyint)
+	sllx	%o0, 32, %o0
+	or	%o0, %o1, %o0
+	stx	%o0, [%sp + 72]
+	ldd	[%sp + 72], %f0
+	fcmpd	%fcc3, %f0, %f0			/* Check for sNaN */
 	st	%fsr, [%sp + 88]
 	sethi	%hi(TWO_FIFTYTWO), %o2
 	sethi	%hi(0xf8003e0), %o5
 	ld	[%sp + 88], %o4
-	sllx	%o0, 32, %o0
 	or	%o5, %lo(0xf8003e0), %o5
-	or	%o0, %o1, %o0
 	andn	%o4, %o5, %o4
 	fzero	ZERO
 	st	%o4, [%sp + 80]
-	stx	%o0, [%sp + 72]
 	sllx	%o2, 32, %o2
 	fnegd	ZERO, SIGN_BIT
-	ldd	[%sp + 72], %f0
 	ld	[%sp + 80], %fsr
 	stx	%o2, [%sp + 72]
 	fabsd	%f0, %f14
@@ -65,8 +67,4 @@ ENTRY (__nearbyint)
 	retl
 	 ld	[%sp + 88], %fsr
 END (__nearbyint)
-weak_alias (__nearbyint, nearbyint)
-
-#if LONG_DOUBLE_COMPAT(libm, GLIBC_2_1)
-compat_symbol (libm, __nearbyint, nearbyintl, GLIBC_2_1)
-#endif
+libm_alias_double (__nearbyint, nearbyint)

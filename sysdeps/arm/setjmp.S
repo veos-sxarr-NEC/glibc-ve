@@ -1,5 +1,5 @@
 /* setjmp for ARM.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <stap-probe.h>
@@ -36,20 +36,15 @@ ENTRY (__sigsetjmp)
 #ifdef PTR_MANGLE
 	mov	a4, sp
 	PTR_MANGLE2 (a4, a4, a3)
-	sfi_breg ip, \
-	str	a4, [\B], #4
+	str	a4, [ip], #4
 	PTR_MANGLE2 (a4, lr, a3)
-	sfi_breg ip, \
-	str	a4, [\B], #4
+	str	a4, [ip], #4
 #else
-	sfi_breg ip, \
-	str	sp, [\B], #4
-	sfi_breg ip, \
-	str	lr, [\B], #4
+	str	sp, [ip], #4
+	str	lr, [ip], #4
 #endif
 	/* Save registers */
-	sfi_breg ip, \
-	stmia	\B!, JMP_BUF_REGLIST
+	stmia	ip!, JMP_BUF_REGLIST
 
 #if !defined ARM_ASSUME_NO_IWMMXT || defined __SOFTFP__
 # define NEED_HWCAP 1
@@ -62,7 +57,7 @@ ENTRY (__sigsetjmp)
 		    C_SYMBOL_NAME(_rtld_local_ro) \
 		    + RTLD_GLOBAL_RO_DL_HWCAP_OFFSET)
 # else
-#  ifdef PIC
+#  ifdef SHARED
 	LDR_GLOBAL (a3, a4, C_SYMBOL_NAME(_rtld_global_ro), \
 		    RTLD_GLOBAL_RO_DL_HWCAP_OFFSET)
 #  else
@@ -80,8 +75,7 @@ ENTRY (__sigsetjmp)
 	   Don't use VFP instructions directly because this code
 	   is used in non-VFP multilibs.  */
 	/* Following instruction is vstmia ip!, {d8-d15}.  */
-	sfi_breg ip, \
-	stc	p11, cr8, [\B], #64
+	stc	p11, cr8, [ip], #64
 .Lno_vfp:
 
 #ifndef ARM_ASSUME_NO_IWMMXT
@@ -90,18 +84,12 @@ ENTRY (__sigsetjmp)
 
 	/* Save the call-preserved iWMMXt registers.  */
 	/* Following instructions are wstrd wr10, [ip], #8 (etc.)  */
-	sfi_breg r12, \
-	stcl	p1, cr10, [\B], #8
-	sfi_breg r12, \
-	stcl	p1, cr11, [\B], #8
-	sfi_breg r12, \
-	stcl	p1, cr12, [\B], #8
-	sfi_breg r12, \
-	stcl	p1, cr13, [\B], #8
-	sfi_breg r12, \
-	stcl	p1, cr14, [\B], #8
-	sfi_breg r12, \
-	stcl	p1, cr15, [\B], #8
+	stcl	p1, cr10, [r12], #8
+	stcl	p1, cr11, [r12], #8
+	stcl	p1, cr12, [r12], #8
+	stcl	p1, cr13, [r12], #8
+	stcl	p1, cr14, [r12], #8
+	stcl	p1, cr15, [r12], #8
 .Lno_iwmmxt:
 #endif
 

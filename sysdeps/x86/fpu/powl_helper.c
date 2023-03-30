@@ -1,5 +1,5 @@
 /* Implement powl for x86 using extra-precision log.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
 #include <stdbool.h>
 
 /* High parts and low parts of -log (k/16), for integer k from 12 to
@@ -120,7 +121,7 @@ __powl_helper (long double x, long double y)
 	 corrected for by adding log2 (e) * X_FRAC_LOW to the final
 	 result.  */
       int32_t se;
-      u_int32_t i0, i1;
+      uint32_t i0, i1;
       GET_LDOUBLE_WORDS (se, i0, i1, x_frac);
       x_frac_low = x_frac;
       i1 &= 0xffffffe0;
@@ -139,7 +140,7 @@ __powl_helper (long double x, long double y)
   long double w = x_frac - 1;
   long double w_hi, w_lo;
   int32_t se;
-  u_int32_t i0, i1;
+  uint32_t i0, i1;
   GET_LDOUBLE_WORDS (se, i0, i1, w);
   i0 &= 0xffff0000;
   i1 = 0;
@@ -215,7 +216,7 @@ __powl_helper (long double x, long double y)
 
   /* Split the base-2 logarithm of the result into integer and
      fractional parts.  */
-  long double log2_res_int = __roundl (log2_res_hi);
+  long double log2_res_int = roundl (log2_res_hi);
   long double log2_res_frac = log2_res_hi - log2_res_int + log2_res_lo;
   /* If the integer part is very large, the computed fractional part
      may be outside the valid range for f2xm1.  */
@@ -229,6 +230,7 @@ __powl_helper (long double x, long double y)
   if (negate)
     res = -res;
   asm ("fscale" : "=t" (res) : "0" (res), "u" (log2_res_int));
+  math_check_force_underflow (res);
   return res;
 }
 

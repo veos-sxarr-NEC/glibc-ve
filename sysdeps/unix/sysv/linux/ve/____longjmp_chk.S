@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 
@@ -31,8 +31,7 @@ longjmp_msg:
 
 
 #ifdef PIC
-#define CALL_FAIL	lea	%s59, longjmp_msg@got_lo;	\
-			and	%s59, %s59, (32)0;		\
+#define CALL_FAIL	addi %s59,0,longjmp_msg@got_lo; 		\
 			lea.sl	%s59, longjmp_msg@got_hi(%s59, %s15);	\
 			ld	%s0, (,%s59);	/*		\
 			HIDDEN_JUMPTARGET(__fortify_fail)*/
@@ -68,6 +67,12 @@ ENTRY (____longjmp_chk)
 	shm.l	%s0, 0x0(%s60)
 	shm.l	%s1, 0x8(%s60)
 	shm.l	%s2, 0x10(%s60)
+	or %s34,10,(0)1 ;          /* VLFA DELAY */
+	brgt.w  0,%s34,32;
+	fencei ;
+	subs.w.sx  %s34,%s34,(63)0;
+	br.l -24;
+	nop;
 	monc
 
 	/* check return val */

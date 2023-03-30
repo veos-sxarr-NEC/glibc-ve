@@ -17,8 +17,10 @@
 static char rcsid[] = "$NetBSD: k_tanf.c,v 1.4 1995/05/10 20:46:39 jtc Exp $";
 #endif
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
 static const float
 one   =  1.0000000000e+00, /* 0x3f800000 */
 pio4  =  7.8539812565e-01, /* 0x3f490fda */
@@ -45,10 +47,16 @@ float __kernel_tanf(float x, float y, int iy)
 	int32_t ix,hx;
 	GET_FLOAT_WORD(hx,x);
 	ix = hx&0x7fffffff;	/* high word of |x| */
-	if(ix<0x31800000)			/* x < 2**-28 */
+	if(ix<0x39000000)			/* x < 2**-13 */
 	    {if((int)x==0) {			/* generate inexact */
 		if((ix|(iy+1))==0) return one/fabsf(x);
-		else return (iy==1)? x: -one/x;
+		else if (iy == 1)
+		  {
+		    math_check_force_underflow (x);
+		    return x;
+		  }
+		else
+		  return -one / x;
 	    }
 	    }
 	if(ix>=0x3f2ca140) { 			/* |x|>=0.6744 */

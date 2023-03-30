@@ -1,4 +1,4 @@
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <fenv.h>
 #include <fpu_control.h>
@@ -29,21 +29,19 @@
 # define _FP_NANFRAC_S		((_FP_QNANBIT_S << 1) - 1)
 # define _FP_NANFRAC_D		((_FP_QNANBIT_D << 1) - 1)
 # define _FP_NANFRAC_Q		((_FP_QNANBIT_Q << 1) - 1), -1
-
 #define _FP_NANSIGN_S		0
 #define _FP_NANSIGN_D		0
 #define _FP_NANSIGN_Q		0
 
 #define _FP_KEEPNANFRACP 1
-
 # define _FP_QNANNEGATEDP 0
 
 /* From my experiments it seems X is chosen unless one of the
    NaNs is sNaN,  in which case the result is NANSIGN/NANFRAC.  */
-#define _FP_CHOOSENAN(fs, wc, R, X, Y, OP)			\
+# define _FP_CHOOSENAN(fs, wc, R, X, Y, OP)			\
   do {								\
-    if ((_FP_FRAC_HIGH_RAW_##fs(X) |				\
-	 _FP_FRAC_HIGH_RAW_##fs(Y)) & _FP_QNANBIT_##fs)		\
+    if ((_FP_FRAC_HIGH_RAW_##fs(X)				\
+	 | _FP_FRAC_HIGH_RAW_##fs(Y)) & _FP_QNANBIT_##fs)	\
       {								\
 	R##_s = _FP_NANSIGN_##fs;				\
         _FP_FRAC_SET_##wc(R,_FP_NANFRAC_##fs);			\
@@ -55,6 +53,8 @@
       }								\
     R##_c = FP_CLS_NAN;						\
   } while (0)
+
+#define _FP_TININESS_AFTER_ROUNDING 1
 
 #define _FP_DECL_EX		fpu_control_t _fcw
 
@@ -70,9 +70,6 @@
 #define FP_EX_UNDERFLOW		FE_UNDERFLOW
 #define FP_EX_DIVZERO		FE_DIVBYZERO
 #define FP_EX_INEXACT		FE_INEXACT
-
-#define _FP_TININESS_AFTER_ROUNDING 1
-
 
 #define FP_INIT_ROUNDMODE			\
 do {						\

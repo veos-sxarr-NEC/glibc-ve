@@ -1,5 +1,5 @@
 /* memcopy.h -- definitions for memory copy functions.  Generic C version.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Torbjorn Granlund (tege@sics.se).
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _MEMCOPY_H
 #define _MEMCOPY_H	1
@@ -60,7 +60,7 @@
    This should normally be the biggest type supported by a single load
    and store.  */
 #define	op_t	unsigned long int
-#define OPSIZ	(sizeof(op_t))
+#define OPSIZ	(sizeof (op_t))
 
 /* Type to use for unaligned operations.  */
 typedef unsigned char byte;
@@ -111,8 +111,10 @@ typedef unsigned char byte;
    the assumption that DST_BP is aligned on an OPSIZ multiple.  If
    not all bytes could be easily copied, store remaining number of bytes
    in NBYTES_LEFT, otherwise store 0.  */
-extern void _wordcopy_fwd_aligned (long int, long int, size_t) __THROW;
-extern void _wordcopy_fwd_dest_aligned (long int, long int, size_t) __THROW;
+extern void _wordcopy_fwd_aligned (long int, long int, size_t)
+  attribute_hidden __THROW;
+extern void _wordcopy_fwd_dest_aligned (long int, long int, size_t)
+  attribute_hidden __THROW;
 #define WORD_COPY_FWD(dst_bp, src_bp, nbytes_left, nbytes)		      \
   do									      \
     {									      \
@@ -131,8 +133,10 @@ extern void _wordcopy_fwd_dest_aligned (long int, long int, size_t) __THROW;
    DST_END_PTR is aligned on an OPSIZ multiple.  If not all bytes could be
    easily copied, store remaining number of bytes in NBYTES_REMAINING,
    otherwise store 0.  */
-extern void _wordcopy_bwd_aligned (long int, long int, size_t) __THROW;
-extern void _wordcopy_bwd_dest_aligned (long int, long int, size_t) __THROW;
+extern void _wordcopy_bwd_aligned (long int, long int, size_t)
+  attribute_hidden __THROW;
+extern void _wordcopy_bwd_dest_aligned (long int, long int, size_t)
+  attribute_hidden __THROW;
 #define WORD_COPY_BWD(dst_ep, src_ep, nbytes_left, nbytes)		      \
   do									      \
     {									      \
@@ -160,8 +164,8 @@ extern void _wordcopy_bwd_dest_aligned (long int, long int, size_t) __THROW;
 # define PAGE_COPY_FWD_MAYBE(dstp, srcp, nbytes_left, nbytes)		      \
   do									      \
     {									      \
-      if ((nbytes) >= PAGE_COPY_THRESHOLD &&				      \
-	  PAGE_OFFSET ((dstp) - (srcp)) == 0) 				      \
+      if ((nbytes) >= PAGE_COPY_THRESHOLD				      \
+	  && PAGE_OFFSET ((dstp) - (srcp)) == 0)			      \
 	{								      \
 	  /* The amount to copy is past the threshold for copying	      \
 	     pages virtually with kernel VM operations, and the		      \

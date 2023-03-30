@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stdint.h>
@@ -53,7 +53,7 @@ __readonly_area (const char *ptr, size_t size)
   char *line = NULL;
   size_t linelen = 0;
 
-  while (! feof_unlocked (fp))
+  while (! __feof_unlocked (fp))
     {
       if (_IO_getdelim (&line, &linelen, '\n', fp) <= 0)
 	break;

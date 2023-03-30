@@ -1,6 +1,8 @@
 #ifndef _ALIASES_H
 #include <inet/aliases.h>
 
+# ifndef _ISOMAC
+
 extern int __getaliasent_r (struct aliasent *__restrict __result_buf,
 			    char *__restrict __buffer, size_t __buflen,
 			    struct aliasent **__restrict __result)
@@ -12,7 +14,8 @@ extern int __old_getaliasent_r (struct aliasent *__restrict __result_buf,
 extern int __getaliasbyname_r (const char *__restrict __name,
 			       struct aliasent *__restrict __result_buf,
 			       char *__restrict __buffer, size_t __buflen,
-			       struct aliasent **__restrict __result);
+			       struct aliasent **__restrict __result)
+     attribute_hidden;
 extern int __old_getaliasbyname_r (const char *__restrict __name,
 				   struct aliasent *__restrict __result_buf,
 				   char *__restrict __buffer, size_t __buflen,
@@ -34,4 +37,5 @@ DECLARE_NSS_PROTOTYPES (nis)
 DECLARE_NSS_PROTOTYPES (nisplus)
 #undef DECLARE_NSS_PROTOTYPES
 
+# endif /* !_ISOMAC */
 #endif

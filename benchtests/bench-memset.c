@@ -1,5 +1,5 @@
 /* Measure memset functions.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,154 +14,143 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
-#ifdef TEST_BZERO
-# define TEST_NAME "bzero"
-#else
+#ifndef WIDE
 # define TEST_NAME "memset"
-#endif
+#else
+# define TEST_NAME "wmemset"
+# define generic_memset generic_wmemset
+#endif /* WIDE */
 #define MIN_PAGE_SIZE 131072
 #include "bench-string.h"
 
-char *simple_memset (char *, int, size_t);
+#include "json-lib.h"
 
-#ifdef TEST_BZERO
-typedef void (*proto_t) (char *, size_t);
-void simple_bzero (char *, size_t);
-void builtin_bzero (char *, size_t);
-
-IMPL (simple_bzero, 0)
-IMPL (builtin_bzero, 0)
-IMPL (bzero, 1)
-
-void
-simple_bzero (char *s, size_t n)
-{
-  simple_memset (s, 0, n);
-}
-
-void
-builtin_bzero (char *s, size_t n)
-{
-  __builtin_bzero (s, n);
-}
+#ifdef WIDE
+CHAR *generic_wmemset (CHAR *, CHAR, size_t);
 #else
-typedef char *(*proto_t) (char *, int, size_t);
-char *builtin_memset (char *, int, size_t);
-
-IMPL (simple_memset, 0)
-IMPL (builtin_memset, 0)
-IMPL (memset, 1)
-
-char *
-builtin_memset (char *s, int c, size_t n)
-{
-  return __builtin_memset (s, c, n);
-}
+void *generic_memset (void *, int, size_t);
 #endif
 
-char *
-inhibit_loop_to_libcall
-simple_memset (char *s, int c, size_t n)
-{
-  char *r = s, *end = s + n;
-  while (r < end)
-    *r++ = c;
-  return s;
-}
+typedef void *(*proto_t) (void *, int, size_t);
+
+IMPL (MEMSET, 1)
+IMPL (generic_memset, 0)
 
 static void
-do_one_test (impl_t *impl, char *s, int c __attribute ((unused)), size_t n)
+do_one_test (json_ctx_t *json_ctx, impl_t *impl, CHAR *s,
+	     int c __attribute ((unused)), size_t n)
 {
   size_t i, iters = INNER_LOOP_ITERS;
   timing_t start, stop, cur;
-  char tstbuf[n];
-#ifdef TEST_BZERO
-  simple_bzero (tstbuf, n);
-  CALL (impl, s, n);
-  if (memcmp (s, tstbuf, n) != 0)
-#else
-  char *res = CALL (impl, s, c, n);
-  if (res != s
-      || simple_memset (tstbuf, c, n) != tstbuf
-      || memcmp (s, tstbuf, n) != 0)
-#endif
-    {
-      error (0, 0, "Wrong result in function %s", impl->name);
-      ret = 1;
-      return;
-    }
 
   TIMING_NOW (start);
   for (i = 0; i < iters; ++i)
     {
-#ifdef TEST_BZERO
-      CALL (impl, s, n);
-#else
       CALL (impl, s, c, n);
-#endif
     }
   TIMING_NOW (stop);
 
   TIMING_DIFF (cur, start, stop);
 
-  TIMING_PRINT_MEAN ((double) cur, (double) iters);
+  json_element_double (json_ctx, (double) cur / (double) iters);
 }
 
 static void
-do_test (size_t align, int c, size_t len)
+do_test (json_ctx_t *json_ctx, size_t align, int c, size_t len)
 {
-  align &= 7;
-  if (align + len > page_size)
+  align &= 63;
+  if ((align + len) * sizeof (CHAR) > page_size)
     return;
 
-  printf ("Length %4zd, alignment %2zd, c %2d:", len, align, c);
+  json_element_object_begin (json_ctx);
+  json_attr_uint (json_ctx, "length", len);
+  json_attr_uint (json_ctx, "alignment", align);
+  json_attr_int (json_ctx, "char", c);
+  json_array_begin (json_ctx, "timings");
 
   FOR_EACH_IMPL (impl, 0)
-    do_one_test (impl, (char *) buf1 + align, c, len);
+    {
+      do_one_test (json_ctx, impl, (CHAR *) (buf1) + align, c, len);
+      alloc_bufs ();
+    }
 
-  putchar ('\n');
+  json_array_end (json_ctx);
+  json_element_object_end (json_ctx);
 }
 
 int
 test_main (void)
 {
+  json_ctx_t json_ctx;
   size_t i;
   int c = 0;
 
   test_init ();
 
-  printf ("%24s", "");
-  FOR_EACH_IMPL (impl, 0)
-    printf ("\t%s", impl->name);
-  putchar ('\n');
+  json_init (&json_ctx, 0, stdout);
 
-#ifndef TEST_BZERO
+  json_document_begin (&json_ctx);
+  json_attr_string (&json_ctx, "timing_type", TIMING_TYPE);
+
+  json_attr_object_begin (&json_ctx, "functions");
+  json_attr_object_begin (&json_ctx, TEST_NAME);
+  json_attr_string (&json_ctx, "bench-variant", "");
+
+  json_array_begin (&json_ctx, "ifuncs");
+  FOR_EACH_IMPL (impl, 0)
+    json_element_string (&json_ctx, impl->name);
+  json_array_end (&json_ctx);
+
+  json_array_begin (&json_ctx, "results");
+
   for (c = -65; c <= 130; c += 65)
-#endif
     {
       for (i = 0; i < 18; ++i)
-	do_test (0, c, 1 << i);
+	do_test (&json_ctx, 0, c, 1 << i);
       for (i = 1; i < 32; ++i)
 	{
-	  do_test (i, c, i);
+	  do_test (&json_ctx, i, c, i);
 	  if (i & (i - 1))
-	    do_test (0, c, i);
+	    do_test (&json_ctx, 0, c, i);
 	}
       for (i = 32; i < 512; i+=32)
 	{
-	  do_test (0, c, i);
-	  do_test (i, c, i);
+	  do_test (&json_ctx, 0, c, i);
+	  do_test (&json_ctx, i, c, i);
 	}
-      do_test (1, c, 14);
-      do_test (3, c, 1024);
-      do_test (4, c, 64);
-      do_test (2, c, 25);
+      do_test (&json_ctx, 1, c, 14);
+      do_test (&json_ctx, 3, c, 1024);
+      do_test (&json_ctx, 4, c, 64);
+      do_test (&json_ctx, 2, c, 25);
     }
+  for (i = 33; i <= 256; i += 4)
+    {
+      do_test (&json_ctx, 0, c, 32 * i);
+      do_test (&json_ctx, i, c, 32 * i);
+    }
+
+  json_array_end (&json_ctx);
+  json_attr_object_end (&json_ctx);
+  json_attr_object_end (&json_ctx);
+  json_document_end (&json_ctx);
 
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>
+
+#define libc_hidden_builtin_def(X)
+#define libc_hidden_def(X)
+#define libc_hidden_weak(X)
+#define weak_alias(X,Y)
+#ifndef WIDE
+# undef MEMSET
+# define MEMSET generic_memset
+# include <string/memset.c>
+#else
+# define WMEMSET generic_wmemset
+# include <wcsmbs/wmemset.c>
+#endif

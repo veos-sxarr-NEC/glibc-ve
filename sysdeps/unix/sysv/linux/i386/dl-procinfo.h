@@ -1,5 +1,5 @@
 /* Linux/i386 version of processor capability information handling macros.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,11 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sysdeps/i386/dl-procinfo.h>
-#include <ldsodefs.h>
-
+#ifndef _DL_I386_PROCINFO_H
+#define _DL_I386_PROCINFO_H	1
+#include <sysdeps/x86/dl-procinfo.h>
 
 #undef _dl_procinfo
 static inline int
@@ -30,13 +30,13 @@ _dl_procinfo (unsigned int type, unsigned long int word)
      in the kernel sources.  */
   int i;
 
-  /* Fallback to unknown output mechanism.  */
-  if (type == AT_HWCAP2)
+  /* Fallback to generic output mechanism.  */
+  if (type != AT_HWCAP)
     return -1;
 
   _dl_printf ("AT_HWCAP:   ");
 
-  for (i = 0; i < _DL_HWCAP_COUNT; ++i)
+  for (i = 0; i < 32; ++i)
     if (word & (1 << i))
       _dl_printf (" %s", GLRO(dl_x86_cap_flags)[i]);
 
@@ -44,3 +44,4 @@ _dl_procinfo (unsigned int type, unsigned long int word)
 
   return 0;
 }
+#endif

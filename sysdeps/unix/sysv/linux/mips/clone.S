@@ -1,6 +1,6 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
-   Contributed by Ralf Baechle <ralf@linux-mips.org>, 1996.
+   Contributed by Ralf Bächle <ralf@linux-mips.org>, 1996.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -24,9 +24,6 @@
 #define _ERRNO_H	1
 #include <bits/errno.h>
 #include <tls.h>
-
-#define CLONE_VM      0x00000100
-#define CLONE_THREAD  0x00010000
 
 /* int clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg,
 	     void *parent_tidptr, void *tls, void *child_tidptr) */
@@ -130,12 +127,6 @@ L(thread_start):
 	SAVE_GP (GPOFF)
 	/* The stackframe has been created on entry of clone().  */
 
-	/* Check and see if we need to reset the PID.  */
-	LONG_L		a0,(PTRSIZE*2)(sp)
-	and		a1,a0,CLONE_THREAD
-	beqz		a1,L(restore_pid)
-L(donepid):
-
 	/* Restore the arg for user's function.  */
 	PTR_L		t9,0(sp)	/* Function pointer.  */
 	PTR_L		a0,PTRSIZE(sp)	/* Argument pointer.  */
@@ -143,27 +134,11 @@ L(donepid):
 	/* Call the user's function.  */
 	jal		t9
 
-	/* Call _exit rather than doing it inline for breakpoint purposes.  */
 	move		a0,v0
-#ifdef __PIC__
-	PTR_LA		t9,_exit
-	jalr		t9
-#else
-	jal		_exit
-#endif
-
-L(restore_pid):
-	and		a1,a0,CLONE_VM
-	li		v0,-1
-	bnez		a1,L(gotpid)
-	li		v0,__NR_getpid
+	li		v0,__NR_exit
 	syscall
-L(gotpid):
-	READ_THREAD_POINTER(v1)
-	INT_S		v0,PID_OFFSET(v1)
-	INT_S		v0,TID_OFFSET(v1)
-	b		L(donepid)
 
 	END(__thread_start)
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

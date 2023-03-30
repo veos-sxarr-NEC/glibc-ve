@@ -29,7 +29,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 /* __ieee754_asin(x)
  * Method :
@@ -59,9 +59,12 @@
  */
 
 
+#include <float.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
-long double sqrtl (long double);
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const long double
   one = 1.0L,
@@ -134,7 +137,7 @@ __ieee754_asinl (long double x)
   long double a, t, w, p, q, c, r, s;
   int flag;
 
-  if (__glibc_unlikely (__isnanl (x)))
+  if (__glibc_unlikely (isnan (x)))
     return x + x;
   flag = 0;
   a = __builtin_fabsl (x);
@@ -146,8 +149,10 @@ __ieee754_asinl (long double x)
     {
       if (a < 6.938893903907228e-18L) /* |x| < 2**-57 */
 	{
-	  if (huge + x > one)
-	    return x;		/* return x with inexact if x!=0 */
+	  math_check_force_underflow (x);
+	  long double force_inexact =  huge + x;
+	  math_force_eval (force_inexact);
+	  return x;		/* return x with inexact if x!=0 */
 	}
       else
 	{
@@ -223,7 +228,7 @@ __ieee754_asinl (long double x)
       return x + x * w;
     }
 
-  s = __ieee754_sqrtl (t);
+  s = sqrtl (t);
   if (a > 0.975L)
     {
       w = p / q;
@@ -244,4 +249,4 @@ __ieee754_asinl (long double x)
   else
     return -t;
 }
-strong_alias (__ieee754_asinl, __asinl_finite)
+libm_alias_finite (__ieee754_asinl, __asinl)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -21,18 +21,15 @@
 #include <unistd.h>
 #include <ldsodefs.h>
 #include <exit-thread.h>
+#include <libc-internal.h>
+
+#include <elf/dl-tunables.h>
 
 extern void __libc_init_first (int argc, char **argv, char **envp);
-#ifndef SHARED
-extern void __libc_csu_irel (void);
-#endif
-
-extern int __libc_multiple_libcs;
 
 #include <tls.h>
 #ifndef SHARED
 # include <dl-osinfo.h>
-extern void __pthread_initialize_minimal (void);
 # ifndef THREAD_SET_STACK_GUARD
 /* Only exported for architectures that don't store the stack guard canary
    in thread local area.  */
@@ -105,6 +102,12 @@ apply_irel (void)
 # define MAIN_AUXVEC_PARAM
 #endif
 
+#ifndef ARCH_INIT_CPU_FEATURES
+# define ARCH_INIT_CPU_FEATURES()
+#endif
+
+#include <libc-start.h>
+
 STATIC int LIBC_START_MAIN (int (*main) (int, char **, char **
 					 MAIN_AUXVEC_DECL),
 			    int argc,
@@ -138,6 +141,8 @@ LIBC_START_MAIN (int (*main) (int, char **, char ** MAIN_AUXVEC_DECL),
   __libc_multiple_libcs = &_dl_starting_up && !_dl_starting_up;
 
 #ifndef SHARED
+  _dl_relocate_static_pie ();
+
   char **ev = &argv[argc + 1];
 
   __environ = ev;
@@ -178,6 +183,32 @@ LIBC_START_MAIN (int (*main) (int, char **, char ** MAIN_AUXVEC_DECL),
         }
     }
 
+  /* Initialize very early so that tunables can use it.  */
+  __libc_init_secure ();
+
+  __tunables_init (__environ);
+
+  ARCH_INIT_CPU_FEATURES ();
+
+  /* Perform IREL{,A} relocations.  */
+  ARCH_SETUP_IREL ();
+
+  /* The stack guard goes into the TCB, so initialize it early.  */
+  ARCH_SETUP_TLS ();
+
+  /* In some architectures, IREL{,A} relocations happen after TLS setup in
+     order to let IFUNC resolvers benefit from TCB information, e.g. powerpc's
+     hwcap and platform fields available in the TCB.  */
+  ARCH_APPLY_IREL ();
+
+  /* Set up the stack checker's canary.  */
+  uintptr_t stack_chk_guard = _dl_setup_stack_chk_guard (_dl_random);
+# ifdef THREAD_SET_STACK_GUARD
+  THREAD_SET_STACK_GUARD (stack_chk_guard);
+# else
+  __stack_chk_guard = stack_chk_guard;
+# endif
+
 # ifdef DL_SYSDEP_OSCHECK
   if (!__libc_multiple_libcs)
     {
@@ -187,21 +218,9 @@ LIBC_START_MAIN (int (*main) (int, char **, char ** MAIN_AUXVEC_DECL),
     }
 # endif
 
-  /* Perform IREL{,A} relocations.  */
-  apply_irel ();
-
-  /* Initialize the thread library at least a bit since the libgcc
-     functions are using thread functions if these are available and
-     we need to setup errno.  */
-  __pthread_initialize_minimal ();
-
-  /* Set up the stack checker's canary.  */
-  uintptr_t stack_chk_guard = _dl_setup_stack_chk_guard (_dl_random);
-# ifdef THREAD_SET_STACK_GUARD
-  THREAD_SET_STACK_GUARD (stack_chk_guard);
-# else
-  __stack_chk_guard = stack_chk_guard;
-# endif
+  /* Initialize libpthread if linked in.  */
+  if (__pthread_initialize_minimal != NULL)
+    __pthread_initialize_minimal ();
 
   /* Set up the pointer guard value.  */
   uintptr_t pointer_chk_guard = _dl_setup_pointer_guard (_dl_random,
@@ -212,7 +231,7 @@ LIBC_START_MAIN (int (*main) (int, char **, char ** MAIN_AUXVEC_DECL),
   __pointer_chk_guard_local = pointer_chk_guard;
 # endif
 
-#endif
+#endif /* !SHARED  */
 
   /* Register the destructor of the dynamic linker if there is any.  */
   if (__glibc_likely (rtld_fini != NULL))
@@ -253,7 +272,7 @@ LIBC_START_MAIN (int (*main) (int, char **, char ** MAIN_AUXVEC_DECL),
       for (unsigned int cnt = 0; cnt < GLRO(dl_naudit); ++cnt)
 	{
 	  if (afct->preinit != NULL)
-	    afct->preinit (&head->l_audit[cnt].cookie);
+	    afct->preinit (&link_map_audit_state (head, cnt)->cookie);
 
 	  afct = afct->next;
 	}

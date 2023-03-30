@@ -1,5 +1,5 @@
 /* Helper functions used by strftime/strptime to handle alternate digits.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include "../locale/localeinfo.h"
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <stdlib.h>
 #include <wchar.h>
 #include <string.h>
@@ -69,7 +69,6 @@ _nl_init_alt_digit (struct __locale_data *current)
 }
 
 const char *
-internal_function
 _nl_get_alt_digit (unsigned int number, struct __locale_data *current)
 {
   const char *result;
@@ -95,7 +94,6 @@ _nl_get_alt_digit (unsigned int number, struct __locale_data *current)
 
 
 const wchar_t *
-internal_function
 _nl_get_walt_digit (unsigned int number, struct __locale_data *current)
 {
   const wchar_t *result = NULL;
@@ -148,7 +146,6 @@ _nl_get_walt_digit (unsigned int number, struct __locale_data *current)
 
 
 int
-internal_function
 _nl_parse_alt_digit (const char **strp, struct __locale_data *current)
 {
   const char *str = *strp;
@@ -165,8 +162,8 @@ _nl_parse_alt_digit (const char **strp, struct __locale_data *current)
       || ! current->private.time->alt_digits_initialized)
     _nl_init_alt_digit (current);
 
-  if (current->private.time != NULL &&
-      current->private.time->alt_digits != NULL)
+  if (current->private.time != NULL
+      && current->private.time->alt_digits != NULL)
     /* Matching is not unambiguous.  The alternative digits could be like
        I, II, III, ... and the first one is a substring of the second
        and third.  Therefore we must keep on searching until we found

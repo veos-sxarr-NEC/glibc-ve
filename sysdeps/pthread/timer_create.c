@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Kaz Kylheku <kaz@ashi.footprints.net>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
@@ -27,10 +27,7 @@
 
 /* Create new per-process timer using CLOCK.  */
 int
-timer_create (clock_id, evp, timerid)
-     clockid_t clock_id;
-     struct sigevent *evp;
-     timer_t *timerid;
+timer_create (clockid_t clock_id, struct sigevent *evp, timer_t *timerid)
 {
   int retval = -1;
   struct timer_node *newtimer = NULL;
@@ -80,7 +77,7 @@ timer_create (clock_id, evp, timerid)
     {
       newtimer->event.sigev_notify = SIGEV_SIGNAL;
       newtimer->event.sigev_signo = SIGALRM;
-      newtimer->event.sigev_value.sival_ptr = timer_ptr2id (newtimer);
+      newtimer->event.sigev_value.sival_ptr = newtimer;
       newtimer->event.sigev_notify_function = 0;
     }
 

@@ -1,5 +1,5 @@
 /* getifaddrs -- get names and addresses of all network interfaces
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <assert.h>
@@ -102,7 +102,7 @@ __netlink_sendreq (struct netlink_handle *h, int type)
   struct sockaddr_nl nladdr;
 
   if (h->seq == 0)
-    h->seq = time (NULL);
+    h->seq = time_now ();
 
   req.nlh.nlmsg_len = sizeof (req);
   req.nlh.nlmsg_type = type;
@@ -161,13 +161,17 @@ __netlink_request (struct netlink_handle *h, int type)
     {
       struct msghdr msg =
 	{
-	  (void *) &nladdr, sizeof (nladdr),
-	  &iov, 1,
-	  NULL, 0,
-	  0
+	  .msg_name = (void *) &nladdr,
+	  .msg_namelen =  sizeof (nladdr),
+	  .msg_iov = &iov,
+	  .msg_iovlen = 1,
+	  .msg_control = NULL,
+	  .msg_controllen = 0,
+	  .msg_flags = 0
 	};
 
       read_len = TEMP_FAILURE_RETRY (__recvmsg (h->fd, &msg, 0));
+      __netlink_assert_response (h->fd, read_len);
       if (read_len < 0)
 	goto out_fail;
 
@@ -251,7 +255,7 @@ __netlink_open (struct netlink_handle *h)
 {
   struct sockaddr_nl nladdr;
 
-  h->fd = __socket (PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+  h->fd = __socket (PF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
   if (h->fd < 0)
     goto out;
 
@@ -282,7 +286,6 @@ __netlink_open (struct netlink_handle *h)
    Since we get at first all RTM_NEWLINK entries, it can never happen
    that a RTM_NEWADDR index is not known to this map.  */
 static int
-internal_function
 map_newlink (int index, struct ifaddrs_storage *ifas, int *map, int max)
 {
   int i;
@@ -366,6 +369,14 @@ getifaddrs_internal (struct ifaddrs **ifap)
 	  /* Check if the message is what we want.  */
 	  if ((pid_t) nlh->nlmsg_pid != nh.pid || nlh->nlmsg_seq != nlp->seq)
 	    continue;
+
+	  /* If the dump got interrupted, we can't rely on the results
+	     so try again. */
+	  if (nlh->nlmsg_flags & NLM_F_DUMP_INTR)
+	    {
+	      result = -EAGAIN;
+	      goto exit_free;
+	    }
 
 	  if (nlh->nlmsg_type == NLMSG_DONE)
 	    break;		/* ok */
@@ -830,6 +841,7 @@ __getifaddrs (struct ifaddrs **ifap)
   return res;
 }
 weak_alias (__getifaddrs, getifaddrs)
+libc_hidden_def (__getifaddrs)
 libc_hidden_weak (getifaddrs)
 
 
@@ -839,4 +851,5 @@ __freeifaddrs (struct ifaddrs *ifa)
   free (ifa);
 }
 weak_alias (__freeifaddrs, freeifaddrs)
+libc_hidden_def (__freeifaddrs)
 libc_hidden_weak (freeifaddrs)

@@ -1,5 +1,5 @@
 /* Provide access to the collection of available transformation modules.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <limits.h>
@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <locale/localeinfo.h>
 
 #include <dlfcn.h>
@@ -121,7 +121,6 @@ static void *known_derivations;
 
 /* Look up whether given transformation was already requested before.  */
 static int
-internal_function
 derivation_lookup (const char *fromset, const char *toset,
 		   struct __gconv_step **handle, size_t *nsteps)
 {
@@ -143,7 +142,6 @@ derivation_lookup (const char *fromset, const char *toset,
 
 /* Add new derivation to list of known ones.  */
 static void
-internal_function
 add_derivation (const char *fromset, const char *toset,
 		struct __gconv_step *handle, size_t nsteps)
 {
@@ -180,15 +178,14 @@ free_derivation (void *p)
 
   for (cnt = 0; cnt < deriv->nsteps; ++cnt)
     if (deriv->steps[cnt].__counter > 0
-	&& deriv->steps[cnt].__end_fct != NULL)
+	&& deriv->steps[cnt].__shlib_handle != NULL)
       {
-	assert (deriv->steps[cnt].__shlib_handle != NULL);
-
 	__gconv_end_fct end_fct = deriv->steps[cnt].__end_fct;
 #ifdef PTR_DEMANGLE
 	PTR_DEMANGLE (end_fct);
 #endif
-	DL_CALL_FCT (end_fct, (&deriv->steps[cnt]));
+	if (end_fct != NULL)
+	  DL_CALL_FCT (end_fct, (&deriv->steps[cnt]));
       }
 
   /* Free the name strings.  */
@@ -205,23 +202,18 @@ free_derivation (void *p)
 
 /* Decrement the reference count for a single step in a steps array.  */
 void
-internal_function
 __gconv_release_step (struct __gconv_step *step)
 {
   /* Skip builtin modules; they are not reference counted.  */
   if (step->__shlib_handle != NULL && --step->__counter == 0)
     {
       /* Call the destructor.  */
-      if (step->__end_fct != NULL)
-	{
-	  assert (step->__shlib_handle != NULL);
-
-	  __gconv_end_fct end_fct = step->__end_fct;
+	__gconv_end_fct end_fct = step->__end_fct;
 #ifdef PTR_DEMANGLE
-	  PTR_DEMANGLE (end_fct);
+	PTR_DEMANGLE (end_fct);
 #endif
-	  DL_CALL_FCT (end_fct, (step));
-	}
+      if (end_fct != NULL)
+	DL_CALL_FCT (end_fct, (step));
 
 #ifndef STATIC_GCONV
       /* Release the loaded module.  */
@@ -235,7 +227,6 @@ __gconv_release_step (struct __gconv_step *step)
 }
 
 static int
-internal_function
 gen_steps (struct derivation_step *best, const char *toset,
 	   const char *fromset, struct __gconv_step **handle, size_t *nsteps)
 {
@@ -243,6 +234,8 @@ gen_steps (struct derivation_step *best, const char *toset,
   struct __gconv_step *result;
   struct derivation_step *current;
   int status = __GCONV_NOMEM;
+  char *from_name = NULL;
+  char *to_name = NULL;
 
   /* First determine number of steps.  */
   for (current = best; current->last != NULL; current = current->last)
@@ -259,12 +252,30 @@ gen_steps (struct derivation_step *best, const char *toset,
       current = best;
       while (step_cnt-- > 0)
 	{
-	  result[step_cnt].__from_name = (step_cnt == 0
-					  ? __strdup (fromset)
-					  : (char *)current->last->result_set);
-	  result[step_cnt].__to_name = (step_cnt + 1 == *nsteps
-					? __strdup (current->result_set)
-					: result[step_cnt + 1].__from_name);
+	  if (step_cnt == 0)
+	    {
+	      result[step_cnt].__from_name = from_name = __strdup (fromset);
+	      if (from_name == NULL)
+		{
+		  failed = 1;
+		  break;
+		}
+	    }
+	  else
+	    result[step_cnt].__from_name = (char *)current->last->result_set;
+
+	  if (step_cnt + 1 == *nsteps)
+	    {
+	      result[step_cnt].__to_name = to_name
+		= __strdup (current->result_set);
+	      if (to_name == NULL)
+		{
+		  failed = 1;
+		  break;
+		}
+	    }
+	  else
+	    result[step_cnt].__to_name = result[step_cnt + 1].__from_name;
 
 	  result[step_cnt].__counter = 1;
 	  result[step_cnt].__data = NULL;
@@ -293,29 +304,30 @@ gen_steps (struct derivation_step *best, const char *toset,
 
 	      /* Call the init function.  */
 	      __gconv_init_fct init_fct = result[step_cnt].__init_fct;
+# ifdef PTR_DEMANGLE
+	      PTR_DEMANGLE (init_fct);
+# endif
 	      if (init_fct != NULL)
 		{
-		  assert (result[step_cnt].__shlib_handle != NULL);
-
-# ifdef PTR_DEMANGLE
-		  PTR_DEMANGLE (init_fct);
-# endif
 		  status = DL_CALL_FCT (init_fct, (&result[step_cnt]));
 
 		  if (__builtin_expect (status, __GCONV_OK) != __GCONV_OK)
 		    {
 		      failed = 1;
-		      /* Make sure we unload this modules.  */
-		      --step_cnt;
+		      /* Do not call the end function because the init
+			 function has failed.  */
 		      result[step_cnt].__end_fct = NULL;
+# ifdef PTR_MANGLE
+		      PTR_MANGLE (result[step_cnt].__end_fct);
+# endif
+		      /* Make sure we unload this module.  */
+		      --step_cnt;
 		      break;
 		    }
-
-# ifdef PTR_MANGLE
-		  if (result[step_cnt].__btowc_fct != NULL)
-		    PTR_MANGLE (result[step_cnt].__btowc_fct);
-# endif
 		}
+# ifdef PTR_MANGLE
+	      PTR_MANGLE (result[step_cnt].__btowc_fct);
+# endif
 	    }
 	  else
 #endif
@@ -332,6 +344,8 @@ gen_steps (struct derivation_step *best, const char *toset,
 	  while (++step_cnt < *nsteps)
 	    __gconv_release_step (&result[step_cnt]);
 	  free (result);
+	  free (from_name);
+	  free (to_name);
 	  *nsteps = 0;
 	  *handle = NULL;
 	  if (status == __GCONV_OK)
@@ -352,7 +366,6 @@ gen_steps (struct derivation_step *best, const char *toset,
 
 #ifndef STATIC_GCONV
 static int
-internal_function
 increment_counter (struct __gconv_step *steps, size_t nsteps)
 {
   /* Increment the user counter.  */
@@ -389,20 +402,17 @@ increment_counter (struct __gconv_step *steps, size_t nsteps)
 
 	      /* These settings can be overridden by the init function.  */
 	      step->__btowc_fct = NULL;
-	    }
 
-	  /* Call the init function.  */
-	  __gconv_init_fct init_fct = step->__init_fct;
-	  if (init_fct != NULL)
-	    {
+	      /* Call the init function.  */
+	      __gconv_init_fct init_fct = step->__init_fct;
 #ifdef PTR_DEMANGLE
 	      PTR_DEMANGLE (init_fct);
 #endif
-	      DL_CALL_FCT (init_fct, (step));
+	      if (init_fct != NULL)
+		DL_CALL_FCT (init_fct, (step));
 
 #ifdef PTR_MANGLE
-	      if (step->__btowc_fct != NULL)
-		PTR_MANGLE (step->__btowc_fct);
+	      PTR_MANGLE (step->__btowc_fct);
 #endif
 	    }
 	}
@@ -415,7 +425,6 @@ increment_counter (struct __gconv_step *steps, size_t nsteps)
 /* The main function: find a possible derivation from the `fromset' (either
    the given name or the alias) to the `toset' (again with alias).  */
 static int
-internal_function
 find_derivation (const char *toset, const char *toset_expand,
 		 const char *fromset, const char *fromset_expand,
 		 struct __gconv_step **handle, size_t *nsteps)
@@ -678,10 +687,6 @@ find_derivation (const char *toset, const char *toset_expand,
 }
 
 
-/* Control of initialization.  */
-__libc_once_define (static, once);
-
-
 static const char *
 do_lookup_alias (const char *name)
 {
@@ -695,13 +700,12 @@ do_lookup_alias (const char *name)
 
 
 int
-internal_function
 __gconv_compare_alias (const char *name1, const char *name2)
 {
   int result;
 
   /* Ensure that the configuration data is read.  */
-  __libc_once (once, __gconv_read_conf);
+  __gconv_load_conf ();
 
   if (__gconv_compare_alias_cache (name1, name2, &result) != 0)
     result = strcmp (do_lookup_alias (name1) ?: name1,
@@ -712,7 +716,6 @@ __gconv_compare_alias (const char *name1, const char *name2)
 
 
 int
-internal_function
 __gconv_find_transform (const char *toset, const char *fromset,
 			struct __gconv_step **handle, size_t *nsteps,
 			int flags)
@@ -722,7 +725,7 @@ __gconv_find_transform (const char *toset, const char *fromset,
   int result;
 
   /* Ensure that the configuration data is read.  */
-  __libc_once (once, __gconv_read_conf);
+  __gconv_load_conf ();
 
   /* Acquire the lock.  */
   __libc_lock_lock (__gconv_lock);
@@ -778,7 +781,6 @@ __gconv_find_transform (const char *toset, const char *fromset,
 
 /* Release the entries of the modules list.  */
 int
-internal_function
 __gconv_close_transform (struct __gconv_step *steps, size_t nsteps)
 {
   int result = __GCONV_OK;
@@ -807,7 +809,7 @@ __gconv_close_transform (struct __gconv_step *steps, size_t nsteps)
 
 /* Free the modules mentioned.  */
 static void
-internal_function __libc_freeres_fn_section
+__libc_freeres_fn_section
 free_modules_db (struct gconv_module *node)
 {
   if (node->left != NULL)
@@ -828,8 +830,9 @@ free_modules_db (struct gconv_module *node)
 /* Free all resources if necessary.  */
 libc_freeres_fn (free_mem)
 {
-  /* First free locale memory.  This needs to be done before freeing derivations,
-     as ctype cleanup functions dereference steps arrays which we free below.  */
+  /* First free locale memory.  This needs to be done before freeing
+     derivations, as ctype cleanup functions dereference steps arrays which we
+     free below.  */
   _nl_locale_subfreeres ();
 
   /* finddomain.c has similar problem.  */

@@ -1,5 +1,5 @@
 /* Implementing POSIX.1 signals under the Hurd.
-   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+   Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,16 +14,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_HURD_SIGNAL_H
 
 #define	_HURD_SIGNAL_H	1
 #include <features.h>
-/* Make sure <signal.h> is going to define NSIG.  */
-#ifndef __USE_GNU
-#error "Must have `_GNU_SOURCE' feature test macro to use this file"
-#endif
 
 #define __need_size_t
 #define __need_NULL
@@ -35,13 +31,21 @@
 #include <hurd/hurd_types.h>
 #include <signal.h>
 #include <errno.h>
+#include <bits/types/error_t.h>
+#include <bits/types/stack_t.h>
+#include <bits/types/sigset_t.h>
+#include <bits/sigaction.h>
 #include <hurd/msg.h>
 
 #include <cthreads.h>		/* For `struct mutex'.  */
 #include <setjmp.h>		/* For `jmp_buf'.  */
 #include <spin-lock.h>
-#include <hurd/threadvar.h>	/* We cache sigstate in a threadvar.  */
 struct hurd_signal_preemptor;	/* <hurd/sigpreempt.h> */
+#if defined __USE_EXTERN_INLINES && defined _LIBC
+# if IS_IN (libc) || IS_IN (libpthread)
+#  include <sigsetops.h>
+# endif
+#endif
 
 
 /* Full details of a signal.  */
@@ -69,8 +73,14 @@ struct hurd_sigstate
 
     sigset_t blocked;		/* What signals are blocked.  */
     sigset_t pending;		/* Pending signals, possibly blocked.  */
-    struct sigaction actions[NSIG];
-    struct sigaltstack sigaltstack;
+
+    /* Signal handlers.  ACTIONS[0] is used to mark the threads with POSIX
+       semantics: if sa_handler is SIG_IGN instead of SIG_DFL, this thread
+       will receive global signals and use the process-wide action vector
+       instead of this one.  */
+    struct sigaction actions[_NSIG];
+
+    stack_t sigaltstack;
 
     /* Chain of thread-local signal preemptors; see <hurd/sigpreempt.h>.
        Each element of this chain is in local stack storage, and the chain
@@ -79,7 +89,7 @@ struct hurd_sigstate
     struct hurd_signal_preemptor *preemptors;
 
     /* For each signal that may be pending, the details to deliver it with.  */
-    struct hurd_signal_detail pending_data[NSIG];
+    struct hurd_signal_detail pending_data[_NSIG];
 
     /* If `suspended' is set when this thread gets a signal,
        the signal thread sends an empty message to it.  */
@@ -125,19 +135,41 @@ extern struct hurd_sigstate *_hurd_self_sigstate (void)
 	by different threads.  */
      __attribute__ ((__const__));
 
+/* Process-wide signal state.  */
+
+extern struct hurd_sigstate *_hurd_global_sigstate;
+
+/* Mark the given thread as a process-wide signal receiver.  */
+
+extern void _hurd_sigstate_set_global_rcv (struct hurd_sigstate *ss);
+
+/* A thread can either use its own action vector and pending signal set
+   or use the global ones, depending on wether it has been marked as a
+   global receiver. The accessors below take that into account.  */
+
+extern void _hurd_sigstate_lock (struct hurd_sigstate *ss);
+extern struct sigaction *_hurd_sigstate_actions (struct hurd_sigstate *ss);
+extern sigset_t _hurd_sigstate_pending (const struct hurd_sigstate *ss);
+extern void _hurd_sigstate_unlock (struct hurd_sigstate *ss);
+
+/* Used by libpthread to remove stale sigstate structures.  */
+extern void _hurd_sigstate_delete (thread_t thread);
+
 #ifndef _HURD_SIGNAL_H_EXTERN_INLINE
 #define _HURD_SIGNAL_H_EXTERN_INLINE __extern_inline
 #endif
 
+#if defined __USE_EXTERN_INLINES && defined _LIBC
+# if IS_IN (libc)
 _HURD_SIGNAL_H_EXTERN_INLINE struct hurd_sigstate *
 _hurd_self_sigstate (void)
 {
-  struct hurd_sigstate **location =
-    (void *) __hurd_threadvar_location (_HURD_THREADVAR_SIGSTATE);
-  if (*location == NULL)
-    *location = _hurd_thread_sigstate (__mach_thread_self ());
-  return *location;
+  if (THREAD_SELF->_hurd_sigstate == NULL)
+    THREAD_SELF->_hurd_sigstate = _hurd_thread_sigstate (__mach_thread_self ());
+  return THREAD_SELF->_hurd_sigstate;
 }
+# endif
+#endif
 
 /* Thread listening on our message port; also called the "signal thread".  */
 
@@ -148,12 +180,6 @@ extern thread_t _hurd_msgport_thread;
 
 extern mach_port_t _hurd_msgport;
 
-
-/* Thread to receive process-global signals.  */
-
-extern thread_t _hurd_sigthread;
-
-
 /* Resource limit on core file size.  Enforced by hurdsig.c.  */
 extern int _hurd_core_limit;
 
@@ -162,22 +188,36 @@ extern int _hurd_core_limit;
    A critical section is a section of code which cannot safely be interrupted
    to run a signal handler; for example, code that holds any lock cannot be
    interrupted lest the signal handler try to take the same lock and
-   deadlock result.  */
+   deadlock result.
 
+   As a consequence, a critical section will see its RPCs return EINTR, even if
+   SA_RESTART is set!  In that case, the critical section should be left, so
+   that the handler can run, and the whole critical section be tried again, to
+   avoid unexpectingly exposing EINTR to the application.  */
+
+extern void *_hurd_critical_section_lock (void);
+
+#if defined __USE_EXTERN_INLINES && defined _LIBC
+# if IS_IN (libc)
 _HURD_SIGNAL_H_EXTERN_INLINE void *
 _hurd_critical_section_lock (void)
 {
-  struct hurd_sigstate **location =
-    (void *) __hurd_threadvar_location (_HURD_THREADVAR_SIGSTATE);
-  struct hurd_sigstate *ss = *location;
+  struct hurd_sigstate *ss;
+
+#ifdef __LIBC_NO_TLS
+  if (__LIBC_NO_TLS ())
+    /* TLS is currently initializing, no need to enter critical section.  */
+    return NULL;
+#endif
+
+  ss = THREAD_SELF->_hurd_sigstate;
   if (ss == NULL)
     {
       /* The thread variable is unset; this must be the first time we've
 	 asked for it.  In this case, the critical section flag cannot
 	 possible already be set.  Look up our sigstate structure the slow
-	 way; this locks the sigstate lock.  */
-      ss = *location = _hurd_thread_sigstate (__mach_thread_self ());
-      __spin_unlock (&ss->lock);
+	 way.  */
+      ss = THREAD_SELF->_hurd_sigstate = _hurd_thread_sigstate (__mach_thread_self ());
     }
 
   if (! __spin_try_lock (&ss->critical_section_lock))
@@ -189,7 +229,13 @@ _hurd_critical_section_lock (void)
      _hurd_critical_section_unlock to unlock it.  */
   return ss;
 }
+# endif
+#endif
 
+extern void _hurd_critical_section_unlock (void *our_lock);
+
+#if defined __USE_EXTERN_INLINES && defined _LIBC
+# if IS_IN (libc)
 _HURD_SIGNAL_H_EXTERN_INLINE void
 _hurd_critical_section_unlock (void *our_lock)
 {
@@ -199,12 +245,12 @@ _hurd_critical_section_unlock (void *our_lock)
   else
     {
       /* It was us who acquired the critical section lock.  Unlock it.  */
-      struct hurd_sigstate *ss = our_lock;
+      struct hurd_sigstate *ss = (struct hurd_sigstate *) our_lock;
       sigset_t pending;
-      __spin_lock (&ss->lock);
+      _hurd_sigstate_lock (ss);
       __spin_unlock (&ss->critical_section_lock);
-      pending = ss->pending & ~ss->blocked;
-      __spin_unlock (&ss->lock);
+      pending = _hurd_sigstate_pending(ss) & ~ss->blocked;
+      _hurd_sigstate_unlock (ss);
       if (! __sigisemptyset (&pending))
 	/* There are unblocked signals pending, which weren't
 	   delivered because we were in the critical section.
@@ -212,6 +258,8 @@ _hurd_critical_section_unlock (void *our_lock)
 	__msg_sig_post (_hurd_msgport, 0, 0, __mach_task_self ());
     }
 }
+# endif
+#endif
 
 /* Convenient macros for simple uses of critical sections.
    These two must be used as a pair at the same C scoping level.  */
@@ -234,8 +282,8 @@ extern void _hurdsig_fault_init (void);
    sigstate SS points to.  If SS is a null pointer, this instead affects
    the calling thread.  */
 
-extern void _hurd_raise_signal (struct hurd_sigstate *ss, int signo,
-				const struct hurd_signal_detail *detail);
+extern int _hurd_raise_signal (struct hurd_sigstate *ss, int signo,
+			       const struct hurd_signal_detail *detail);
 
 /* Translate a Mach exception into a signal (machine-dependent).  */
 
@@ -341,23 +389,23 @@ extern mach_msg_timeout_t _hurd_interrupted_rpc_timeout;
     do									      \
       {									      \
 	/* Get the message port.  */					      \
-	__err = (fetch_msgport_expr);					      \
+	__err = (error_t) (fetch_msgport_expr);				      \
 	if (__err)							      \
 	  break;							      \
 	/* Get the reference port.  */					      \
-	__err = (fetch_refport_expr);					      \
+	__err = (error_t) (fetch_refport_expr);				      \
 	if (__err)							      \
 	  {								      \
 	    /* Couldn't get it; deallocate MSGPORT and fail.  */	      \
 	    __mach_port_deallocate (__mach_task_self (), msgport);	      \
 	    break;							      \
 	  }								      \
-	__err = (rpc_expr);						      \
+	__err = (error_t) (rpc_expr);					      \
 	__mach_port_deallocate (__mach_task_self (), msgport);		      \
 	if ((dealloc_refport) && refport != MACH_PORT_NULL)		      \
 	  __mach_port_deallocate (__mach_task_self (), refport);    	      \
-      } while (__err == MACH_SEND_INVALID_DEST ||			      \
-	       __err == MIG_SERVER_DIED);				      \
+      } while (__err == MACH_SEND_INVALID_DEST				      \
+	       || __err == MIG_SERVER_DIED);				      \
     __err;								      \
 })
 

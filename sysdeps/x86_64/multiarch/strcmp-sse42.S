@@ -1,5 +1,5 @@
 /* strcmp with SSE4.2
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,8 +15,42 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <sysdep.h>
+
+#ifndef STRCMP_SSE42
+# define STRCMP_SSE42	__strcmp_sse42
+#endif
+
+#if defined USE_AS_STRCASECMP_L || defined USE_AS_STRNCASECMP_L
+# include "locale-defines.h"
+#endif
+
+#if defined USE_AS_STRNCMP || defined USE_AS_STRNCASECMP_L
+/* Since the counter, %r11, is unsigned, we branch to strcmp_exitz
+   if the new counter > the old one or is 0.  */
+# define UPDATE_STRNCMP_COUNTER				\
+	/* calculate left number to compare */		\
+	lea	-16(%rcx, %r11), %r9;			\
+	cmp	%r9, %r11;				\
+	jb	LABEL(strcmp_exitz);			\
+	test	%r9, %r9;				\
+	je	LABEL(strcmp_exitz);			\
+	mov	%r9, %r11
+#else
+# define UPDATE_STRNCMP_COUNTER
+#endif
+
+#ifdef USE_AVX
+# define SECTION	avx
+# define GLABEL(l)	l##_avx
+#else
+# define SECTION	sse4.2
+# define GLABEL(l)	l##_sse42
+#endif
+
+#define LABEL(l)	.L##l
 
 /* We use 0x1a:
 	_SIDD_SBYTE_OPS
@@ -92,6 +126,7 @@ END (GLABEL(__strncasecmp))
 
 STRCMP_SSE42:
 	cfi_startproc
+	_CET_ENDBR
 	CALL_MCOUNT
 
 /*
@@ -121,11 +156,11 @@ STRCMP_SSE42:
 #endif
 
 #if defined USE_AS_STRNCMP || defined USE_AS_STRNCASECMP_L
-	test	%rdx, %rdx
+	test	%RDX_LP, %RDX_LP
 	je	LABEL(strcmp_exitz)
-	cmp	$1, %rdx
+	cmp	$1, %RDX_LP
 	je	LABEL(Byte0)
-	mov	%rdx, %r11
+	mov	%RDX_LP, %R11_LP
 #endif
 	mov	%esi, %ecx
 	mov	%edi, %eax
@@ -240,7 +275,7 @@ LABEL(bigger):
 	movslq	(%r10, %r9,4), %r9
 	pcmpeqb	%xmm1, D(%xmm0)		/* Any null chars? */
 	lea	(%r10, %r9), %r10
-	jmp	*%r10			/* jump to corresponding case */
+	_CET_NOTRACK jmp *%r10		/* jump to corresponding case */
 
 /*
  * The following cases will be handled by ashr_0

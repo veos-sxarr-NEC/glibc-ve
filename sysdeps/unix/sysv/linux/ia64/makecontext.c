@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David Mosberger-Tang <davidm@hpl.hp.com>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <libintl.h>
 #include <stdarg.h>
@@ -40,7 +40,7 @@ do {						\
 void
 __makecontext (ucontext_t *ucp, void (*func) (void), int argc, ...)
 {
-  struct sigcontext *sc = &ucp->uc_mcontext;
+  mcontext_t *sc = &ucp->uc_mcontext;
   extern void __start_context (ucontext_t *link, long gp, ...);
   unsigned long stack_start, stack_end;
   va_list ap;

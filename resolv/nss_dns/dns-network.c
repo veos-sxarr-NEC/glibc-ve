@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Extended from original form by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Parts of this file are plain copies of the file `getnetnamadr.c' from
    the bind package and it has the following copyright.  */
@@ -62,9 +62,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #include "nsswitch.h"
 #include <arpa/inet.h>
+#include <arpa/nameser.h>
+#include <resolv/resolv-internal.h>
+#include <resolv/resolv_context.h>
 
 /* Maximum number of aliases we allow.  */
 #define MAX_NR_ALIASES	48
@@ -91,13 +95,6 @@ typedef union querybuf
   u_char buf[MAXPACKET];
 } querybuf;
 
-/* These functions are defined in res_comp.c.  */
-#define NS_MAXCDNAME	255	/* maximum compressed domain name */
-extern int __ns_name_ntop (const u_char *, char *, size_t) __THROW;
-extern int __ns_name_unpack (const u_char *, const u_char *,
-			     const u_char *, u_char *, size_t) __THROW;
-
-
 /* Prototypes for local functions.  */
 static enum nss_status getanswer_r (const querybuf *answer, int anslen,
 				    struct netent *result, char *buffer,
@@ -118,24 +115,28 @@ _nss_dns_getnetbyname_r (const char *name, struct netent *result,
   } net_buffer;
   querybuf *orig_net_buffer;
   int anslen;
-  char *qbuf;
   enum nss_status status;
 
-  if (__res_maybe_init (&_res, 0) == -1)
-    return NSS_STATUS_UNAVAIL;
-
-  qbuf = strdupa (name);
+  struct resolv_context *ctx = __resolv_context_get ();
+  if (ctx == NULL)
+    {
+      *errnop = errno;
+      *herrnop = NETDB_INTERNAL;
+      return NSS_STATUS_UNAVAIL;
+    }
 
   net_buffer.buf = orig_net_buffer = (querybuf *) alloca (1024);
 
-  anslen = __libc_res_nsearch (&_res, qbuf, C_IN, T_PTR, net_buffer.buf->buf,
-			       1024, &net_buffer.ptr, NULL, NULL, NULL, NULL);
+  anslen = __res_context_search
+    (ctx, name, C_IN, T_PTR, net_buffer.buf->buf,
+     1024, &net_buffer.ptr, NULL, NULL, NULL, NULL);
   if (anslen < 0)
     {
       /* Nothing found.  */
       *errnop = errno;
       if (net_buffer.buf != orig_net_buffer)
 	free (net_buffer.buf);
+      __resolv_context_put (ctx);
       return (errno == ECONNREFUSED
 	      || errno == EPFNOSUPPORT
 	      || errno == EAFNOSUPPORT)
@@ -146,6 +147,7 @@ _nss_dns_getnetbyname_r (const char *name, struct netent *result,
 			errnop, herrnop, BYNAME);
   if (net_buffer.buf != orig_net_buffer)
     free (net_buffer.buf);
+  __resolv_context_put (ctx);
   return status;
 }
 
@@ -166,17 +168,22 @@ _nss_dns_getnetbyaddr_r (uint32_t net, int type, struct netent *result,
   unsigned int net_bytes[4];
   char qbuf[MAXDNAME];
   int cnt, anslen;
-  u_int32_t net2;
+  uint32_t net2;
   int olderr = errno;
 
   /* No net address lookup for IPv6 yet.  */
   if (type != AF_INET)
     return NSS_STATUS_UNAVAIL;
 
-  if (__res_maybe_init (&_res, 0) == -1)
-    return NSS_STATUS_UNAVAIL;
+  struct resolv_context *ctx = __resolv_context_get ();
+  if (ctx == NULL)
+    {
+      *errnop = errno;
+      *herrnop = NETDB_INTERNAL;
+      return NSS_STATUS_UNAVAIL;
+    }
 
-  net2 = (u_int32_t) net;
+  net2 = (uint32_t) net;
   for (cnt = 4; net2 != 0; net2 >>= 8)
     net_bytes[--cnt] = net2 & 0xff;
 
@@ -204,8 +211,8 @@ _nss_dns_getnetbyaddr_r (uint32_t net, int type, struct netent *result,
 
   net_buffer.buf = orig_net_buffer = (querybuf *) alloca (1024);
 
-  anslen = __libc_res_nquery (&_res, qbuf, C_IN, T_PTR, net_buffer.buf->buf,
-			      1024, &net_buffer.ptr, NULL, NULL, NULL, NULL);
+  anslen = __res_context_query (ctx, qbuf, C_IN, T_PTR, net_buffer.buf->buf,
+				1024, &net_buffer.ptr, NULL, NULL, NULL, NULL);
   if (anslen < 0)
     {
       /* Nothing found.  */
@@ -213,6 +220,7 @@ _nss_dns_getnetbyaddr_r (uint32_t net, int type, struct netent *result,
       __set_errno (olderr);
       if (net_buffer.buf != orig_net_buffer)
 	free (net_buffer.buf);
+      __resolv_context_put (ctx);
       return (err == ECONNREFUSED
 	      || err == EPFNOSUPPORT
 	      || err == EAFNOSUPPORT)
@@ -233,12 +241,10 @@ _nss_dns_getnetbyaddr_r (uint32_t net, int type, struct netent *result,
       result->n_net = u_net;
     }
 
+  __resolv_context_put (ctx);
   return status;
 }
 
-
-#undef offsetof
-#define offsetof(Type, Member) ((size_t) &((Type *) NULL)->Member)
 
 static enum nss_status
 getanswer_r (const querybuf *answer, int anslen, struct netent *result,
@@ -329,11 +335,8 @@ getanswer_r (const querybuf *answer, int anslen, struct netent *result,
 
   while (--answer_count >= 0 && cp < end_of_message)
     {
-      int n = dn_expand (answer->buf, end_of_message, cp, bp, linebuflen);
-      int type, class;
-
-      n = __ns_name_unpack (answer->buf, end_of_message, cp,
-			    packtmp, sizeof packtmp);
+      int n = __ns_name_unpack (answer->buf, end_of_message, cp,
+				packtmp, sizeof packtmp);
       if (n != -1 && __ns_name_ntop (packtmp, bp, linebuflen) == -1)
 	{
 	  if (errno == EMSGSIZE)
@@ -342,16 +345,27 @@ getanswer_r (const querybuf *answer, int anslen, struct netent *result,
 	  n = -1;
 	}
 
-      if (n > 0 && bp[0] == '.')
-	bp[0] = '\0';
-
       if (n < 0 || res_dnok (bp) == 0)
 	break;
       cp += n;
+
+      if (end_of_message - cp < 10)
+	{
+	  __set_h_errno (NO_RECOVERY);
+	  return NSS_STATUS_UNAVAIL;
+	}
+
+      int type, class;
       GETSHORT (type, cp);
       GETSHORT (class, cp);
       cp += INT32SZ;		/* TTL */
-      GETSHORT (n, cp);
+      uint16_t rdatalen;
+      GETSHORT (rdatalen, cp);
+      if (end_of_message - cp < rdatalen)
+	{
+	  __set_h_errno (NO_RECOVERY);
+	  return NSS_STATUS_UNAVAIL;
+	}
 
       if (class == C_IN && type == T_PTR)
 	{
@@ -373,7 +387,7 @@ getanswer_r (const querybuf *answer, int anslen, struct netent *result,
 	      cp += n;
 	      return NSS_STATUS_UNAVAIL;
 	    }
-	  cp += n;
+	  cp += rdatalen;
          if (alias_pointer + 2 < &net_data->aliases[MAX_NR_ALIASES])
            {
              *alias_pointer++ = bp;
@@ -384,6 +398,9 @@ getanswer_r (const querybuf *answer, int anslen, struct netent *result,
              ++have_answer;
            }
 	}
+      else
+	/* Skip over unknown record data.  */
+	cp += rdatalen;
     }
 
   if (have_answer)

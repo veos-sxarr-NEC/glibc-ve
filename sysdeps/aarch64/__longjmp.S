@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <jmpbuf-offsets.h>
@@ -46,6 +46,8 @@ ENTRY (__longjmp)
 	cfi_offset(d14, JB_D14<<3)
 	cfi_offset(d15, JB_D15<<3)
 
+	DELOUSE (0)
+
 	ldp	x19, x20, [x0, #JB_X19<<3]
 	ldp	x21, x22, [x0, #JB_X21<<3]
 	ldp	x23, x24, [x0, #JB_X23<<3]
@@ -53,7 +55,7 @@ ENTRY (__longjmp)
 	ldp	x27, x28, [x0, #JB_X27<<3]
 #ifdef PTR_DEMANGLE
 	ldp	x29,  x4, [x0, #JB_X29<<3]
-	PTR_DEMANGLE (x30, x4, x3, x2)
+	PTR_DEMANGLE (30, 4, 3, 2)
 #else
 	ldp	x29, x30, [x0, #JB_X29<<3]
 #endif
@@ -98,7 +100,7 @@ ENTRY (__longjmp)
 	cfi_same_value(d15)
 #ifdef PTR_DEMANGLE
 	ldr	x4, [x0, #JB_SP<<3]
-	PTR_DEMANGLE (x5, x4, x3, x2)
+	PTR_DEMANGLE (5, 4, 3, 2)
 #else
 	ldr	x5, [x0, #JB_SP<<3]
 #endif

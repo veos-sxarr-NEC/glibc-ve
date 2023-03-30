@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,18 +13,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <libc-internal.h>
 
 /* Defined in brk.c.  */
 extern void *__curbrk;
 extern int __brk (void *addr);
-
-/* Defined in init-first.c.  */
-extern int __libc_multiple_libcs attribute_hidden;
 
 /* Extend the process's data space by INCREMENT.
    If INCREMENT is negative, shrink data space by - INCREMENT.
@@ -47,10 +45,15 @@ __sbrk (intptr_t increment)
     return __curbrk;
 
   oldbrk = __curbrk;
-  if ((increment > 0
-       ? ((uintptr_t) oldbrk + (uintptr_t) increment < (uintptr_t) oldbrk)
-       : ((uintptr_t) oldbrk < (uintptr_t) -increment))
-      || __brk (oldbrk + increment) < 0)
+  if (increment > 0
+      ? ((uintptr_t) oldbrk + (uintptr_t) increment < (uintptr_t) oldbrk)
+      : ((uintptr_t) oldbrk < (uintptr_t) -increment))
+    {
+      __set_errno (ENOMEM);
+      return (void *) -1;
+    }
+
+  if (__brk (oldbrk + increment) < 0)
     return (void *) -1;
 
   return oldbrk;

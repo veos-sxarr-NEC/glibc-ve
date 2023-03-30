@@ -1,5 +1,5 @@
 /* Truncate argument to nearest integral value not larger than the argument.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997 and
 		  Jakub Jelinek <jj@ultra.linux.cz>, 1999.
@@ -16,18 +16,25 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
+#include <math-use-builtins.h>
 
 
-long double
-__truncl (long double x)
+_Float128
+__truncl (_Float128 x)
 {
+#if USE_TRUNCL_BUILTIN
+  return __builtin_truncl (x);
+#else
+  /* Use generic implementation.  */
   int32_t j0;
-  u_int64_t i0, i1, sx;
+  uint64_t i0, i1, sx;
 
   GET_LDOUBLE_WORDS64 (i0, i1, x);
   sx = i0 & 0x8000000000000000ULL;
@@ -52,5 +59,6 @@ __truncl (long double x)
     }
 
   return x;
+#endif /* ! USE_TRUNCL_BUILTIN  */
 }
-weak_alias (__truncl, truncl)
+libm_alias_ldouble (__trunc, trunc)

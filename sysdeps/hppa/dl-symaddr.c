@@ -1,5 +1,5 @@
 /* Get the symbol address.  HPPA version.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ldsodefs.h>
 #include <dl-machine.h>
@@ -23,7 +23,7 @@ void *
 _dl_symbol_address (struct link_map *map, const ElfW(Sym) *ref)
 {
   /* Find the "ip" from the "map" and symbol "ref" */
-  Elf32_Addr value = (map ? map->l_addr : 0) + ref->st_value;
+  Elf32_Addr value = SYMBOL_ADDRESS (map, ref, false);
 
   /* On hppa, we have to return the pointer to function descriptor.
      This involves an "| 2" to inform $$dyncall that this is a plabel32  */
@@ -33,3 +33,4 @@ _dl_symbol_address (struct link_map *map, const ElfW(Sym) *ref)
   else
     return (void *) value;
 }
+rtld_hidden_def (_dl_symbol_address)

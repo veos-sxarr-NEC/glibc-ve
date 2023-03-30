@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2004.
 
@@ -14,7 +14,12 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+/* This file tests gets.  Force it to be declared.  */
+#include <features.h>
+#undef __GLIBC_USE_DEPRECATED_GETS
+#define __GLIBC_USE_DEPRECATED_GETS 1
 
 #include <assert.h>
 #include <fcntl.h>
@@ -143,12 +148,25 @@ do_test (void)
   if (memcmp (buf, "aabcdefghi", 10))
     FAIL ();
 
+  memcpy (buf, "abcdefghij", 10);
+  bcopy (buf, buf + 1, 9);
+  if (memcmp (buf, "aabcdefghi", 10))
+    FAIL ();
+
   if (mempcpy (buf + 5, "abcde", 5) != buf + 10
       || memcmp (buf, "aabcdabcde", 10))
     FAIL ();
 
   memset (buf + 8, 'j', 2);
   if (memcmp (buf, "aabcdabcjj", 10))
+    FAIL ();
+
+  bzero (buf + 8, 2);
+  if (memcmp (buf, "aabcdabc\0\0", 10))
+    FAIL ();
+
+  explicit_bzero (buf + 6, 4);
+  if (memcmp (buf, "aabcda\0\0\0\0", 10))
     FAIL ();
 
   strcpy (buf + 4, "EDCBA");
@@ -175,12 +193,25 @@ do_test (void)
   if (memcmp (buf, "aabcdefghi", 10))
     FAIL ();
 
+  memcpy (buf, "abcdefghij", l0 + 10);
+  bcopy (buf, buf + 1, l0 + 9);
+  if (memcmp (buf, "aabcdefghi", 10))
+    FAIL ();
+
   if (mempcpy (buf + 5, "abcde", l0 + 5) != buf + 10
       || memcmp (buf, "aabcdabcde", 10))
     FAIL ();
 
   memset (buf + 8, 'j', l0 + 2);
   if (memcmp (buf, "aabcdabcjj", 10))
+    FAIL ();
+
+  bzero (buf + 8, l0 + 2);
+  if (memcmp (buf, "aabcdabc\0\0", 10))
+    FAIL ();
+
+  explicit_bzero (buf + 6, l0 + 4);
+  if (memcmp (buf, "aabcda\0\0\0\0", 10))
     FAIL ();
 
   strcpy (buf + 4, str1 + 5);
@@ -214,8 +245,15 @@ do_test (void)
   if (memcmp (buf, "aabcEcdZY", 10))
     FAIL ();
 
+  /* The following tests are supposed to succeed at all fortify
+     levels, even though they overflow a.buf1 into a.buf2.  */
   memcpy (a.buf1, "abcdefghij", l0 + 10);
   memmove (a.buf1 + 1, a.buf1, l0 + 9);
+  if (memcmp (a.buf1, "aabcdefghi", 10))
+    FAIL ();
+
+  memcpy (a.buf1, "abcdefghij", l0 + 10);
+  bcopy (a.buf1, a.buf1 + 1, l0 + 9);
   if (memcmp (a.buf1, "aabcdefghi", 10))
     FAIL ();
 
@@ -225,6 +263,14 @@ do_test (void)
 
   memset (a.buf1 + 8, 'j', l0 + 2);
   if (memcmp (a.buf1, "aabcdabcjj", 10))
+    FAIL ();
+
+  bzero (a.buf1 + 8, l0 + 2);
+  if (memcmp (a.buf1, "aabcdabc\0\0", 10))
+    FAIL ();
+
+  explicit_bzero (a.buf1 + 6, l0 + 4);
+  if (memcmp (a.buf1, "aabcda\0\0\0\0", 10))
     FAIL ();
 
 #if __USE_FORTIFY_LEVEL < 2
@@ -264,10 +310,20 @@ do_test (void)
 #endif
 
 #if __USE_FORTIFY_LEVEL >= 1
-  /* Now check if all buffer overflows are caught at runtime.  */
+  /* Now check if all buffer overflows are caught at runtime.
+     N.B. All tests involving a length parameter need to be done
+     twice: once with the length a compile-time constant, once without.  */
+
+  CHK_FAIL_START
+  memcpy (buf + 1, "abcdefghij", 10);
+  CHK_FAIL_END
 
   CHK_FAIL_START
   memcpy (buf + 1, "abcdefghij", l0 + 10);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  memmove (buf + 2, buf + 1, 9);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -275,11 +331,43 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  bcopy (buf + 1, buf + 2, 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bcopy (buf + 1, buf + 2, l0 + 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  p = (char *) mempcpy (buf + 6, "abcde", 5);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   p = (char *) mempcpy (buf + 6, "abcde", l0 + 5);
   CHK_FAIL_END
 
   CHK_FAIL_START
+  memset (buf + 9, 'j', 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   memset (buf + 9, 'j', l0 + 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bzero (buf + 9, 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bzero (buf + 9, l0 + 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  explicit_bzero (buf + 9, 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  explicit_bzero (buf + 9, l0 + 2);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -291,7 +379,15 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  strncpy (buf + 7, "X", 4);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   strncpy (buf + 7, "X", l0 + 4);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  stpncpy (buf + 6, "cd", 5);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -301,6 +397,10 @@ do_test (void)
 # if !defined __cplusplus || defined __va_arg_pack
   CHK_FAIL_START
   sprintf (buf + 8, "%d", num1);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  snprintf (buf + 8, 3, "%d", num2);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -316,14 +416,23 @@ do_test (void)
   CHK_FAIL_END
 # endif
 
-  memcpy (buf, str1 + 2, l0 + 9);
+  memcpy (buf, str1 + 2, 9);
   CHK_FAIL_START
   strcat (buf, "AB");
   CHK_FAIL_END
 
-  memcpy (buf, str1 + 3, l0 + 8);
+  memcpy (buf, str1 + 3, 8);
+  CHK_FAIL_START
+  strncat (buf, "ZYXWV", 3);
+  CHK_FAIL_END
+
+  memcpy (buf, str1 + 3, 8);
   CHK_FAIL_START
   strncat (buf, "ZYXWV", l0 + 3);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  memcpy (a.buf1 + 1, "abcdefghij", 10);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -331,7 +440,23 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  memmove (a.buf1 + 2, a.buf1 + 1, 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   memmove (a.buf1 + 2, a.buf1 + 1, l0 + 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bcopy (a.buf1 + 1, a.buf1 + 2, 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bcopy (a.buf1 + 1, a.buf1 + 2, l0 + 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  p = (char *) mempcpy (a.buf1 + 6, "abcde", 5);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -339,7 +464,27 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  memset (a.buf1 + 9, 'j', 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   memset (a.buf1 + 9, 'j', l0 + 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bzero (a.buf1 + 9, 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  bzero (a.buf1 + 9, l0 + 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  explicit_bzero (a.buf1 + 9, 2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  explicit_bzero (a.buf1 + 9, l0 + 2);
   CHK_FAIL_END
 
 # if __USE_FORTIFY_LEVEL >= 2
@@ -357,6 +502,10 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  strncpy (a.buf1 + (O + 6), "X", 4);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   strncpy (a.buf1 + (O + 6), "X", l0 + 4);
   CHK_FAIL_END
 
@@ -366,16 +515,20 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  snprintf (a.buf1 + (O + 7), 3, "%d", num2);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   snprintf (a.buf1 + (O + 7), l0 + 3, "%d", num2);
   CHK_FAIL_END
 # endif
 
-  memcpy (a.buf1, str1 + (3 - O), l0 + 8 + O);
+  memcpy (a.buf1, str1 + (3 - O), 8 + O);
   CHK_FAIL_START
   strcat (a.buf1, "AB");
   CHK_FAIL_END
 
-  memcpy (a.buf1, str1 + (4 - O), l0 + 7 + O);
+  memcpy (a.buf1, str1 + (4 - O), 7 + O);
   CHK_FAIL_START
   strncat (a.buf1, "ZYXWV", l0 + 3);
   CHK_FAIL_END
@@ -504,10 +657,20 @@ do_test (void)
 #endif
 
 #if __USE_FORTIFY_LEVEL >= 1
-  /* Now check if all buffer overflows are caught at runtime.  */
+  /* Now check if all buffer overflows are caught at runtime.
+     N.B. All tests involving a length parameter need to be done
+     twice: once with the length a compile-time constant, once without.  */
+
+  CHK_FAIL_START
+  wmemcpy (wbuf + 1, L"abcdefghij", 10);
+  CHK_FAIL_END
 
   CHK_FAIL_START
   wmemcpy (wbuf + 1, L"abcdefghij", l0 + 10);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  wmemcpy (wbuf + 9, L"abcdefghij", 10);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -515,11 +678,23 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wmemmove (wbuf + 2, wbuf + 1, 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wmemmove (wbuf + 2, wbuf + 1, l0 + 9);
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wp = wmempcpy (wbuf + 6, L"abcde", 5);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wp = wmempcpy (wbuf + 6, L"abcde", l0 + 5);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  wmemset (wbuf + 9, L'j', 2);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -535,6 +710,10 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wcsncpy (wbuf + 7, L"X", 4);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wcsncpy (wbuf + 7, L"X", l0 + 4);
   CHK_FAIL_END
 
@@ -547,17 +726,25 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wcpncpy (wbuf + 6, L"cd", 5);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wcpncpy (wbuf + 6, L"cd", l0 + 5);
   CHK_FAIL_END
 
-  wmemcpy (wbuf, wstr1 + 2, l0 + 9);
+  wmemcpy (wbuf, wstr1 + 2, 9);
   CHK_FAIL_START
   wcscat (wbuf, L"AB");
   CHK_FAIL_END
 
-  wmemcpy (wbuf, wstr1 + 3, l0 + 8);
+  wmemcpy (wbuf, wstr1 + 3, 8);
   CHK_FAIL_START
   wcsncat (wbuf, L"ZYXWV", l0 + 3);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  wmemcpy (wa.buf1 + 1, L"abcdefghij", 10);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -565,11 +752,23 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wmemmove (wa.buf1 + 2, wa.buf1 + 1, 9);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wmemmove (wa.buf1 + 2, wa.buf1 + 1, l0 + 9);
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wp = wmempcpy (wa.buf1 + 6, L"abcde", 5);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wp = wmempcpy (wa.buf1 + 6, L"abcde", l0 + 5);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  wmemset (wa.buf1 + 9, L'j', 2);
   CHK_FAIL_END
 
   CHK_FAIL_START
@@ -591,15 +790,19 @@ do_test (void)
   CHK_FAIL_END
 
   CHK_FAIL_START
+  wcsncpy (wa.buf1 + (O + 6), L"X", 4);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
   wcsncpy (wa.buf1 + (O + 6), L"X", l0 + 4);
   CHK_FAIL_END
 
-  wmemcpy (wa.buf1, wstr1 + (3 - O), l0 + 8 + O);
+  wmemcpy (wa.buf1, wstr1 + (3 - O), 8 + O);
   CHK_FAIL_START
   wcscat (wa.buf1, L"AB");
   CHK_FAIL_END
 
-  wmemcpy (wa.buf1, wstr1 + (4 - O), l0 + 7 + O);
+  wmemcpy (wa.buf1, wstr1 + (4 - O), 7 + O);
   CHK_FAIL_START
   wcsncat (wa.buf1, L"ZYXWV", l0 + 3);
   CHK_FAIL_END
@@ -884,6 +1087,11 @@ do_test (void)
   if (read (fileno (stdin), buf, sizeof (buf) + 1) != sizeof (buf) + 1)
     FAIL ();
   CHK_FAIL_END
+
+  CHK_FAIL_START
+  if (read (fileno (stdin), buf, l0 + sizeof (buf) + 1) != sizeof (buf) + 1)
+    FAIL ();
+  CHK_FAIL_END
 #endif
 
   if (pread (fileno (stdin), buf, sizeof (buf) - 1, sizeof (buf) - 2)
@@ -904,6 +1112,12 @@ do_test (void)
       != sizeof (buf) + 1)
     FAIL ();
   CHK_FAIL_END
+
+  CHK_FAIL_START
+  if (pread (fileno (stdin), buf, l0 + sizeof (buf) + 1, 2 * sizeof (buf))
+      != sizeof (buf) + 1)
+    FAIL ();
+  CHK_FAIL_END
 #endif
 
   if (pread64 (fileno (stdin), buf, sizeof (buf) - 1, sizeof (buf) - 2)
@@ -921,6 +1135,12 @@ do_test (void)
 #if __USE_FORTIFY_LEVEL >= 1
   CHK_FAIL_START
   if (pread64 (fileno (stdin), buf, sizeof (buf) + 1, 2 * sizeof (buf))
+      != sizeof (buf) + 1)
+    FAIL ();
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  if (pread64 (fileno (stdin), buf, l0 + sizeof (buf) + 1, 2 * sizeof (buf))
       != sizeof (buf) + 1)
     FAIL ();
   CHK_FAIL_END
@@ -1435,22 +1655,37 @@ do_test (void)
 
   fd_set s;
   FD_ZERO (&s);
+
   FD_SET (FD_SETSIZE - 1, &s);
 #if __USE_FORTIFY_LEVEL >= 1
   CHK_FAIL_START
   FD_SET (FD_SETSIZE, &s);
   CHK_FAIL_END
+
+  CHK_FAIL_START
+  FD_SET (l0 + FD_SETSIZE, &s);
+  CHK_FAIL_END
 #endif
+
   FD_CLR (FD_SETSIZE - 1, &s);
 #if __USE_FORTIFY_LEVEL >= 1
   CHK_FAIL_START
   FD_CLR (FD_SETSIZE, &s);
   CHK_FAIL_END
+
+  CHK_FAIL_START
+  FD_SET (l0 + FD_SETSIZE, &s);
+  CHK_FAIL_END
 #endif
+
   FD_ISSET (FD_SETSIZE - 1, &s);
 #if __USE_FORTIFY_LEVEL >= 1
   CHK_FAIL_START
   FD_ISSET (FD_SETSIZE, &s);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  FD_ISSET (l0 + FD_SETSIZE, &s);
   CHK_FAIL_END
 #endif
 
@@ -1462,11 +1697,19 @@ do_test (void)
   CHK_FAIL_START
   poll (fds, 2, 0);
   CHK_FAIL_END
+
+  CHK_FAIL_START
+  poll (fds, l0 + 2, 0);
+  CHK_FAIL_END
 #endif
   ppoll (fds, 1, NULL, NULL);
 #if __USE_FORTIFY_LEVEL >= 1
   CHK_FAIL_START
   ppoll (fds, 2, NULL, NULL);
+  CHK_FAIL_END
+
+  CHK_FAIL_START
+  ppoll (fds, l0 + 2, NULL, NULL);
   CHK_FAIL_END
 #endif
 

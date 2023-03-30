@@ -1,5 +1,5 @@
 /* Special .init and .fini section support for VE architecture.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* crti.S puts a function prologue at the beginning of the .init and
    .fini sections and defines global symbols for those addresses, so
@@ -62,6 +62,7 @@
 	.section .init,"ax",@progbits
 	.balign 1 		/* init section is 1 byte aligned in VE */
 	.globl _init
+	.hidden _init
 	.type _init, @function
 _init:
 	/* Maintain 16-byte stack alignment for called functions.  */
@@ -69,8 +70,7 @@ _init:
         st      %lr,0x8(,%sp)
         st      %got,0x18(,%sp)
         st      %plt,0x20(,%sp)
-        lea 	%got,_GLOBAL_OFFSET_TABLE_@PC_LO(-24)
-        and 	%got,%got,(32)0
+        addi %got,-16,_GLOBAL_OFFSET_TABLE_@PC_LO
         sic 	%plt
         lea.sl 	%got,_GLOBAL_OFFSET_TABLE_@PC_HI(%plt,%got)
         or      %fp,0,%sp
@@ -88,8 +88,7 @@ _init:
 #if PREINIT_FUNCTION_WEAK
 
 	xor     %s61, %s61, %s61
-	lea     %s61, PREINIT_FUNCTION@GOT_LO
-	and     %s61, %s61, (32)0
+	addi %s61,0,PREINIT_FUNCTION@GOT_LO
 	lea.sl  %s61, PREINIT_FUNCTION@GOT_HI(%s61, %got)
 	ld	%s61, (,%s61)
 
@@ -98,16 +97,14 @@ _init:
 	breq.w  0, %s61, .L4.2		/* if address is zero then do nothing */
 	br.l    .L4.1
 .L4.1:
-	lea     %s12, PREINIT_FUNCTION@plt_lo(-24)
-	and     %s12, %s12, (32)0
+	addi %s12,-16,PREINIT_FUNCTION@PLT_LO
 	sic     %s60
 	lea.sl  %s12, PREINIT_FUNCTION@plt_hi(%s12,%s60)
 	bsic    %lr, (%s12)
 	
 .L4.2:
 #else
-        lea     %s12, PREINIT_FUNCTION@plt_lo(-24)
-        and     %s12, %s12, (32)0
+        addi %s12,-16,PREINIT_FUNCTION@PLT_LO
         sic     %s60
         lea.sl  %s12, PREINIT_FUNCTION@plt_hi(%s12,%s60)
 	bsic    %lr, (%s12)
@@ -124,7 +121,7 @@ _init:
 	.type   __ve_hw_specific01,@object
 	.hidden __ve_hw_specific01
 __ve_hw_specific01:
-	.zero   1024
+	.zero   256
 
 
 /* Not much to do in this function, so as placeholder */
@@ -132,6 +129,7 @@ __ve_hw_specific01:
 	.section .fini,"ax",@progbits
 	.balign 1                /* fini section is 1 byte aligned in VE */
 	.globl _fini
+	.hidden _fini
 	.type _fini, @function
 _fini:
 	st      %fp,0x0(,%sp)

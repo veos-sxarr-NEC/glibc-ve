@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,17 +14,20 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <setjmp.h>
 #include <stdlib.h>
 #include <nptl/pthreadP.h>
+#include <futex-internal.h>
 
 
 /* The next two functions are similar to pthread_setcanceltype() but
    more specialized for the use in the cancelable functions like write().
-   They do not need to check parameters etc.  */
+   They do not need to check parameters etc.  These functions must be
+   AS-safe, with the exception of the actual cancellation, because they
+   are called by wrappers around AS-safe functions like write().*/
 int
 attribute_hidden
 __pthread_enable_asynccancel (void)
@@ -59,9 +62,10 @@ __pthread_enable_asynccancel (void)
   return oldval;
 }
 
-
+/* See the comment for __pthread_enable_asynccancel regarding
+   the AS-safety of this function.  */
 void
-internal_function attribute_hidden
+attribute_hidden
 __pthread_disable_asynccancel (int oldtype)
 {
   /* If asynchronous cancellation was enabled before we do not have
@@ -98,7 +102,8 @@ __pthread_disable_asynccancel (int oldtype)
   while (__builtin_expect ((newval & (CANCELING_BITMASK | CANCELED_BITMASK))
 			   == CANCELING_BITMASK, 0))
     {
-      lll_futex_timed_wait(&self->cancelhandling, newval, &rcheck, LLL_PRIVATE);
+      futex_reltimed_wait ((unsigned int *) &self->cancelhandling, newval,
+			 &rcheck, FUTEX_PRIVATE);
       newval = THREAD_GETMEM (self, cancelhandling);
     }
 }

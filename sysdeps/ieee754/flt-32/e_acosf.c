@@ -15,6 +15,7 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-finite.h>
 
 static const float
 one =  1.0000000000e+00, /* 0x3F800000 */
@@ -56,14 +57,14 @@ __ieee754_acosf(float x)
 	    z = (one+x)*(float)0.5;
 	    p = z*(pS0+z*(pS1+z*(pS2+z*(pS3+z*(pS4+z*pS5)))));
 	    q = one+z*(qS1+z*(qS2+z*(qS3+z*qS4)));
-	    s = __ieee754_sqrtf(z);
+	    s = sqrtf(z);
 	    r = p/q;
 	    w = r*s-pio2_lo;
 	    return pi - (float)2.0*(s+w);
 	} else {			/* x > 0.5 */
 	    int32_t idf;
 	    z = (one-x)*(float)0.5;
-	    s = __ieee754_sqrtf(z);
+	    s = sqrtf(z);
 	    df = s;
 	    GET_FLOAT_WORD(idf,df);
 	    SET_FLOAT_WORD(df,idf&0xfffff000);
@@ -75,4 +76,4 @@ __ieee754_acosf(float x)
 	    return (float)2.0*(df+w);
 	}
 }
-strong_alias (__ieee754_acosf, __acosf_finite)
+libm_alias_finite (__ieee754_acosf, __acosf)

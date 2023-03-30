@@ -5,25 +5,17 @@
 /* Adapted for use as nearbyint by Ulrich Drepper <drepper@cygnus.com>.  */
 
 #include <machine/asm.h>
+#include <libm-alias-double.h>
 
 ENTRY(__nearbyint)
 	fldl	4(%esp)
-	pushl	%eax
-	cfi_adjust_cfa_offset (4)
-	pushl	%ecx
-	cfi_adjust_cfa_offset (4)
-	fnstcw	(%esp)
-	movl	(%esp), %eax
-	orl	$0x20, %eax
-	movl	%eax, 4(%esp)
-	fldcw	4(%esp)
+	subl	$32, %esp
+	cfi_adjust_cfa_offset (32)
+	fnstenv	4(%esp)
 	frndint
-	fclex
-	fldcw	(%esp)
-	popl	%ecx
-	cfi_adjust_cfa_offset (-4)
-	popl	%eax
-	cfi_adjust_cfa_offset (-4)
+	fldenv	4(%esp)
+	addl	$32, %esp
+	cfi_adjust_cfa_offset (-32)
 	ret
 END (__nearbyint)
-weak_alias (__nearbyint, nearbyint)
+libm_alias_double (__nearbyint, nearbyint)

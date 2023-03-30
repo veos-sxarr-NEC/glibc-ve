@@ -1,5 +1,5 @@
 /* Declarations for internal libc locale interfaces
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _LOCALEINFO_H
 #define _LOCALEINFO_H 1
@@ -63,7 +63,7 @@ struct __locale_data
      the data.  */
   struct
   {
-    void (*cleanup) (struct __locale_data *) internal_function;
+    void (*cleanup) (struct __locale_data *);
     union
     {
       void *data;
@@ -183,22 +183,28 @@ enum
 #define _ISCTYPE(c, desc) \
   (((((const uint32_t *) (desc)) - 8)[(c) >> 5] >> ((c) & 0x1f)) & 1)
 
-/* Category name handling variables.  */
+/* Category name handling variables.  Concatenate all the strings in a
+   single object to minimize relocations.  Individual strings can be
+   accessed using _nl_category_names.  */
 #define CATNAMEMF(line) CATNAMEMF1 (line)
 #define CATNAMEMF1(line) str##line
-extern const union catnamestr_t
+extern const struct catnamestr_t
 {
-  struct
-  {
 #define DEFINE_CATEGORY(category, category_name, items, a) \
-    char CATNAMEMF (__LINE__)[sizeof (category_name)];
+  char CATNAMEMF (__LINE__)[sizeof (category_name)];
 #include "categories.def"
 #undef DEFINE_CATEGORY
-  };
-  char str[0];
 } _nl_category_names attribute_hidden;
 extern const uint8_t _nl_category_name_idxs[__LC_LAST] attribute_hidden;
 extern const uint8_t _nl_category_name_sizes[__LC_LAST] attribute_hidden;
+
+/* Return the name of the category INDEX, which must be nonnegative
+   and less than _LC_LAST.  */
+static inline const char *
+_nl_category_names_get (int index)
+{
+  return (const char *) &_nl_category_names + _nl_category_name_idxs[index];
+}
 
 /* Name of the standard locales.  */
 extern const char _nl_C_name[] attribute_hidden;
@@ -214,9 +220,9 @@ extern struct __locale_struct _nl_global_locale attribute_hidden;
 
 /* This fetches the thread-local locale_t pointer, either one set with
    uselocale or &_nl_global_locale.  */
-#define _NL_CURRENT_LOCALE	(__libc_tsd_get (__locale_t, LOCALE))
-#include <bits/libc-tsd.h>
-__libc_tsd_define (extern, __locale_t, LOCALE)
+#define _NL_CURRENT_LOCALE	(__libc_tsd_get (locale_t, LOCALE))
+#include <libc-tsd.h>
+__libc_tsd_define (extern, locale_t, LOCALE)
 
 
 /* For static linking it is desireable to avoid always linking in the code
@@ -260,12 +266,15 @@ extern __thread struct __locale_data *const *_nl_current_##category \
 #define _NL_CURRENT_WORD(category, item) \
   ((uint32_t) (*_nl_current_##category)->values[_NL_ITEM_INDEX (item)].word)
 
-/* This is used in lc-CATEGORY.c to define _nl_current_CATEGORY.  */
+/* This is used in lc-CATEGORY.c to define _nl_current_CATEGORY.  The symbol
+   _nl_current_CATEGORY_used is set to a value unequal to zero to mark this
+   category as used.  On S390 the used relocation to load the symbol address
+   can only handle even addresses.  */
 #define _NL_CURRENT_DEFINE(category) \
   __thread struct __locale_data *const *_nl_current_##category \
     attribute_hidden = &_nl_global_locale.__locales[category]; \
   asm (".globl " __SYMBOL_PREFIX "_nl_current_" #category "_used\n" \
-       _NL_CURRENT_DEFINE_ABS (_nl_current_##category##_used, 1));
+       _NL_CURRENT_DEFINE_ABS (_nl_current_##category##_used, 2));
 #ifdef HAVE_ASM_SET_DIRECTIVE
 # define _NL_CURRENT_DEFINE_ABS(sym, val) ".set " #sym ", " #val
 #else
@@ -299,6 +308,27 @@ extern __thread struct __locale_data *const *_nl_current_##category \
 
 #endif
 
+/* Extract CATEGORY locale's string for ITEM.  */
+static inline const char *
+_nl_lookup (locale_t l, int category, int item)
+{
+  return l->__locales[category]->values[_NL_ITEM_INDEX (item)].string;
+}
+
+/* Extract CATEGORY locale's wide string for ITEM.  */
+static inline const wchar_t *
+_nl_lookup_wstr (locale_t l, int category, int item)
+{
+  return (wchar_t *) l->__locales[category]
+    ->values[_NL_ITEM_INDEX (item)].wstr;
+}
+
+/* Extract the CATEGORY locale's word for ITEM.  */
+static inline uint32_t
+_nl_lookup_word (locale_t l, int category, int item)
+{
+  return l->__locales[category]->values[_NL_ITEM_INDEX (item)].word;
+}
 
 /* Default search path if no LOCPATH environment variable.  */
 extern const char _nl_default_locale_path[] attribute_hidden;
@@ -312,19 +342,18 @@ extern const char _nl_default_locale_path[] attribute_hidden;
 extern struct __locale_data *_nl_find_locale (const char *locale_path,
 					      size_t locale_path_len,
 					      int category, const char **name)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Try to load the file described by FILE.  */
 extern void _nl_load_locale (struct loaded_l10nfile *file, int category)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Free all resource.  */
-extern void _nl_unload_locale (struct __locale_data *locale)
-     internal_function attribute_hidden;
+extern void _nl_unload_locale (struct __locale_data *locale) attribute_hidden;
 
 /* Free the locale and give back all memory if the usage count is one.  */
 extern void _nl_remove_locale (int locale, struct __locale_data *data)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Find the locale *NAMEP in the locale archive, and return the
    internalized data structure for its CATEGORY data.  If this locale has
@@ -333,7 +362,7 @@ extern void _nl_remove_locale (int locale, struct __locale_data *data)
    archive string table; that way, the next call can short-circuit strcmp.  */
 extern struct __locale_data *_nl_load_locale_from_archive (int category,
 							   const char **namep)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Subroutine of setlocale's __libc_subfreeres hook.  */
 extern void _nl_archive_subfreeres (void) attribute_hidden;
@@ -349,40 +378,39 @@ extern void _nl_locale_subfreeres (void) attribute_hidden;
 extern struct __locale_data *_nl_intern_locale_data (int category,
 						     const void *data,
 						     size_t datasize)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 
 /* Return `era' entry which corresponds to TP.  Used in strftime.  */
 extern struct era_entry *_nl_get_era_entry (const struct tm *tp,
 					    struct __locale_data *lc_time)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Return `era' cnt'th entry .  Used in strptime.  */
 extern struct era_entry *_nl_select_era_entry (int cnt,
 					       struct __locale_data *lc_time)
-	  internal_function attribute_hidden;
+	  attribute_hidden;
 
 /* Return `alt_digit' which corresponds to NUMBER.  Used in strftime.  */
 extern const char *_nl_get_alt_digit (unsigned int number,
 				      struct __locale_data *lc_time)
-	  internal_function attribute_hidden;
+	  attribute_hidden;
 
 /* Similar, but now for wide characters.  */
 extern const wchar_t *_nl_get_walt_digit (unsigned int number,
 					  struct __locale_data *lc_time)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Parse string as alternative digit and return numeric value.  */
 extern int _nl_parse_alt_digit (const char **strp,
 				struct __locale_data *lc_time)
-     internal_function attribute_hidden;
+     attribute_hidden;
 
 /* Postload processing.  */
 extern void _nl_postload_ctype (void);
 
 /* Functions used for the `private.cleanup' hook.  */
-extern void _nl_cleanup_time (struct __locale_data *)
-     internal_function attribute_hidden;
+extern void _nl_cleanup_time (struct __locale_data *) attribute_hidden;
 
 
 #endif	/* localeinfo.h */

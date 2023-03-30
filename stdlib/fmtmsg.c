@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -14,10 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <fmtmsg.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -53,7 +53,7 @@ static const struct
     { 6, "action"},
     { 3, "tag" }
   };
-#define NKEYWORDS (sizeof( keywords) / sizeof (keywords[0]))
+#define NKEYWORDS (sizeof (keywords) / sizeof (keywords[0]))
 
 
 struct severity_info
@@ -94,8 +94,7 @@ static int print;
 
 /* Prototypes for local functions.  */
 static void init (void);
-static int internal_addseverity (int severity, const char *string)
-     internal_function;
+static int internal_addseverity (int severity, const char *string);
 
 
 int
@@ -127,8 +126,8 @@ fmtmsg (long int classification, const char *label, int severity,
   /* We do not want this call to be cut short by a thread
      cancellation.  Therefore disable cancellation for now.  */
   int state = PTHREAD_CANCEL_ENABLE;
-  __libc_ptf_call (pthread_setcancelstate, (PTHREAD_CANCEL_DISABLE, &state),
-		   0);
+  __libc_ptf_call (__pthread_setcancelstate,
+		   (PTHREAD_CANCEL_DISABLE, &state), 0);
 #endif
 
   __libc_lock_lock (lock);
@@ -199,7 +198,7 @@ fmtmsg (long int classification, const char *label, int severity,
   __libc_lock_unlock (lock);
 
 #ifdef __libc_ptf_call
-  __libc_ptf_call (pthread_setcancelstate, (state, NULL), 0);
+  __libc_ptf_call (__pthread_setcancelstate, (state, NULL), 0);
 #endif
 
   return result;
@@ -295,7 +294,6 @@ init (void)
 
 /* Add the new entry to the list.  */
 static int
-internal_function
 internal_addseverity (int severity, const char *string)
 {
   struct severity_info *runp, *lastp;
@@ -347,7 +345,7 @@ internal_addseverity (int severity, const char *string)
 
 /* Add new severity level or remove old one.  */
 int
-addseverity (int severity, const char *string)
+__addseverity (int severity, const char *string)
 {
   int result;
 
@@ -366,6 +364,7 @@ addseverity (int severity, const char *string)
 
   return result;
 }
+weak_alias (__addseverity, addseverity)
 
 
 libc_freeres_fn (free_mem)

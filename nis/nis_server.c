@@ -1,4 +1,4 @@
-/* Copyright (c) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@vt.uni-paderborn.de>, 1997.
 
@@ -14,10 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <string.h>
 #include <rpcsvc/nis.h>
+#include <shlib-compat.h>
 
 #include "nis_xdr.h"
 #include "nis_intern.h"
@@ -47,6 +48,7 @@ nis_servstate (const nis_server *serv, const nis_tag *tags,
 
   return NIS_SUCCESS;
 }
+libnsl_hidden_nolink_def (nis_servstate, GLIBC_2_1)
 
 nis_error
 nis_stats (const nis_server *serv, const nis_tag *tags,
@@ -73,6 +75,7 @@ nis_stats (const nis_server *serv, const nis_tag *tags,
 
   return NIS_SUCCESS;
 }
+libnsl_hidden_nolink_def (nis_stats, GLIBC_2_1)
 
 void
 nis_freetags (nis_tag *tags, const int numtags)
@@ -83,3 +86,4 @@ nis_freetags (nis_tag *tags, const int numtags)
     free (tags[i].tag_val);
   free (tags);
 }
+libnsl_hidden_nolink_def (nis_freetags, GLIBC_2_1)

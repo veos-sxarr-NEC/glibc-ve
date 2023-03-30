@@ -1,5 +1,5 @@
 /* Optimized strcmp implementation for PowerPC64.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -22,7 +22,11 @@
 
 /* int [r3] strcmp (const char *s1 [r3], const char *s2 [r4])  */
 
-EALIGN (strcmp, 4, 0)
+#ifndef STRCMP
+# define STRCMP strcmp
+#endif
+
+ENTRY_TOCLESS (STRCMP, 4)
 	CALL_MCOUNT 2
 
 #define rTMP2	r0
@@ -172,5 +176,5 @@ L(u3):	sub	rRTN, rWORD1, rWORD2
 L(u4):	lbz	rWORD1, -1(rSTR1)
 	sub	rRTN, rWORD1, rWORD2
 	blr
-END (strcmp)
+END (STRCMP)
 libc_hidden_builtin_def (strcmp)

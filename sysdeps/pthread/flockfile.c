@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,18 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread.h>
 #include <stdio.h>
-#include <libio.h>
-#include <bits/stdio-lock.h>
+#include <stdio-lock.h>
 
 
 void
-__flockfile (stream)
-     FILE *stream;
+__flockfile (FILE *stream)
 {
+  stream->_flags2 |= _IO_FLAGS2_NEED_LOCK;
   _IO_lock_lock (*stream->_lock);
 }
 strong_alias (__flockfile, _IO_flockfile)

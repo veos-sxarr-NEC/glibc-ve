@@ -1,5 +1,5 @@
 /* Load a shared object at run time.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <dlfcn.h>
 #include <libintl.h>
@@ -61,7 +61,7 @@ dlopen_doit (void *a)
   if (args->mode & ~(RTLD_BINDING_MASK | RTLD_NOLOAD | RTLD_DEEPBIND
 		     | RTLD_GLOBAL | RTLD_LOCAL | RTLD_NODELETE
 		     | __RTLD_SPROF))
-    GLRO(dl_signal_error) (0, NULL, NULL, _("invalid mode parameter"));
+    _dl_signal_error (0, NULL, NULL, _("invalid mode parameter"));
 
   args->new = GLRO(dl_open) (args->file ?: "", args->mode | __RTLD_DLOPEN,
 			     args->caller,
@@ -74,7 +74,7 @@ void *
 __dlopen (const char *file, int mode DL_CALLER_DECL)
 {
 # ifdef SHARED
-  if (__glibc_unlikely (_dlfcn_hook != NULL))
+  if (!rtld_active ())
     return _dlfcn_hook->dlopen (file, mode, DL_CALLER);
 # endif
 

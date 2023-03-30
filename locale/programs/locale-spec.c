@@ -1,5 +1,5 @@
 /* Handle special requests.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, 1996.
 
@@ -14,7 +14,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -53,7 +53,7 @@ locale_special (const char *name, int show_category_name,
 	  size_t cnt;
 
 	  for (cnt = 0; cnt < nelem; ++cnt)
-	    if (__collate_element_hash[2 * cnt] != (~((u_int32_t) 0)))
+	    if (__collate_element_hash[2 * cnt] != (~((uint32_t) 0)))
 	      {
 		size_t idx = __collate_element_hash[2 * cnt];
 

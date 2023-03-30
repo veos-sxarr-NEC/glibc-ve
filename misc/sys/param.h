@@ -1,5 +1,5 @@
 /* Compatibility header for old-style Unix parameters and limits.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SYS_PARAM_H
 #define _SYS_PARAM_H    1
@@ -49,6 +49,9 @@
 #endif
 #if !defined NOFILE && defined OPEN_MAX
 # define NOFILE		OPEN_MAX
+#endif
+#if !defined MAXHOSTNAMELEN && defined HOST_NAME_MAX
+# define MAXHOSTNAMELEN	HOST_NAME_MAX
 #endif
 #ifndef NCARGS
 # ifdef ARG_MAX

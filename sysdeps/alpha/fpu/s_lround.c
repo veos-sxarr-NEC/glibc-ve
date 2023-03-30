@@ -1,4 +1,4 @@
-/* Copyright (C) 2007-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,12 +13,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define __llround	not___llround
 #define llround		not_llround
 #include <math.h>
 #include <math_ldbl_opt.h>
+#include <libm-alias-double.h>
 #undef __llround
 #undef llround
 
@@ -33,15 +34,5 @@ __lround (double x)
 }
 
 strong_alias (__lround, __llround)
-weak_alias (__lround, lround)
-weak_alias (__llround, llround)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__lround, __lroundl)
-strong_alias (__lround, __llroundl)
-weak_alias (__lroundl, lroundl)
-weak_alias (__llroundl, llroundl)
-#endif
-#if LONG_DOUBLE_COMPAT(libm, GLIBC_2_1)
-compat_symbol (libm, __lround, lroundl, GLIBC_2_1);
-compat_symbol (libm, __llround, llroundl, GLIBC_2_1);
-#endif
+libm_alias_double (__lround, lround)
+libm_alias_double (__llround, llround)

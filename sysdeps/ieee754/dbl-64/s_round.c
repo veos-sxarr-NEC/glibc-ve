@@ -1,5 +1,5 @@
 /* Round double to integer away from zero.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,50 +15,48 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 
 #include <math_private.h>
-
-
-static const double huge = 1.0e300;
+#include <libm-alias-double.h>
+#include <stdint.h>
+#include <math-use-builtins.h>
 
 
 double
 __round (double x)
 {
-  int32_t i0, j0;
-  u_int32_t i1;
+#if USE_ROUND_BUILTIN
+  return __builtin_round (x);
+#else
+  /* Use generic implementation.  */
+  int64_t i0, j0;
 
-  EXTRACT_WORDS (i0, i1, x);
-  j0 = ((i0 >> 20) & 0x7ff) - 0x3ff;
-  if (j0 < 20)
+  EXTRACT_WORDS64 (i0, x);
+  j0 = ((i0 >> 52) & 0x7ff) - 0x3ff;
+  if (__glibc_likely (j0 < 52))
     {
       if (j0 < 0)
 	{
-	  math_force_eval (huge + x);
-
-	  i0 &= 0x80000000;
+	  i0 &= UINT64_C (0x8000000000000000);
 	  if (j0 == -1)
-	    i0 |= 0x3ff00000;
-	  i1 = 0;
+	    i0 |= UINT64_C (0x3ff0000000000000);
 	}
       else
 	{
-	  u_int32_t i = 0x000fffff >> j0;
-	  if (((i0 & i) | i1) == 0)
+	  uint64_t i = UINT64_C (0x000fffffffffffff) >> j0;
+	  if ((i0 & i) == 0)
 	    /* X is integral.  */
 	    return x;
-	  math_force_eval (huge + x);
 
-	  /* Raise inexact if x != 0.  */
-	  i0 += 0x00080000 >> j0;
+	  i0 += UINT64_C (0x0008000000000000) >> j0;
 	  i0 &= ~i;
-	  i1 = 0;
 	}
     }
-  else if (j0 > 51)
+  else
     {
       if (j0 == 0x400)
 	/* Inf or NaN.  */
@@ -66,28 +64,9 @@ __round (double x)
       else
 	return x;
     }
-  else
-    {
-      u_int32_t i = 0xffffffff >> (j0 - 20);
-      if ((i1 & i) == 0)
-	/* X is integral.  */
-	return x;
 
-      math_force_eval (huge + x);
-
-      /* Raise inexact if x != 0.  */
-      u_int32_t j = i1 + (1 << (51 - j0));
-      if (j < i1)
-	i0 += 1;
-      i1 = j;
-      i1 &= ~i;
-    }
-
-  INSERT_WORDS (x, i0, i1);
+  INSERT_WORDS64 (x, i0);
   return x;
+#endif /* ! USE_ROUND_BUILTIN  */
 }
-weak_alias (__round, round)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__round, __roundl)
-weak_alias (__round, roundl)
-#endif
+libm_alias_double (__round, round)

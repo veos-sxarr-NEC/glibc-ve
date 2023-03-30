@@ -1,5 +1,5 @@
 /* copysign function, sparc64 version.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David S. Miller <davem@davemloft.net>, 2012.
 
@@ -15,9 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <libm-alias-double.h>
 
 ENTRY (__copysign)
 	fzeros	%f7
@@ -27,4 +28,4 @@ ENTRY (__copysign)
 	retl
 	 fors	%f0, %f9, %f0
 END (__copysign)
-weak_alias (__copysign, copysign)
+libm_alias_double (__copysign, copysign)

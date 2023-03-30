@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Zack Weinberg <zack@rabi.phys.columbia.edu>, 1998.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -31,12 +31,11 @@
 #define _PATH_DEVPTS _PATH_DEV "pts"
 
 /* Prototype for function that opens BSD-style master pseudo-terminals.  */
-int __bsd_getpt (void);
+extern int __bsd_getpt (void) attribute_hidden;
 
 /* Open a master pseudo terminal and return its file descriptor.  */
 int
-__posix_openpt (oflag)
-     int oflag;
+__posix_openpt (int oflag)
 {
   static int have_no_dev_ptmx;
   int fd;

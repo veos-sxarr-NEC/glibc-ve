@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _TLS_H
 # define _TLS_H 1
@@ -25,17 +25,7 @@
 # include <stdbool.h>
 # include <stddef.h>
 # include <stdint.h>
-
-/* Type for the dtv.  */
-typedef union dtv
-{
-  size_t counter;
-  struct
-  {
-    void *val;
-    bool is_static;
-  } pointer;
-} dtv_t;
+# include <dl-dtv.h>
 
 #else /* __ASSEMBLER__ */
 # include <tcb-offsets.h>
@@ -126,6 +116,7 @@ typedef struct
   (descr->member[idx] = (value))
 
 /* Get and set the global scope generation counter in struct pthread.  */
+# define THREAD_GSCOPE_IN_TCB      1
 # define THREAD_GSCOPE_FLAG_UNUSED 0
 # define THREAD_GSCOPE_FLAG_USED   1
 # define THREAD_GSCOPE_FLAG_WAIT   2

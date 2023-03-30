@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    Contributed by Denis Joseph Barrow (djbarrow@de.ibm.com).
    This file is part of the GNU C Library.
 
@@ -14,25 +14,28 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SYS_UCONTEXT_H
 #define _SYS_UCONTEXT_H	1
-/* Forward definition to avoid parse errors */
-struct ucontext;
-typedef struct ucontext ucontext_t;
-#include <features.h>
-#include <signal.h>
 
-/* We need the signal context definitions even if they are not used
-   included in <signal.h>.  */
-#include <bits/sigcontext.h>
+#include <features.h>
+
+#include <bits/types/sigset_t.h>
+#include <bits/types/stack_t.h>
+
+
+#ifdef __USE_MISC
+# define __ctx(fld) fld
+#else
+# define __ctx(fld) __ ## fld
+#endif
 
 /* Type for a program status word.  */
 typedef struct
 {
-  unsigned long mask;
-  unsigned long addr;
+  unsigned long __ctx(mask);
+  unsigned long __ctx(addr);
 } __attribute__ ((__aligned__(8))) __psw_t;
 
 /* Type for a general-purpose register.  */
@@ -44,44 +47,49 @@ typedef unsigned long greg_t;
    that has the same size as s390_regs.  This is needed for the
    elf_prstatus structure.  */
 #if __WORDSIZE == 64
-# define NGREG 27
+# define __NGREG 27
 #else
-# define NGREG 36
+# define __NGREG 36
+#endif
+#ifdef __USE_MISC
+# define NGREG __NGREG
 #endif
 /* Must match kernels psw_t alignment.  */
-typedef greg_t gregset_t[NGREG] __attribute__ ((__aligned__(8)));
+typedef greg_t gregset_t[__NGREG] __attribute__ ((__aligned__(8)));
 
 typedef union
   {
-    double  d;
-    float   f;
+    double  __ctx(d);
+    float   __ctx(f);
   } fpreg_t;
 
 /* Register set for the floating-point registers.  */
 typedef struct
   {
-    unsigned int fpc;
-    fpreg_t fprs[16];
+    unsigned int __ctx(fpc);
+    fpreg_t __ctx(fprs)[16];
   } fpregset_t;
 
 /* Context to describe whole processor state.  */
 typedef struct
   {
-    __psw_t psw;
-    unsigned long gregs[16];
-    unsigned int aregs[16];
-    fpregset_t fpregs;
+    __psw_t __ctx(psw);
+    unsigned long __ctx(gregs)[16];
+    unsigned int __ctx(aregs)[16];
+    fpregset_t __ctx(fpregs);
   } mcontext_t;
 
 /* Userlevel context.  */
-struct ucontext
+typedef struct ucontext_t
   {
-    unsigned long int uc_flags;
-    struct ucontext *uc_link;
+    unsigned long int __ctx(uc_flags);
+    struct ucontext_t *uc_link;
     stack_t uc_stack;
     mcontext_t uc_mcontext;
-    __sigset_t uc_sigmask;
-  };
+    sigset_t uc_sigmask;
+  } ucontext_t;
+
+#undef __ctx
 
 
 #endif /* sys/ucontext.h */

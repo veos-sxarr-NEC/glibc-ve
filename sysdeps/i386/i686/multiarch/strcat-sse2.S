@@ -1,5 +1,5 @@
 /* strcat with SSE2
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 
 #if IS_IN (libc)
@@ -34,7 +34,7 @@
 # define PUSH(REG) pushl REG; CFI_PUSH (REG)
 # define POP(REG) popl REG; CFI_POP (REG)
 
-# ifdef SHARED
+# ifdef PIC
 #  define JMPTBL(I, B) I - B
 
 /* Load an entry in a jump table into ECX and branch to it.  TABLE is a
@@ -50,7 +50,7 @@
 	absolute address.  */	\
 	addl	(%ecx,INDEX,SCALE), %ecx;	\
 	/* We loaded the jump table and adjusted ECX. Go.  */	\
-	jmp	*%ecx
+	_CET_NOTRACK jmp *%ecx
 # else
 #  define JMPTBL(I, B) I
 
@@ -59,7 +59,7 @@
 	jump table.  SCALE is the scale of INDEX. */
 
 #  define BRANCH_TO_JMPTBL_ENTRY(TABLE, INDEX, SCALE)	\
-	jmp	*TABLE(,INDEX,SCALE)
+	_CET_NOTRACK jmp *TABLE(,INDEX,SCALE)
 # endif
 
 # ifndef STRCAT
@@ -227,6 +227,8 @@ L(StartStrcpyPart):
 	pxor	%xmm0, %xmm0
 # ifdef USE_AS_STRNCAT
 	add	%ecx, %ebx
+	sbb	%edx, %edx
+	or	%edx, %ebx
 # endif
 	sub	%ecx, %eax
 	jmp	L(Unalign16Both)

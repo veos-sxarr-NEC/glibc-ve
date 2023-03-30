@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -22,12 +22,6 @@
 #include <sysdep.h>
 #define _ERRNO_H	1
 #include <bits/errno.h>
-
-#define CLONE_VM_BIT      8
-#define CLONE_VM          (1 << CLONE_VM_BIT)
-
-#define CLONE_THREAD_BIT  16
-#define CLONE_THREAD      (1 << CLONE_THREAD_BIT)
 
 /* int clone(int (*fn)(void *arg),            x0
 	     void *child_stack,               x1
@@ -39,6 +33,13 @@
  */
         .text
 ENTRY(__clone)
+	DELOUSE (0)
+	DELOUSE (1)
+	DELOUSE (2)
+	DELOUSE (3)
+	DELOUSE (4)
+	DELOUSE (5)
+	DELOUSE (6)
 	/* Save args for the child.  */
 	mov	x10, x0
 	mov	x11, x2
@@ -72,25 +73,15 @@ thread_start:
 	cfi_undefined (x30)
 	mov	x29, 0
 
-	tbnz	x11, #CLONE_THREAD_BIT, 3f
-	mov	x0, #-1
-	tbnz	x11, #CLONE_VM_BIT, 2f
-	mov	x8, #SYS_ify(getpid)
-	svc	0x0
-2:
-	mrs	x1, tpidr_el0
-	sub	x1, x1, #PTHREAD_SIZEOF
-	str	w0, [x1, #PTHREAD_PID_OFFSET]
-	str	w0, [x1, #PTHREAD_TID_OFFSET]
-3:
-
 	/* Pick the function arg and execute.  */
 	mov	x0, x12
 	blr	x10
 
 	/* We are done, pass the return value through x0.  */
-	b	HIDDEN_JUMPTARGET(_exit)
+	mov	x8, #SYS_ify(exit)
+	svc	0x0
 	cfi_endproc
 	.size thread_start, .-thread_start
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

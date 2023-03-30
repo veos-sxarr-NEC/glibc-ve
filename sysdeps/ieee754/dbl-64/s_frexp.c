@@ -26,6 +26,7 @@ static char rcsid[] = "$NetBSD: s_frexp.c,v 1.9 1995/05/10 20:47:24 jtc Exp $";
 
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-double.h>
 
 static const double
   two54 = 1.80143985094819840000e+16; /* 0x43500000, 0x00000000 */
@@ -38,7 +39,7 @@ __frexp (double x, int *eptr)
   ix = 0x7fffffff & hx;
   *eptr = 0;
   if (ix >= 0x7ff00000 || ((ix | lx) == 0))
-    return x;                                           /* 0,inf,nan */
+    return x + x;                                           /* 0,inf,nan */
   if (ix < 0x00100000)                  /* subnormal */
     {
       x *= two54;
@@ -51,8 +52,4 @@ __frexp (double x, int *eptr)
   SET_HIGH_WORD (x, hx);
   return x;
 }
-weak_alias (__frexp, frexp)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__frexp, __frexpl)
-weak_alias (__frexp, frexpl)
-#endif
+libm_alias_double (__frexp, frexp)

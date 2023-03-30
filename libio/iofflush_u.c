@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -28,8 +28,7 @@
 #include <stdio.h>
 
 int
-fflush_unlocked (fp)
-     _IO_FILE *fp;
+__fflush_unlocked (FILE *fp)
 {
   if (fp == NULL)
     return _IO_flush_all ();
@@ -39,4 +38,6 @@ fflush_unlocked (fp)
       return _IO_SYNC (fp) ? EOF : 0;
     }
 }
-libc_hidden_def (fflush_unlocked)
+libc_hidden_def (__fflush_unlocked)
+weak_alias (__fflush_unlocked, fflush_unlocked)
+libc_hidden_weak (fflush_unlocked)

@@ -1,5 +1,5 @@
 /* Read the dynamic section at DYN and fill in INFO with indices DT_*.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
+
+/* This file is included multiple times and therefore lacks a header
+   file inclusion guard.  */
 
 #include <assert.h>
-#include <libc-internal.h>
+#include <libc-diag.h>
 
 #ifndef RESOLVE_MAP
 static
@@ -35,7 +38,7 @@ elf_get_dynamic_info (struct link_map *l, ElfW(Dyn) *temp)
   typedef Elf64_Xword d_tag_utype;
 #endif
 
-#ifndef RTLD_BOOTSTRAP
+#if !defined RTLD_BOOTSTRAP && !defined STATIC_PIE_BOOTSTRAP
   if (dyn == NULL)
     return;
 #endif
@@ -46,8 +49,8 @@ elf_get_dynamic_info (struct link_map *l, ElfW(Dyn) *temp)
     {
       if ((d_tag_utype) dyn->d_tag < DT_NUM)
 	info[dyn->d_tag] = dyn;
-      else if (dyn->d_tag >= DT_LOPROC &&
-	       dyn->d_tag < DT_LOPROC + DT_THISPROCNUM)
+      else if (dyn->d_tag >= DT_LOPROC
+	       && dyn->d_tag < DT_LOPROC + DT_THISPROCNUM)
 	{
 	  /* This does not violate the array bounds of l->l_info, but
 	     gcc 4.6 on sparc somehow does not see this.  */
@@ -107,8 +110,7 @@ elf_get_dynamic_info (struct link_map *l, ElfW(Dyn) *temp)
 # endif
       ADJUST_DYN_INFO (DT_JMPREL);
       ADJUST_DYN_INFO (VERSYMIDX (DT_VERSYM));
-      ADJUST_DYN_INFO (DT_ADDRTAGIDX (DT_GNU_HASH) + DT_NUM + DT_THISPROCNUM
-		       + DT_VERSIONTAGNUM + DT_EXTRANUM + DT_VALNUM);
+      ADJUST_DYN_INFO (ADDRIDX (DT_GNU_HASH));
 # undef ADJUST_DYN_INFO
       assert (cnt <= DL_RO_DYN_TEMP_CNT);
     }
@@ -136,9 +138,11 @@ elf_get_dynamic_info (struct link_map *l, ElfW(Dyn) *temp)
   /* Only the bind now flags are allowed.  */
   assert (info[VERSYMIDX (DT_FLAGS_1)] == NULL
 	  || (info[VERSYMIDX (DT_FLAGS_1)]->d_un.d_val & ~DF_1_NOW) == 0);
+  /* Flags must not be set for ld.so.  */
   assert (info[DT_FLAGS] == NULL
 	  || (info[DT_FLAGS]->d_un.d_val & ~DF_BIND_NOW) == 0);
-  /* Flags must not be set for ld.so.  */
+#endif
+#if defined RTLD_BOOTSTRAP || defined STATIC_PIE_BOOTSTRAP
   assert (info[DT_RUNPATH] == NULL);
   assert (info[DT_RPATH] == NULL);
 #else
@@ -159,6 +163,8 @@ elf_get_dynamic_info (struct link_map *l, ElfW(Dyn) *temp)
   if (info[VERSYMIDX (DT_FLAGS_1)] != NULL)
     {
       l->l_flags_1 = info[VERSYMIDX (DT_FLAGS_1)]->d_un.d_val;
+      if (l->l_flags_1 & DF_1_NODELETE)
+	l->l_nodelete_pending = true;
 
       /* Only DT_1_SUPPORTED_MASK bits are supported, and we would like
 	 to assert this, but we can't. Users have been setting

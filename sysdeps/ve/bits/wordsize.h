@@ -1,4 +1,4 @@
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 /* Determine the wordsize from the preprocessor defines.  */
 
 # define __WORDSIZE	64

@@ -1,4 +1,4 @@
-/* Copyright (C) 1989, 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1989, 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,9 +13,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <alloca.h>
 #include <assert.h>
 #include <errno.h>
 #include <grp.h>
@@ -26,23 +25,23 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <nsswitch.h>
+#include <scratch_buffer.h>
+#include <config.h>
 
 #include "../nscd/nscd-client.h"
 #include "../nscd/nscd_proto.h"
 
+#ifdef LINK_OBSOLETE_NSL
+# define DEFAULT_CONFIG "compat [NOTFOUND=return] files"
+#else
+# define DEFAULT_CONFIG "files"
+#endif
 
 /* Type of the lookup function.  */
 typedef enum nss_status (*initgroups_dyn_function) (const char *, gid_t,
 						    long int *, long int *,
 						    gid_t **, long int, int *);
 
-/* The lookup function for the first entry of this service.  */
-extern int __nss_group_lookup (service_user **nip, const char *name,
-				   void **fctp);
-extern void *__nss_lookup_function (service_user *ni, const char *fct_name);
-
-extern service_user *__nss_group_database attribute_hidden;
-service_user *__nss_initgroups_database;
 static bool use_initgroups_entry;
 
 
@@ -80,12 +79,12 @@ internal_getgrouplist (const char *user, gid_t group, long int *size,
 
   if (__nss_initgroups_database == NULL)
     {
-      if (__nss_database_lookup ("initgroups", NULL, "",
-				 &__nss_initgroups_database) < 0)
+      if (__nss_database_lookup2 ("initgroups", NULL, "",
+				  &__nss_initgroups_database) < 0)
 	{
 	  if (__nss_group_database == NULL)
-	    no_more = __nss_database_lookup ("group", NULL, "compat files",
-					     &__nss_group_database);
+	    no_more = __nss_database_lookup2 ("group", NULL, DEFAULT_CONFIG,
+					      &__nss_group_database);
 
 	  __nss_initgroups_database = __nss_group_database;
 	}
@@ -129,7 +128,7 @@ internal_getgrouplist (const char *user, gid_t group, long int *size,
 
       /* This is really only for debugging.  */
       if (NSS_STATUS_TRYAGAIN > status || status > NSS_STATUS_RETURN)
-	__libc_fatal ("illegal status in internal_getgrouplist");
+	__libc_fatal ("Illegal status in internal_getgrouplist.\n");
 
       /* For compatibility reason we will continue to look for more
 	 entries using the next service even though data has already

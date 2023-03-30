@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <spawn.h>
@@ -25,11 +25,12 @@
 		   | POSIX_SPAWN_SETSIGMASK				      \
 		   | POSIX_SPAWN_SETSCHEDPARAM				      \
 		   | POSIX_SPAWN_SETSCHEDULER				      \
+		   | POSIX_SPAWN_SETSID					      \
 		   | POSIX_SPAWN_USEVFORK)
 
 /* Store flags in the attribute structure.  */
 int
-posix_spawnattr_setflags (posix_spawnattr_t *attr, short int flags)
+__posix_spawnattr_setflags (posix_spawnattr_t *attr, short int flags)
 {
   /* Check no invalid bits are set.  */
   if (flags & ~ALL_FLAGS)
@@ -40,3 +41,4 @@ posix_spawnattr_setflags (posix_spawnattr_t *attr, short int flags)
 
   return 0;
 }
+weak_alias (__posix_spawnattr_setflags, posix_spawnattr_setflags)

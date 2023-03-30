@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@suse.de>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -28,7 +28,8 @@
 #include <rpcsvc/ypupd.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
+#include <shlib-compat.h>
 
 /* This should only be defined on systems with a BSD compatible ypbind */
 #ifndef BINDINGDIR
@@ -68,25 +69,11 @@ yp_bind_client_create (const char *domain, dom_binding *ysd,
   ysd->dom_domain[YPMAXDOMAIN] = '\0';
 
   ysd->dom_socket = RPC_ANYSOCK;
-#ifdef SOCK_CLOEXEC
-# define xflags SOCK_CLOEXEC
-#else
-# define xflags 0
-#endif
   ysd->dom_client = __libc_clntudp_bufcreate (&ysd->dom_server_addr, YPPROG,
 					      YPVERS, UDPTIMEOUT,
 					      &ysd->dom_socket,
 					      UDPMSGSIZE, UDPMSGSIZE,
-					      xflags);
-
-  if (ysd->dom_client != NULL)
-    {
-#ifndef SOCK_CLOEXEC
-      /* If the program exits, close the socket */
-      if (fcntl (ysd->dom_socket, F_SETFD, FD_CLOEXEC) == -1)
-	perror ("fcntl: F_SETFD");
-#endif
-    }
+					      SOCK_CLOEXEC);
 }
 
 #if USE_BINDINGDIR
@@ -240,7 +227,7 @@ yp_bind (const char *indomain)
 
   return status;
 }
-libnsl_hidden_def (yp_bind)
+libnsl_hidden_nolink_def (yp_bind, GLIBC_2_0)
 
 static void
 yp_unbind_locked (const char *indomain)
@@ -280,6 +267,7 @@ yp_unbind (const char *indomain)
 
   return;
 }
+libnsl_hidden_nolink_def(yp_unbind, GLIBC_2_0)
 
 static int
 __ypclnt_call (const char *domain, u_long prog, xdrproc_t xargs,
@@ -420,7 +408,7 @@ yp_get_default_domain (char **outdomain)
 
   return result;
 }
-libnsl_hidden_def (yp_get_default_domain)
+libnsl_hidden_nolink_def (yp_get_default_domain, GLIBC_2_0)
 
 int
 __yp_check (char **domain)
@@ -438,6 +426,7 @@ __yp_check (char **domain)
     return 1;
   return 0;
 }
+libnsl_hidden_nolink_def(__yp_check, GLIBC_2_0)
 
 int
 yp_match (const char *indomain, const char *inmap, const char *inkey,
@@ -447,9 +436,9 @@ yp_match (const char *indomain, const char *inmap, const char *inkey,
   ypresp_val resp;
   enum clnt_stat result;
 
-  if (indomain == NULL || indomain[0] == '\0' ||
-      inmap == NULL || inmap[0] == '\0' ||
-      inkey == NULL || inkey[0] == '\0' || inkeylen <= 0)
+  if (indomain == NULL || indomain[0] == '\0'
+      || inmap == NULL || inmap[0] == '\0'
+      || inkey == NULL || inkey[0] == '\0' || inkeylen <= 0)
     return YPERR_BADARGS;
 
   req.domain = (char *) indomain;
@@ -482,6 +471,7 @@ yp_match (const char *indomain, const char *inmap, const char *inkey,
 
   return status;
 }
+libnsl_hidden_nolink_def(yp_match, GLIBC_2_0)
 
 int
 yp_first (const char *indomain, const char *inmap, char **outkey,
@@ -491,8 +481,8 @@ yp_first (const char *indomain, const char *inmap, char **outkey,
   ypresp_key_val resp;
   enum clnt_stat result;
 
-  if (indomain == NULL || indomain[0] == '\0' ||
-      inmap == NULL || inmap[0] == '\0')
+  if (indomain == NULL || indomain[0] == '\0'
+      || inmap == NULL || inmap[0] == '\0')
     return YPERR_BADARGS;
 
   req.domain = (char *) indomain;
@@ -536,6 +526,7 @@ yp_first (const char *indomain, const char *inmap, char **outkey,
 
   return status;
 }
+libnsl_hidden_nolink_def(yp_first, GLIBC_2_0)
 
 int
 yp_next (const char *indomain, const char *inmap, const char *inkey,
@@ -546,9 +537,9 @@ yp_next (const char *indomain, const char *inmap, const char *inkey,
   ypresp_key_val resp;
   enum clnt_stat result;
 
-  if (indomain == NULL || indomain[0] == '\0' ||
-      inmap == NULL || inmap[0] == '\0' ||
-      inkeylen <= 0 || inkey == NULL || inkey[0] == '\0')
+  if (indomain == NULL || indomain[0] == '\0'
+      || inmap == NULL || inmap[0] == '\0'
+      || inkeylen <= 0 || inkey == NULL || inkey[0] == '\0')
     return YPERR_BADARGS;
 
   req.domain = (char *) indomain;
@@ -592,6 +583,7 @@ yp_next (const char *indomain, const char *inmap, const char *inkey,
 
   return status;
 }
+libnsl_hidden_nolink_def(yp_next, GLIBC_2_0)
 
 int
 yp_master (const char *indomain, const char *inmap, char **outname)
@@ -600,8 +592,8 @@ yp_master (const char *indomain, const char *inmap, char **outname)
   ypresp_master resp;
   enum clnt_stat result;
 
-  if (indomain == NULL || indomain[0] == '\0' ||
-      inmap == NULL || inmap[0] == '\0')
+  if (indomain == NULL || indomain[0] == '\0'
+      || inmap == NULL || inmap[0] == '\0')
     return YPERR_BADARGS;
 
   req.domain = (char *) indomain;
@@ -621,7 +613,7 @@ yp_master (const char *indomain, const char *inmap, char **outname)
 
   return *outname == NULL ? YPERR_YPERR : YPERR_SUCCESS;
 }
-libnsl_hidden_def (yp_master)
+libnsl_hidden_nolink_def (yp_master, GLIBC_2_0)
 
 int
 yp_order (const char *indomain, const char *inmap, unsigned int *outorder)
@@ -630,8 +622,8 @@ yp_order (const char *indomain, const char *inmap, unsigned int *outorder)
   struct ypresp_order resp;
   enum clnt_stat result;
 
-  if (indomain == NULL || indomain[0] == '\0' ||
-      inmap == NULL || inmap[0] == '\0')
+  if (indomain == NULL || indomain[0] == '\0'
+      || inmap == NULL || inmap[0] == '\0')
     return YPERR_BADARGS;
 
   req.domain = (char *) indomain;
@@ -651,6 +643,7 @@ yp_order (const char *indomain, const char *inmap, unsigned int *outorder)
 
   return result;
 }
+libnsl_hidden_nolink_def(yp_order, GLIBC_2_0)
 
 struct ypresp_all_data
 {
@@ -794,9 +787,9 @@ yp_all (const char *indomain, const char *inmap,
 
   return res;
 }
+libnsl_hidden_nolink_def (yp_all, GLIBC_2_0)
 
 int
-
 yp_maplist (const char *indomain, struct ypmaplist **outmaplist)
 {
   struct ypresp_maplist resp;
@@ -820,6 +813,7 @@ yp_maplist (const char *indomain, struct ypmaplist **outmaplist)
 
   return result;
 }
+libnsl_hidden_nolink_def (yp_maplist, GLIBC_2_0)
 
 const char *
 yperr_string (const int error)
@@ -884,6 +878,7 @@ yperr_string (const int error)
     }
   return _(str);
 }
+libnsl_hidden_nolink_def(yperr_string, GLIBC_2_0)
 
 static const int8_t yp_2_yperr[] =
   {
@@ -907,7 +902,7 @@ ypprot_err (const int code)
     return YPERR_YPERR;
   return yp_2_yperr[code - YP_VERS];
 }
-libnsl_hidden_def (ypprot_err)
+libnsl_hidden_nolink_def (ypprot_err, GLIBC_2_0)
 
 const char *
 ypbinderr_string (const int error)
@@ -933,7 +928,7 @@ ypbinderr_string (const int error)
     }
   return _(str);
 }
-libnsl_hidden_def (ypbinderr_string)
+libnsl_hidden_nolink_def (ypbinderr_string, GLIBC_2_0)
 
 #define WINDOW 60
 
@@ -1033,3 +1028,4 @@ again:
     }
   return res;
 }
+libnsl_hidden_nolink_def(yp_update, GLIBC_2_0)

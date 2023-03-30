@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #undef ret
@@ -32,6 +32,6 @@ strong_alias (__copysign, __libm_copysign)
 strong_alias (__copysign, __libm_copysignf)
 strong_alias (__copysign, __libm_copysignl)
 
-weak_alias (__copysign, copysign)
-weak_alias (__copysignf, copysignf)
-weak_alias (__copysignl, copysignl)
+libm_alias_double (__copysign, copysign)
+libm_alias_float (__copysign, copysign)
+libm_alias_ldouble (__copysign, copysign)

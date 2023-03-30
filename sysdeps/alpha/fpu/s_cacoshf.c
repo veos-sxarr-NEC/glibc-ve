@@ -1,5 +1,5 @@
 /* Return arc hyperbole cosine of complex float value.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define __cacoshf __cacoshf_not_defined
 #define cacoshf cacoshf_not_defined
@@ -24,11 +24,17 @@
 
 #undef __cacoshf
 #undef cacoshf
-#define __cacoshf internal_cacoshf
 
 static _Complex float internal_cacoshf (_Complex float x);
 
-#include <math/s_cacoshf.c>
+#define M_DECL_FUNC(f) internal_cacoshf
+#include <math-type-macros-float.h>
+
+/* Disable any aliasing from base template.  */
+#undef declare_mgen_alias
+#define declare_mgen_alias(__to, __from)
+
+#include <math/s_cacosh_template.c>
 #include "cfloat-compat.h"
 
 #undef __cacoshf
@@ -47,4 +53,4 @@ __c2_cacoshf (c2_cfloat_decl (x))
   return c2_cfloat_return (r);
 }
 
-cfloat_versions (cacoshf);
+cfloat_versions (cacosh);

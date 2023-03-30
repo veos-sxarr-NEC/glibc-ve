@@ -44,6 +44,8 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 long double
 __ieee754_hypotl(long double x, long double y)
@@ -67,6 +69,8 @@ __ieee754_hypotl(long double x, long double y)
 	if(ha > 0x5f30000000000000LL) {	/* a>2**500 */
 	   if(ha >= 0x7ff0000000000000LL) {	/* Inf or NaN */
 	       w = a+b;			/* for sNaN */
+	       if (issignaling (a) || issignaling (b))
+		 return w;
 	       if(ha == 0x7ff0000000000000LL)
 		 w = a;
 	       if(hb == 0x7ff0000000000000LL)
@@ -105,7 +109,7 @@ __ieee754_hypotl(long double x, long double y)
 	       = a1*(a1+a2) + a2*a + b*b
 	       = a1*a1 + a1*a2 + a2*a + b*b
 	       = a1*a1 + a2*(a+a1) + b*b  */
-	    w  = __ieee754_sqrtl(a1*a1-(b*(-b)-a2*(a+a1)));
+	    w  = sqrtl(a1*a1-(b*(-b)-a2*(a+a1)));
 	} else {
 	    a  = a+a;
 	    ldbl_unpack (b, &hi, &lo);
@@ -122,11 +126,15 @@ __ieee754_hypotl(long double x, long double y)
 	       = w*w + a1*b + a2*b
 	       = w*w + a1*(b1+b2) + a2*b
 	       = w*w + a1*b1 + a1*b2 + a2*b  */
-	    w  = __ieee754_sqrtl(a1*b1-(w*(-w)-(a1*b2+a2*b)));
+	    w  = sqrtl(a1*b1-(w*(-w)-(a1*b2+a2*b)));
 	}
 	if(k!=0)
-	    return w*kld;
+	    {
+		w *= kld;
+		math_check_force_underflow_nonneg (w);
+		return w;
+	    }
 	else
 	    return w;
 }
-strong_alias (__ieee754_hypotl, __hypotl_finite)
+libm_alias_finite (__ieee754_hypotl, __hypotl)

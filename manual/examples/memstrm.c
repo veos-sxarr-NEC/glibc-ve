@@ -1,5 +1,5 @@
 /* open_memstream example.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -12,7 +12,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, if not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, see <https://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
@@ -27,10 +27,10 @@ main (void)
   stream = open_memstream (&bp, &size);
   fprintf (stream, "hello");
   fflush (stream);
-  printf ("buf = `%s', size = %d\n", bp, size);
+  printf ("buf = `%s', size = %zu\n", bp, size);
   fprintf (stream, ", world");
   fclose (stream);
-  printf ("buf = `%s', size = %d\n", bp, size);
+  printf ("buf = `%s', size = %zu\n", bp, size);
 
   return 0;
 }

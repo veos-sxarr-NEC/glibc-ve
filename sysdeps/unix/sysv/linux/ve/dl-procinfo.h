@@ -1,5 +1,5 @@
 /* Linux/VE version of processor capability information handling macros.
-   Copyright (C) 2017-2019 NEC Corporation
+   Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it

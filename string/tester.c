@@ -1,5 +1,5 @@
 /* Tester for string functions.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -32,7 +32,21 @@
 #include <string.h>
 #include <strings.h>
 #include <fcntl.h>
-#include <libc-internal.h>
+#include <libc-diag.h>
+
+/* This file tests a range of corner cases of string functions,
+   including cases where truncation occurs or where sizes specified
+   are larger than the actual buffers, which result in various
+   warnings.  */
+DIAG_IGNORE_NEEDS_COMMENT (8, "-Warray-bounds");
+DIAG_IGNORE_NEEDS_COMMENT (5.0, "-Wmemset-transposed-args");
+#if __GNUC_PREREQ (7, 0)
+DIAG_IGNORE_NEEDS_COMMENT (9, "-Wrestrict");
+DIAG_IGNORE_NEEDS_COMMENT (7, "-Wstringop-overflow=");
+#endif
+#if __GNUC_PREREQ (8, 0)
+DIAG_IGNORE_NEEDS_COMMENT (8, "-Wstringop-truncation");
+#endif
 
 
 #define	STREQ(a, b)	(strcmp((a), (b)) == 0)
@@ -704,11 +718,11 @@ test_memrchr (void)
      bugs due to unrolled loops (assuming unrolling is limited to no
      more than 128 byte chunks: */
   {
-    char buf[128 + sizeof(long)];
+    char buf[128 + sizeof (long)];
     long align, len, i, pos, n = 9;
 
-    for (align = 0; align < (long) sizeof(long); ++align) {
-      for (len = 0; len < (long) (sizeof(buf) - align); ++len) {
+    for (align = 0; align < (long) sizeof (long); ++align) {
+      for (len = 0; len < (long) (sizeof (buf) - align); ++len) {
 	for (i = 0; i < len; ++i)
 	  buf[align + i] = 'x';		/* don't depend on memset... */
 
@@ -1094,8 +1108,8 @@ test_memcmp (void)
     {
       char *a = one + i;
       char *b = two + i;
-      strncpy(a, "--------11112222", 16);
-      strncpy(b, "--------33334444", 16);
+      memcpy(a, "--------11112222", 16);
+      memcpy(b, "--------33334444", 16);
       check(memcmp(b, a, 16) > 0, cnt++);
       check(memcmp(a, b, 16) < 0, cnt++);
     }
@@ -1123,11 +1137,11 @@ test_memchr (void)
      bugs due to unrolled loops (assuming unrolling is limited to no
      more than 128 byte chunks: */
   {
-    char buf[128 + sizeof(long)];
+    char buf[128 + sizeof (long)];
     long align, len, i, pos;
 
-    for (align = 0; align < (long) sizeof(long); ++align) {
-      for (len = 0; len < (long) (sizeof(buf) - align); ++len) {
+    for (align = 0; align < (long) sizeof (long); ++align) {
+      for (len = 0; len < (long) (sizeof (buf) - align); ++len) {
 	for (i = 0; i < len; ++i) {
 	  buf[align + i] = 'x';		/* don't depend on memset... */
 	}
@@ -1304,15 +1318,8 @@ test_memset (void)
   check(memset(one+1, 'x', 3) == one+1, 1);	/* Return value. */
   equal(one, "axxxefgh", 2);		/* Basic test. */
 
-  DIAG_PUSH_NEEDS_COMMENT;
-#if __GNUC_PREREQ (5, 0)
-  /* GCC 5.0 warns about a zero-length memset because the arguments to memset
-     may be in the wrong order.  But we really want to test this.  */
-  DIAG_IGNORE_NEEDS_COMMENT (5.0, "-Wmemset-transposed-args")
-#endif
   (void) memset(one+2, 'y', 0);
   equal(one, "axxxefgh", 3);		/* Zero-length set. */
-  DIAG_POP_NEEDS_COMMENT;
 
   (void) memset(one+5, 0, 1);
   equal(one, "axxxe", 4);			/* Zero fill. */

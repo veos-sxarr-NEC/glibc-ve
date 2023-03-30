@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -14,19 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stddef.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
-#include <sys/statvfs.h>
-
-extern void __internal_statvfs (const char *name, struct statvfs *buf,
-				struct statfs *fsbuf, int fd);
-
+#include "internal_statvfs.h"
 
 int
-statvfs (const char *file, struct statvfs *buf)
+__statvfs (const char *file, struct statvfs *buf)
 {
   struct statfs fsbuf;
 
@@ -40,4 +36,5 @@ statvfs (const char *file, struct statvfs *buf)
   /* We signal success if the statfs call succeeded.  */
   return 0;
 }
-libc_hidden_def (statvfs)
+weak_alias (__statvfs, statvfs)
+libc_hidden_weak (statvfs)

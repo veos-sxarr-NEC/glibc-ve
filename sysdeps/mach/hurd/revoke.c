@@ -1,5 +1,5 @@
 /* Revoke the access of all descriptors currently open on a file.  Hurd version
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,15 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <errno.h>
 #include <hurd.h>
 
 int
-revoke (file_name)
-     const char *file_name;
+__revoke (const char *file_name)
 {
   error_t err;
   file_t file = __file_name_lookup (file_name, 0, 0);
@@ -37,3 +36,5 @@ revoke (file_name)
     return __hurd_fail (err);
   return 0;
 }
+
+weak_alias (__revoke, revoke)

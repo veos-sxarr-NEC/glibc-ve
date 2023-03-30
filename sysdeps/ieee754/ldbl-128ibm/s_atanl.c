@@ -56,11 +56,13 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, see
-    <http://www.gnu.org/licenses/>.  */
+    <https://www.gnu.org/licenses/>.  */
 
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
 #include <math_ldbl_opt.h>
 
 /* arctan(k/8), k = 0, ..., 82 */
@@ -198,6 +200,7 @@ __atanl (long double x)
 
   if (k <= 0x3c800000) /* |x| <= 2**-55.  */
     {
+      math_check_force_underflow (x);
       /* Raise inexact.  */
       if (1e300L + x > 0.0)
 	return x;

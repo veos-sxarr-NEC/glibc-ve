@@ -1,5 +1,5 @@
 /* Common code for DB-based databases in nss_db module.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <sys/mman.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include "nsswitch.h"
 #include "nss_db.h"
 
@@ -77,7 +77,7 @@ CONCAT(_nss_db_set,ENTNAME) (int stayopen)
       keep_db |= stayopen;
 
       /* Reset the sequential index.  */
-      entidx  = (const char *) state.header + state.header->valstroffset;
+      entidx  = NULL;
     }
 
   __libc_lock_unlock (lock);
@@ -253,7 +253,13 @@ CONCAT(_nss_db_get,ENTNAME_r) (struct STRUCTURE *result, char *buffer,
 	  H_ERRNO_SET (NETDB_INTERNAL);
 	  goto out;
 	}
+      entidx = NULL;
     }
+
+  /* Start from the beginning if freshly initialized or reset
+     requested by set*ent.  */
+  if (entidx == NULL)
+    entidx = (const char *) state.header + state.header->valstroffset;
 
   status = NSS_STATUS_UNAVAIL;
   if (state.header != MAP_FAILED)
@@ -288,8 +294,8 @@ CONCAT(_nss_db_get,ENTNAME_r) (struct STRUCTURE *result, char *buffer,
 	    }
 	  if (err < 0)
 	    {
-	      H_ERRNO_SET (HOST_NOT_FOUND);
-	      status = NSS_STATUS_NOTFOUND;
+	      H_ERRNO_SET (NETDB_INTERNAL);
+	      status = NSS_STATUS_TRYAGAIN;
 	      break;
 	    }
 

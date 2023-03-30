@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define scalbln __no_scalbln_decl
 #define scalblnf __no_scalblnf_decl
@@ -39,13 +39,10 @@
 #define __CONCATX(a,b) __CONCAT(a,b)
 
 float_type
-__CONCATX(__scalbn,suffix) (x, exp)
-     float_type x;
-     int exp;
+__CONCATX(__scalbn,suffix) (float_type x, int exp)
 {
   return __m81_u(__CONCATX(__scalbn,suffix))(x, exp);
 }
-weak_alias (__CONCATX(__scalbn,suffix), __CONCATX(scalbn,suffix))
 strong_alias (__CONCATX(__scalbn,suffix), __CONCATX(__scalbln,suffix))
 
 #include <shlib-compat.h>

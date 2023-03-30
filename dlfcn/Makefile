@@ -1,4 +1,4 @@
-# Copyright (C) 1995-2015 Free Software Foundation, Inc.
+# Copyright (C) 1995-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 subdir		:= dlfcn
 
@@ -22,7 +22,7 @@ include ../Makeconfig
 headers		:= bits/dlfcn.h dlfcn.h
 extra-libs	:= libdl
 libdl-routines	:= dlopen dlclose dlsym dlvsym dlerror dladdr dladdr1 dlinfo \
-		   dlmopen dlfcn
+		   dlmopen dlfcn dlfreeres
 routines	:= $(patsubst %,s%,$(filter-out dlfcn,$(libdl-routines)))
 elide-routines.os := $(routines)
 
@@ -33,13 +33,10 @@ libdl-routines	+= dlopenold
 libdl-shared-only-routines := dlopenold dlfcn
 endif
 
-#Commented file bug-atexit3 and its dependency as bug-atexit3-lib.cc is
-#cpp file and it uses g++ compiler to build library bug-atexit3-lib.os
-
 ifeq (yes,$(build-shared))
 tests = glrefmain failtest tst-dladdr default errmsg1 tstcxaatexit \
 	bug-dlopen1 bug-dlsym1 tst-dlinfo bug-atexit1 bug-atexit2 \
-	tstatexit bug-dl-leaf tst-rec-dlopen
+	bug-atexit3 tstatexit bug-dl-leaf tst-rec-dlopen
 
 bug-atexit1-ENV = VE_LD_ORIGIN_PATH=$(objpfx)
 bug-atexit2-ENV = VE_LD_ORIGIN_PATH=$(objpfx)
@@ -63,6 +60,12 @@ tststatic2-ENV = $(tststatic-ENV)
 tststatic3-ENV = $(tststatic-ENV)
 tststatic4-ENV = $(tststatic-ENV)
 tststatic5-ENV = $(tststatic-ENV)
+
+ifneq (,$(CXX))
+modules-names += bug-atexit3-lib
+else
+tests-unsupported += bug-atexit3
+endif
 endif
 
 extra-test-objs += $(modules-names:=.os)
@@ -137,9 +140,12 @@ $(objpfx)bug-atexit1.out: $(objpfx)bug-atexit1-lib.so
 $(objpfx)bug-atexit2: $(libdl)
 $(objpfx)bug-atexit2.out: $(objpfx)bug-atexit2-lib.so
 
-#LDLIBS-bug-atexit3-lib.so = -lstdc++ -lgcc_eh
-#$(objpfx)bug-atexit3: $(libdl)
-#$(objpfx)bug-atexit3.out: $(objpfx)bug-atexit3-lib.so
+ifneq (,$(CXX))
+LDLIBS-bug-atexit3-lib.so = -lstdc++ -lgcc_eh
+$(objpfx)bug-atexit3-lib.so: $(libsupport)
+$(objpfx)bug-atexit3: $(libdl)
+$(objpfx)bug-atexit3.out: $(objpfx)bug-atexit3-lib.so
+endif
 
 $(objpfx)bug-dl-leaf: $(objpfx)bug-dl-leaf-lib.so
 $(objpfx)bug-dl-leaf.out: $(objpfx)bug-dl-leaf-lib-cb.so

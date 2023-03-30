@@ -1,5 +1,5 @@
 /* Get file-specific information about a file.  Linux version.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <mntent.h>
@@ -73,13 +73,13 @@ distinguish_extX (const struct statfs *fsbuf, const char *file, int fd)
     return EXT2_LINK_MAX;
 
   __snprintf (buf, sizeof (buf), "/sys/dev/block/%u:%u",
-	      gnu_dev_major (st.st_dev), gnu_dev_minor (st.st_dev));
+	      __gnu_dev_major (st.st_dev), __gnu_dev_minor (st.st_dev));
 
   ssize_t n = __readlink (buf, path, sizeof (path));
   if (n != -1 && n < sizeof (path))
     {
       path[n] = '\0';
-      char *base = strdupa (basename (path));
+      char *base = strdupa (__basename (path));
       __snprintf (path, sizeof (path), "/sys/fs/ext4/%s", base);
 
       return __access (path, F_OK) == 0 ? EXT4_LINK_MAX : EXT2_LINK_MAX;

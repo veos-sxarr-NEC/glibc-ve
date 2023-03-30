@@ -1,4 +1,4 @@
-/* Copyright (C) 1994-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/socket.h>
@@ -23,11 +23,7 @@
 
 /* Send N bytes of BUF to socket FD.  Returns the number sent or -1.  */
 ssize_t
-__send (fd, buf, n, flags)
-     int fd;
-     const void *buf;
-     size_t n;
-     int flags;
+__send (int fd, const void *buf, size_t n, int flags)
 {
   error_t err;
   size_t wrote;
@@ -36,6 +32,10 @@ __send (fd, buf, n, flags)
 					   flags, buf, n,
 					   NULL, MACH_MSG_TYPE_COPY_SEND, 0,
 					   NULL, 0, &wrote));
+
+  if (err == MIG_BAD_ID || err == EOPNOTSUPP)
+    /* The file did not grok the socket protocol.  */
+    err = ENOTSOCK;
 
   return err ? __hurd_sockfail (fd, flags, err) : wrote;
 }

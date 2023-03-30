@@ -35,7 +35,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 
 /*
  * Locks the static variables in this file.
@@ -61,7 +61,7 @@ bindresvport (int sd, struct sockaddr_in *sin)
   if (sin == (struct sockaddr_in *) 0)
     {
       sin = &myaddr;
-      __bzero (sin, sizeof (*sin));
+      memset (sin, 0, sizeof (*sin));
       sin->sin_family = AF_INET;
     }
   else if (sin->sin_family != AF_INET)

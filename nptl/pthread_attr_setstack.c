@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,9 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include "pthreadP.h"
@@ -28,14 +27,11 @@
 
 
 int
-__pthread_attr_setstack (attr, stackaddr, stacksize)
-     pthread_attr_t *attr;
-     void *stackaddr;
-     size_t stacksize;
+__pthread_attr_setstack (pthread_attr_t *attr, void *stackaddr,
+			 size_t stacksize)
 {
   struct pthread_attr *iattr;
 
-  assert (sizeof (*attr) >= sizeof (struct pthread_attr));
   iattr = (struct pthread_attr *) attr;
 
   /* Catch invalid sizes.  */
@@ -73,7 +69,6 @@ __old_pthread_attr_setstack (pthread_attr_t *attr, void *stackaddr,
 {
   struct pthread_attr *iattr;
 
-  assert (sizeof (*attr) >= sizeof (struct pthread_attr));
   iattr = (struct pthread_attr *) attr;
 
   /* Catch invalid sizes.  */

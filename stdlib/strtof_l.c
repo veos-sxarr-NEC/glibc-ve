@@ -1,5 +1,5 @@
 /* Convert string representing a number to float value, using given locale.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,31 +15,41 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <xlocale.h>
+#include <bits/floatn.h>
 
-extern float ____strtof_l_internal (const char *, char **, int, __locale_t);
-extern unsigned long long int ____strtoull_l_internal (const char *, char **,
-						       int, int, __locale_t);
+#if __HAVE_FLOAT32 && !__HAVE_DISTINCT_FLOAT32
+# define strtof32_l __hide_strtof32_l
+# define wcstof32_l __hide_wcstof32_l
+#endif
+
+#include <locale.h>
+
+extern float ____strtof_l_internal (const char *, char **, int, locale_t);
 
 #define	FLOAT		float
 #define	FLT		FLT
 #ifdef USE_WIDE_CHAR
 # define STRTOF		wcstof_l
 # define __STRTOF	__wcstof_l
+# define STRTOF_NAN	__wcstof_nan
 #else
 # define STRTOF		strtof_l
 # define __STRTOF	__strtof_l
+# define STRTOF_NAN	__strtof_nan
 #endif
 #define	MPN2FLOAT	__mpn_construct_float
 #define	FLOAT_HUGE_VAL	HUGE_VALF
-#define SET_MANTISSA(flt, mant) \
-  do { union ieee754_float u;						      \
-       u.f = (flt);							      \
-       u.ieee_nan.mantissa = (mant);					      \
-       if (u.ieee.mantissa != 0)					      \
-	 (flt) = u.f;							      \
-  } while (0)
 
 #include "strtod_l.c"
+
+#if __HAVE_FLOAT32 && !__HAVE_DISTINCT_FLOAT32
+# undef strtof32_l
+# undef wcstof32_l
+# ifdef USE_WIDE_CHAR
+weak_alias (wcstof_l, wcstof32_l)
+# else
+weak_alias (strtof_l, strtof32_l)
+# endif
+#endif

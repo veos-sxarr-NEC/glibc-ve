@@ -1,5 +1,5 @@
 /* __errno_location -- helper function for locating per-thread errno value
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,15 +14,21 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
-#include <hurd/threadvar.h>
+#if IS_IN (rtld)
+/* rtld can not access TLS too early, thus rtld_errno.
 
-int *
+   Instead of making __open/__close pass errno from TLS to rtld_errno, simply
+   use a weak __errno_location using rtld_errno, which will be overriden by the
+   libc definition.  */
+static int rtld_errno;
+int * weak_function
 __errno_location (void)
 {
-  return (int *) __hurd_threadvar_location (_HURD_THREADVAR_ERRNO);
+  return &rtld_errno;
 }
-strong_alias (__errno_location, __hurd_errno_location)
-libc_hidden_def (__errno_location)
+libc_hidden_weak (__errno_location)
+#else
+#include "../../../csu/errno-loc.c"
+#endif

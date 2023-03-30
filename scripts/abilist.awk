@@ -39,11 +39,14 @@ $2 == "l" { next }
 
 # If the target uses ST_OTHER, it will be output before the symbol name.
 $2 == "g" || $2 == "w" && (NF == 7 || NF == 8) {
-  weak = $2;
   type = $3;
   size = $5;
   sub(/^0*/, "", size);
-  size = " 0x" size;
+  if (size == "") {
+      size = " 0x0";
+  } else {
+      size = " 0x" size;
+  }
   version = $6;
   symbol = $NF;
   gsub(/[()]/, "", version);
@@ -55,7 +58,7 @@ $2 == "g" || $2 == "w" && (NF == 7 || NF == 8) {
   if (version == "GLIBC_PRIVATE") next;
 
   desc = "";
-  if (type == "D" && $4 == ".tbss") {
+  if (type == "D" && ($4 == ".tbss" || $4 == ".tdata")) {
     type = "T";
   }
   else if (type == "D" && $4 == ".opd") {
@@ -72,8 +75,10 @@ $2 == "g" || $2 == "w" && (NF == 7 || NF == 8) {
     seen_opd = -1;
   }
   else if ($4 == "*ABS*") {
-    type = "A";
-    size = "";
+    next;
+  }
+  else if (type == "D") {
+    # Accept unchanged.
   }
   else if (type == "DO") {
     type = "D";
@@ -91,26 +96,18 @@ $2 == "g" || $2 == "w" && (NF == 7 || NF == 8) {
     size = "";
   }
   else {
-    desc = symbol " " version " " weak " ? " type " " $4 " " $5;
-  }
-  if (size == " 0x") {
-    desc = symbol " " version " " weak " ? " type " " $4 " " $5;
+    print "ERROR: Unable to handle this type of symbol:", $0
+    exit 1
   }
 
-  # Disabled -- weakness should not matter to shared library ABIs any more.
-  #if (weak == "w") type = tolower(type);
   if (desc == "")
-    desc = " " symbol " " type size;
+    desc = symbol " " type size;
 
   if (combine)
     version = soname " " version (combine_fullname ? " " sofullname : "");
 
-  if (version in versions) {
-    versions[version] = versions[version] "\n" desc;
-  }
-  else {
-    versions[version] = desc;
-  }
+  # Append to the string which collects the results.
+  descs = descs version " " desc "\n";
   next;
 }
 
@@ -118,7 +115,8 @@ $2 == "g" || $2 == "w" && (NF == 7 || NF == 8) {
 NF == 0 || /DYNAMIC SYMBOL TABLE/ || /file format/ { next }
 
 {
-  print "Don't grok this line:", $0
+  print "ERROR: Unable to interpret this line:", $0
+  exit 1
 }
 
 function emit(end) {
@@ -126,65 +124,20 @@ function emit(end) {
     return;
   tofile = parse_names && !combine;
 
-  nverslist = 0;
-  for (version in versions) {
-    if (nverslist == 0) {
-      verslist = version;
-      nverslist = 1;
-      continue;
-    }
-    split(verslist, s, "\n");
-    if (version < s[1]) {
-      verslist = version;
-      for (i = 1; i <= nverslist; ++i) {
-	verslist = verslist "\n" s[i];
-      }
-    }
-    else {
-      verslist = s[1];
-      for (i = 2; i <= nverslist; ++i) {
-	if (version < s[i]) break;
-	verslist = verslist "\n" s[i];
-      }
-      verslist = verslist "\n" version;
-      for (; i <= nverslist; ++i) {
-	verslist = verslist "\n" s[i];
-      }
-    }
-    ++nverslist;
-  }
-
   if (tofile) {
     out = prefix soname ".symlist";
     if (soname in outfiles)
       out = out "." ++outfiles[soname];
     else
       outfiles[soname] = 1;
-    printf "" > out;
+    outpipe = "LC_ALL=C sort -u > " out;
+  } else {
+    outpipe = "LC_ALL=C sort -u";
   }
 
-  split(verslist, order, "\n");
-  for (i = 1; i <= nverslist; ++i) {
-    version = order[i];
+  printf "%s", descs | outpipe;
 
-    if (tofile) {
-      print version >> out;
-      close(out);
-      outpipe = "sort >> " out;
-    }
-    else {
-      if (combine)
-	print "";
-      print prefix version;
-      outpipe = "sort";
-    }
-    print versions[version] | outpipe;
-    close(outpipe);
-
-    delete versions[version];
-  }
-  for (version in versions)
-    delete versions[version];
+  descs = "";
 
   if (tofile)
     print "wrote", out, "for", sofullname;

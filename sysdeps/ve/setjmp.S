@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 /* setjmp for VE. */
@@ -69,12 +69,10 @@ ENTRY(__sigsetjmp)
 #else
 	/* Make a tail call to __sigjmp_save; it takes the same args.  */
 #ifndef SHARED
-	lea	%s12, __sigjmp_save@CALL_LO
-	and	%s12,%s12,(32)0
+	addi %s12,0,__sigjmp_save@CALL_LO
 	lea.sl	%s12, __sigjmp_save@CALL_HI(,%s12)
 #else
-        lea     %s12, __sigjmp_save@PC_LO(-24)
-        and     %s12,%s12,(32)0
+        addi %s12,-16,__sigjmp_save@PC_LO
         sic     %s62
         lea.sl  %s12, __sigjmp_save@PC_HI(%s12,%s62)
 #endif

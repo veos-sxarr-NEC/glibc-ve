@@ -1,5 +1,5 @@
 /* Implementation of gamma function according to ISO C.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,11 +15,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
 #include <float.h>
+#include <libm-alias-finite.h>
 
 /* Coefficients B_2k / 2k(2k-1) of x^-(2k-1) inside exp in Stirling's
    approximation to gamma function.  */
@@ -58,7 +62,7 @@ gamma_positive (double x, int *exp2_adj)
     {
       /* Adjust into the range for using exp (lgamma).  */
       *exp2_adj = 0;
-      double n = __ceil (x - 1.5);
+      double n = ceil (x - 1.5);
       double x_adj = x - n;
       double eps;
       double prod = __gamma_product (x_adj, 0, n, &eps);
@@ -75,12 +79,8 @@ gamma_positive (double x, int *exp2_adj)
 	{
 	  /* Adjust into the range for applying Stirling's
 	     approximation.  */
-	  double n = __ceil (12.0 - x);
-#if FLT_EVAL_METHOD != 0
-	  volatile
-#endif
-	  double x_tmp = x + n;
-	  x_adj = x_tmp;
+	  double n = ceil (12.0 - x);
+	  x_adj = math_narrow_eval (x + n);
 	  x_eps = (x - (x_adj - n));
 	  prod = __gamma_product (x_adj - n, x_eps, n, &eps);
 	}
@@ -89,7 +89,7 @@ gamma_positive (double x, int *exp2_adj)
 	 starting by computing pow (X_ADJ, X_ADJ) with a power of 2
 	 factored out.  */
       double exp_adj = -eps;
-      double x_adj_int = __round (x_adj);
+      double x_adj_int = round (x_adj);
       double x_adj_frac = x_adj - x_adj_int;
       int x_adj_log2;
       double x_adj_mant = __frexp (x_adj, &x_adj_log2);
@@ -102,9 +102,9 @@ gamma_positive (double x, int *exp2_adj)
       double ret = (__ieee754_pow (x_adj_mant, x_adj)
 		    * __ieee754_exp2 (x_adj_log2 * x_adj_frac)
 		    * __ieee754_exp (-x_adj)
-		    * __ieee754_sqrt (2 * M_PI / x_adj)
+		    * sqrt (2 * M_PI / x_adj)
 		    / prod);
-      exp_adj += x_eps * __ieee754_log (x);
+      exp_adj += x_eps * __ieee754_log (x_adj);
       double bsum = gamma_coeff[NCOEFF - 1];
       double x_adj2 = x_adj * x_adj;
       for (size_t i = 1; i <= NCOEFF - 1; i++)
@@ -118,7 +118,8 @@ double
 __ieee754_gamma_r (double x, int *signgamp)
 {
   int32_t hx;
-  u_int32_t lx;
+  uint32_t lx;
+  double ret;
 
   EXTRACT_WORDS (hx, lx, x);
 
@@ -129,7 +130,7 @@ __ieee754_gamma_r (double x, int *signgamp)
       return 1.0 / x;
     }
   if (__builtin_expect (hx < 0, 0)
-      && (u_int32_t) hx < 0xfff00000 && __rint (x) == x)
+      && (uint32_t) hx < 0xfff00000 && rint (x) == x)
     {
       /* Return value for integer x < 0 is NaN with invalid exception.  */
       *signgamp = 0;
@@ -153,36 +154,71 @@ __ieee754_gamma_r (double x, int *signgamp)
     {
       /* Overflow.  */
       *signgamp = 0;
-      return DBL_MAX * DBL_MAX;
-    }
-  else if (x > 0.0)
-    {
-      *signgamp = 0;
-      int exp2_adj;
-      double ret = gamma_positive (x, &exp2_adj);
-      return __scalbn (ret, exp2_adj);
-    }
-  else if (x >= -DBL_EPSILON / 4.0)
-    {
-      *signgamp = 0;
-      return 1.0 / x;
+      ret = math_narrow_eval (DBL_MAX * DBL_MAX);
+      return ret;
     }
   else
     {
-      double tx = __trunc (x);
-      *signgamp = (tx == 2.0 * __trunc (tx / 2.0)) ? -1 : 1;
-      if (x <= -184.0)
-	/* Underflow.  */
-	return DBL_MIN * DBL_MIN;
-      double frac = tx - x;
-      if (frac > 0.5)
-	frac = 1.0 - frac;
-      double sinpix = (frac <= 0.25
-		       ? __sin (M_PI * frac)
-		       : __cos (M_PI * (0.5 - frac)));
-      int exp2_adj;
-      double ret = M_PI / (-x * sinpix * gamma_positive (-x, &exp2_adj));
-      return __scalbn (ret, -exp2_adj);
+      SET_RESTORE_ROUND (FE_TONEAREST);
+      if (x > 0.0)
+	{
+	  *signgamp = 0;
+	  int exp2_adj;
+	  double tret = gamma_positive (x, &exp2_adj);
+	  ret = __scalbn (tret, exp2_adj);
+	}
+      else if (x >= -DBL_EPSILON / 4.0)
+	{
+	  *signgamp = 0;
+	  ret = 1.0 / x;
+	}
+      else
+	{
+	  double tx = trunc (x);
+	  *signgamp = (tx == 2.0 * trunc (tx / 2.0)) ? -1 : 1;
+	  if (x <= -184.0)
+	    /* Underflow.  */
+	    ret = DBL_MIN * DBL_MIN;
+	  else
+	    {
+	      double frac = tx - x;
+	      if (frac > 0.5)
+		frac = 1.0 - frac;
+	      double sinpix = (frac <= 0.25
+			       ? __sin (M_PI * frac)
+			       : __cos (M_PI * (0.5 - frac)));
+	      int exp2_adj;
+	      double tret = M_PI / (-x * sinpix
+				    * gamma_positive (-x, &exp2_adj));
+	      ret = __scalbn (tret, -exp2_adj);
+	      math_check_force_underflow_nonneg (ret);
+	    }
+	}
+      ret = math_narrow_eval (ret);
     }
+  if (isinf (ret) && x != 0)
+    {
+      if (*signgamp < 0)
+	{
+	  ret = math_narrow_eval (-copysign (DBL_MAX, ret) * DBL_MAX);
+	  ret = -ret;
+	}
+      else
+	ret = math_narrow_eval (copysign (DBL_MAX, ret) * DBL_MAX);
+      return ret;
+    }
+  else if (ret == 0)
+    {
+      if (*signgamp < 0)
+	{
+	  ret = math_narrow_eval (-copysign (DBL_MIN, ret) * DBL_MIN);
+	  ret = -ret;
+	}
+      else
+	ret = math_narrow_eval (copysign (DBL_MIN, ret) * DBL_MIN);
+      return ret;
+    }
+  else
+    return ret;
 }
-strong_alias (__ieee754_gamma_r, __gamma_r_finite)
+libm_alias_finite (__ieee754_gamma_r, __gamma_r)

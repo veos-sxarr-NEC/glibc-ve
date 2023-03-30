@@ -1,7 +1,7 @@
 /* mpn_divrem -- Divide natural numbers, producing both remainder and
    quotient.
 
-Copyright (C) 1993-2015 Free Software Foundation, Inc.
+Copyright (C) 1993-2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -17,7 +17,7 @@ License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, see
-<http://www.gnu.org/licenses/>.  */
+<https://www.gnu.org/licenses/>.  */
 
 #include <gmp.h>
 #include "gmp-impl.h"
@@ -40,19 +40,9 @@ along with the GNU MP Library; see the file COPYING.LIB.  If not, see
    3. NSIZE >= DSIZE, even if QEXTRA_LIMBS is non-zero.  */
 
 mp_limb_t
-#if __STDC__
 mpn_divrem (mp_ptr qp, mp_size_t qextra_limbs,
 	    mp_ptr np, mp_size_t nsize,
 	    mp_srcptr dp, mp_size_t dsize)
-#else
-mpn_divrem (qp, qextra_limbs, np, nsize, dp, dsize)
-     mp_ptr qp;
-     mp_size_t qextra_limbs;
-     mp_ptr np;
-     mp_size_t nsize;
-     mp_srcptr dp;
-     mp_size_t dsize;
-#endif
 {
   mp_limb_t most_significant_q_limb = 0;
 

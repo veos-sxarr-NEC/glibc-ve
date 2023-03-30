@@ -1,4 +1,4 @@
-# Copyright (C) 1995-2015 Free Software Foundation, Inc.
+# Copyright (C) 1995-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for sysvipc portion of the library.
@@ -30,7 +30,9 @@ routines := ftok \
 	    semop semget semctl semtimedop \
 	    shmat shmdt shmget shmctl
 
+tests    := test-sysvmsg test-sysvsem test-sysvshm
+
 include ../Rules
 
-CFLAGS-msgrcv.c = -fexceptions -fasynchronous-unwind-tables
-CFLAGS-msgsnd.c = -fexceptions -fasynchronous-unwind-tables
+CFLAGS-msgrcv.c += -fexceptions -fasynchronous-unwind-tables
+CFLAGS-msgsnd.c += -fexceptions -fasynchronous-unwind-tables

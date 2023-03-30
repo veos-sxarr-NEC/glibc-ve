@@ -25,14 +25,17 @@ static char rcsid[] = "$NetBSD: s_nextafter.c,v 1.8 1995/05/10 20:47:58 jtc Exp 
 #define __nexttoward __internal___nexttoward
 #define nexttoward __internal_nexttoward
 
+#include <errno.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
 #include <float.h>
+#include <libm-alias-double.h>
 
 double __nextafter(double x, double y)
 {
 	int32_t hx,hy,ix,iy;
-	u_int32_t lx,ly;
+	uint32_t lx,ly;
 
 	EXTRACT_WORDS(hx,lx,x);
 	EXTRACT_WORDS(hy,ly,y);
@@ -72,18 +75,18 @@ double __nextafter(double x, double y)
 	if(hy>=0x7ff00000) {
 	  double u = x+x;	/* overflow  */
 	  math_force_eval (u);
+	  __set_errno (ERANGE);
 	}
 	if(hy<0x00100000) {
 	    double u = x*x;			/* underflow */
 	    math_force_eval (u);		/* raise underflow flag */
+	  __set_errno (ERANGE);
 	}
 	INSERT_WORDS(x,hx,lx);
 	return x;
 }
-weak_alias (__nextafter, nextafter)
+libm_alias_double (__nextafter, nextafter)
 #ifdef NO_LONG_DOUBLE
-strong_alias (__nextafter, __nextafterl)
-weak_alias (__nextafter, nextafterl)
 strong_alias (__nextafter, __nexttowardl)
 weak_alias (__nexttowardl, nexttowardl)
 #undef __nexttoward

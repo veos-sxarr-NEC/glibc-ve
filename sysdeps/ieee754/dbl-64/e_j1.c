@@ -59,8 +59,12 @@
  */
 
 #include <errno.h>
+#include <float.h>
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static double pone (double), qone (double);
 
@@ -111,11 +115,11 @@ __ieee754_j1 (double x)
        * y1(x) = 1/sqrt(pi) * (P(1,x)*ss + Q(1,x)*cc) / sqrt(x)
        */
       if (ix > 0x48000000)
-	z = (invsqrtpi * cc) / __ieee754_sqrt (y);
+	z = (invsqrtpi * cc) / sqrt (y);
       else
 	{
 	  u = pone (y); v = qone (y);
-	  z = invsqrtpi * (u * cc - v * ss) / __ieee754_sqrt (y);
+	  z = invsqrtpi * (u * cc - v * ss) / sqrt (y);
 	}
       if (hx < 0)
 	return -z;
@@ -124,8 +128,14 @@ __ieee754_j1 (double x)
     }
   if (__glibc_unlikely (ix < 0x3e400000))                  /* |x|<2**-27 */
     {
-      if (huge + x > one)
-	return 0.5 * x;                 /* inexact if x!=0 necessary */
+      if (huge + x > one)                 /* inexact if x!=0 necessary */
+	{
+	  double ret = math_narrow_eval (0.5 * x);
+	  math_check_force_underflow (ret);
+	  if (ret == 0 && x != 0)
+	    __set_errno (ERANGE);
+	  return ret;
+	}
     }
   z = x * x;
   r1 = z * R[0]; z2 = z * z;
@@ -138,7 +148,7 @@ __ieee754_j1 (double x)
   s = s1 + z2 * s2 + z4 * s3;
   return (x * 0.5 + r / s);
 }
-strong_alias (__ieee754_j1, __j1_finite)
+libm_alias_finite (__ieee754_j1, __j1)
 
 static const double U0[5] = {
  -1.96057090646238940668e-01, /* 0xBFC91866, 0x143CBC8A */
@@ -167,7 +177,7 @@ __ieee754_y1 (double x)
   if (__glibc_unlikely (ix >= 0x7ff00000))
     return one / (x + x * x);
   if (__glibc_unlikely ((ix | lx) == 0))
-    return -HUGE_VAL + x;
+    return -1 / zero; /* -inf and divide by zero exception.  */
   /* -inf and overflow exception.  */;
   if (__glibc_unlikely (hx < 0))
     return zero / (zero * x);
@@ -196,18 +206,18 @@ __ieee754_y1 (double x)
        * to compute the worse one.
        */
       if (ix > 0x48000000)
-	z = (invsqrtpi * ss) / __ieee754_sqrt (x);
+	z = (invsqrtpi * ss) / sqrt (x);
       else
 	{
 	  u = pone (x); v = qone (x);
-	  z = invsqrtpi * (u * ss + v * cc) / __ieee754_sqrt (x);
+	  z = invsqrtpi * (u * ss + v * cc) / sqrt (x);
 	}
       return z;
     }
   if (__glibc_unlikely (ix <= 0x3c900000))              /* x < 2**-54 */
     {
       z = -tpi / x;
-      if (__isinf (z))
+      if (isinf (z))
 	__set_errno (ERANGE);
       return z;
     }
@@ -221,7 +231,7 @@ __ieee754_y1 (double x)
   v = v1 + z2 * v2 + z4 * v3;
   return (x * (u / v) + tpi * (__ieee754_j1 (x) * __ieee754_log (x) - one / x));
 }
-strong_alias (__ieee754_y1, __y1_finite)
+libm_alias_finite (__ieee754_y1, __y1)
 
 /* For x >= 8, the asymptotic expansions of pone is
  *	1 + 15/128 s^2 - 4725/2^15 s^4 - ...,	where s = 1/x.
@@ -305,6 +315,7 @@ pone (double x)
   int32_t ix;
   GET_HIGH_WORD (ix, x);
   ix &= 0x7fffffff;
+  /* ix >= 0x40000000 for all calls to this function.  */
   if (ix >= 0x41b00000)
     {
       return one;
@@ -321,7 +332,7 @@ pone (double x)
     {
       p = pr3; q = ps3;
     }
-  else if (ix >= 0x40000000)
+  else
     {
       p = pr2; q = ps2;
     }
@@ -424,6 +435,7 @@ qone (double x)
   int32_t ix;
   GET_HIGH_WORD (ix, x);
   ix &= 0x7fffffff;
+  /* ix >= 0x40000000 for all calls to this function.  */
   if (ix >= 0x41b00000)
     {
       return .375 / x;
@@ -440,7 +452,7 @@ qone (double x)
     {
       p = qr3; q = qs3;
     }
-  else if (ix >= 0x40000000)
+  else
     {
       p = qr2; q = qs2;
     }

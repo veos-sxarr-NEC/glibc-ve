@@ -89,7 +89,7 @@ more meaning than the system administrator gives to it.
 
 @item priority
 This tells how important the content of the message is.  Examples of
-defined priority values are: debug, informational, warning, critical.
+defined priority values are: debug, informational, warning and critical.
 For the complete list, see @ref{syslog; vsyslog}.  Except for
 the fact that the priorities have a defined order, the meaning of each
 of these priorities is entirely determined by the system administrator.
@@ -144,9 +144,8 @@ system, use the socket I/O functions to write a UDP datagram to the
 The symbols referred to in this section are declared in the file
 @file{syslog.h}.
 
-@comment syslog.h
-@comment BSD
 @deftypefun void openlog (const char *@var{ident}, int @var{option}, int @var{facility})
+@standards{BSD, syslog.h}
 @safety{@prelim{}@mtsafe{}@asunsafe{@asulock{}}@acunsafe{@aculock{} @acsfd{}}}
 @c openlog @asulock @aculock @acsfd
 @c  libc_lock_lock @asulock @aculock
@@ -221,7 +220,7 @@ implicitly and uses defaults for the information in @var{ident} and
 @var{options} is a bit string, with the bits as defined by the following
 single bit masks:
 
-@table @code
+@vtable @code
 @item LOG_PERROR
 If on, @code{openlog} sets up the connection so that any @code{syslog}
 on this connection writes its message to the calling process' Standard
@@ -250,14 +249,14 @@ exactly the opposite.
 @item LOG_ODELAY
 This bit does nothing.  It exists for backward compatibility.
 
-@end table
+@end vtable
 
 If any other bit in @var{options} is on, the result is undefined.
 
 @var{facility} is the default facility code for this connection.  A
 @code{syslog} on this connection that specifies default facility causes
 this facility to be associated with the message.  See @code{syslog} for
-possible values.  A value of zero means the default default, which is
+possible values.  A value of zero means the default, which is
 @code{LOG_USER}.
 
 If a Syslog connection is already open when you call @code{openlog},
@@ -284,9 +283,8 @@ The symbols referred to in this section are declared in the file
 @file{syslog.h}.
 
 @c syslog() is implemented as a call to vsyslog().
-@comment syslog.h
-@comment BSD
 @deftypefun void syslog (int @var{facility_priority}, const char *@var{format}, @dots{})
+@standards{BSD, syslog.h}
 @safety{@prelim{}@mtsafe{@mtsenv{} @mtslocale{}}@asunsafe{@asucorrupt{} @ascuheap{} @asulock{} @ascudlopen{}}@acunsafe{@acucorrupt{} @aculock{} @acsmem{} @acsfd{}}}
 @c syslog @mtsenv @mtslocale @asucorrupt @ascuheap @asulock @ascudlopen @acucorrupt @aculock @acsmem @acsfd
 @c  va_start dup ok
@@ -444,9 +442,8 @@ syslog (LOG_MAKEPRI(LOG_LOCAL1, LOG_ERROR),
 @end deftypefun
 
 
-@comment syslog.h
-@comment BSD
 @deftypefun void vsyslog (int @var{facility_priority}, const char *@var{format}, va_list @var{arglist})
+@standards{BSD, syslog.h}
 @safety{@prelim{}@mtsafe{@mtsenv{} @mtslocale{}}@asunsafe{@asucorrupt{} @ascuheap{} @asulock{} @ascudlopen{}}@acunsafe{@acucorrupt{} @aculock{} @acsmem{} @acsfd{}}}
 @c vsyslog @mtsenv @mtslocale @asucorrupt @ascuheap @asulock @ascudlopen @acucorrupt @aculock @acsmem @acsfd
 @c  vsyslog_chk dup @mtsenv @mtslocale @asucorrupt @ascuheap @asulock @ascudlopen @acucorrupt @aculock @acsmem @acsfd
@@ -463,9 +460,8 @@ length argument.
 The symbols referred to in this section are declared in the file
 @file{syslog.h}.
 
-@comment syslog.h
-@comment BSD
 @deftypefun void closelog (void)
+@standards{BSD, syslog.h}
 @safety{@prelim{}@mtsafe{}@asunsafe{@asulock{}}@acunsafe{@aculock{} @acsfd{}}}
 @c closelog @asulock @aculock @acsfd
 @c  libc_lock_lock @asulock @aculock
@@ -500,9 +496,8 @@ Syslog connections are automatically closed on exec or exit.
 The symbols referred to in this section are declared in the file
 @file{syslog.h}.
 
-@comment syslog.h
-@comment BSD
 @deftypefun int setlogmask (int @var{mask})
+@standards{BSD, syslog.h}
 @safety{@prelim{}@mtunsafe{@mtasurace{:LogMask}}@asunsafe{}@acsafe{}}
 @c Read and modify are not guarded by syslog_lock, so concurrent changes
 @c or even uses are undefined.  This should use an atomic swap instead,

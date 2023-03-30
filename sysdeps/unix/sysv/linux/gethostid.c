@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <alloca.h>
 #include <errno.h>
@@ -21,13 +21,13 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <not-cancel.h>
+#include <stdbool.h>
 
 #define HOSTIDFILE "/etc/hostid"
 
 #ifdef SET_PROCEDURE
 int
-sethostid (id)
-     long int id;
+sethostid (long int id)
 {
   int fd;
   ssize_t written;
@@ -48,13 +48,13 @@ sethostid (id)
     }
 
   /* Open file for writing.  Everybody is allowed to read this file.  */
-  fd = open_not_cancel (HOSTIDFILE, O_CREAT|O_WRONLY|O_TRUNC, 0644);
+  fd = __open_nocancel (HOSTIDFILE, O_CREAT|O_WRONLY|O_TRUNC, 0644);
   if (fd < 0)
     return -1;
 
-  written = write_not_cancel (fd, &id32, sizeof (id32));
+  written = __write_nocancel (fd, &id32, sizeof (id32));
 
-  close_not_cancel_no_status (fd);
+  __close_nocancel_nostatus (fd);
 
   return written != sizeof (id32) ? -1 : 0;
 }
@@ -64,13 +64,12 @@ sethostid (id)
 # include <sys/param.h>
 # include <resolv/netdb.h>
 # include <netinet/in.h>
+# include <scratch_buffer.h>
 
 long int
 gethostid (void)
 {
   char hostname[MAXHOSTNAMELEN + 1];
-  size_t buflen;
-  char *buffer;
   struct hostent hostbuf, *hp;
   int32_t id;
   struct in_addr in;
@@ -78,40 +77,54 @@ gethostid (void)
   int fd;
 
   /* First try to get the ID from a former invocation of sethostid.  */
-  fd = open_not_cancel (HOSTIDFILE, O_RDONLY|O_LARGEFILE, 0);
+  fd = __open_nocancel (HOSTIDFILE, O_RDONLY|O_LARGEFILE, 0);
   if (fd >= 0)
     {
-      ssize_t n = read_not_cancel (fd, &id, sizeof (id));
+      ssize_t n = __read_nocancel (fd, &id, sizeof (id));
 
-      close_not_cancel_no_status (fd);
+      __close_nocancel_nostatus (fd);
 
       if (n == sizeof (id))
 	return id;
     }
 
-  /* Getting from the file was not successful.  An intelligent guess for
-     a unique number of a host is its IP address.  Return this.  */
+  /* Getting from the file was not successful.  An intelligent guess
+     for a unique number of a host is its IP address.  To get the IP
+     address we need to know the host name.  */
   if (__gethostname (hostname, MAXHOSTNAMELEN) < 0 || hostname[0] == '\0')
     /* This also fails.  Return and arbitrary value.  */
     return 0;
 
-  buflen = 1024;
-  buffer = __alloca (buflen);
-
-  /* To get the IP address we need to know the host name.  */
-  while (__gethostbyname_r (hostname, &hostbuf, buffer, buflen, &hp, &herr)
-	 != 0
-	 || hp == NULL)
-    if (herr != NETDB_INTERNAL || errno != ERANGE)
-      return 0;
-    else
-      /* Enlarge buffer.  */
-      buffer = extend_alloca (buffer, buflen, 2 * buflen);
+  /* Determine the IP address of the host name.  */
+  struct scratch_buffer tmpbuf;
+  scratch_buffer_init (&tmpbuf);
+  while (true)
+    {
+      int ret = __gethostbyname_r (hostname, &hostbuf,
+				   tmpbuf.data, tmpbuf.length, &hp, &herr);
+      if (ret == 0 && hp != NULL)
+	break;
+      else
+	{
+	  /* Enlarge the buffer on ERANGE.  */
+	  if (ret != 0 && herr == NETDB_INTERNAL && errno == ERANGE)
+	    {
+	      if (!scratch_buffer_grow (&tmpbuf))
+		return 0;
+	    }
+	  /* Other errors are a failure.  Return an arbitrary value.  */
+	  else
+	    {
+	      scratch_buffer_free (&tmpbuf);
+	      return 0;
+	    }
+	}
+    }
 
   in.s_addr = 0;
   memcpy (&in, hp->h_addr,
 	  (int) sizeof (in) < hp->h_length ? (int) sizeof (in) : hp->h_length);
-
+  scratch_buffer_free (&tmpbuf);
   /* For the return value to be not exactly the IP address we do some
      bit fiddling.  */
   return (int32_t) (in.s_addr << 16 | in.s_addr >> 16);

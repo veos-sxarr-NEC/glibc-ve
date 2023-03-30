@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_isnan.c,v 1.8 1995/05/10 20:47:36 jtc Exp $";
-#endif
-
 /*
  * isnan(x) returns 1 is x is nan, else 0;
  * no branching!
@@ -21,21 +17,24 @@ static char rcsid[] = "$NetBSD: s_isnan.c,v 1.8 1995/05/10 20:47:36 jtc Exp $";
 
 #include <math.h>
 #include <math_private.h>
+#include <ldbl-classify-compat.h>
+#include <shlib-compat.h>
+#include <stdint.h>
 
-#undef __isnan
 int
 __isnan (double x)
 {
-  int32_t hx, lx;
-  EXTRACT_WORDS (hx, lx, x);
-  hx &= 0x7fffffff;
-  hx |= (u_int32_t) (lx | (-lx)) >> 31;
-  hx = 0x7ff00000 - hx;
-  return (int) (((u_int32_t) hx) >> 31);
+  int64_t hx;
+  EXTRACT_WORDS64 (hx, x);
+  hx &= UINT64_C (0x7fffffffffffffff);
+  hx = UINT64_C (0x7ff0000000000000) - hx;
+  return (int)(((uint64_t)hx)>>63);
 }
 hidden_def (__isnan)
 weak_alias (__isnan, isnan)
 #ifdef NO_LONG_DOUBLE
-strong_alias (__isnan, __isnanl)
+# if LDBL_CLASSIFY_COMPAT && SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_23)
+compat_symbol (libc, __isnan, __isnanl, GLIBC_2_0);
+# endif
 weak_alias (__isnan, isnanl)
 #endif

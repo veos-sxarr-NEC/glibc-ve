@@ -15,82 +15,56 @@
  * Return x rounded toward -inf to integral value
  * Method:
  *	Bit twiddling.
- * Exception:
- *	Inexact flag raised if x not equal to ceil(x).
  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
 #include <math_private.h>
-
-static const double huge = 1.0e300;
+#include <libm-alias-double.h>
+#include <math-use-builtins.h>
 
 double
 __ceil (double x)
 {
-  int32_t i0, i1, j0;
-  u_int32_t i, j;
-  EXTRACT_WORDS (i0, i1, x);
-  j0 = ((i0 >> 20) & 0x7ff) - 0x3ff;
-  if (j0 < 20)
+#if USE_CEIL_BUILTIN
+  return __builtin_ceil (x);
+#else
+  /* Use generic implementation.  */
+  int64_t i0, i;
+  int32_t j0;
+  EXTRACT_WORDS64 (i0, x);
+  j0 = ((i0 >> 52) & 0x7ff) - 0x3ff;
+  if (j0 <= 51)
     {
-      if (j0 < 0)       /* raise inexact if x != 0 */
+      if (j0 < 0)
 	{
-	  math_force_eval (huge + x);
-	  /* return 0*sign(x) if |x|<1 */
+	  /* return 0 * sign(x) if |x| < 1  */
 	  if (i0 < 0)
-	    {
-	      i0 = 0x80000000; i1 = 0;
-	    }
-	  else if ((i0 | i1) != 0)
-	    {
-	      i0 = 0x3ff00000; i1 = 0;
-	    }
+	    i0 = INT64_C (0x8000000000000000);
+	  else if (i0 != 0)
+	    i0 = INT64_C (0x3ff0000000000000);
 	}
       else
 	{
-	  i = (0x000fffff) >> j0;
-	  if (((i0 & i) | i1) == 0)
-	    return x;                        /* x is integral */
-	  math_force_eval (huge + x);           /* raise inexact flag */
+	  i = INT64_C (0x000fffffffffffff) >> j0;
+	  if ((i0 & i) == 0)
+	    return x;			/* x is integral  */
 	  if (i0 > 0)
-	    i0 += (0x00100000) >> j0;
-	  i0 &= (~i); i1 = 0;
+	    i0 += UINT64_C (0x0010000000000000) >> j0;
+	  i0 &= ~i;
 	}
-    }
-  else if (j0 > 51)
-    {
-      if (j0 == 0x400)
-	return x + x;                   /* inf or NaN */
-      else
-	return x;                       /* x is integral */
     }
   else
     {
-      i = ((u_int32_t) (0xffffffff)) >> (j0 - 20);
-      if ((i1 & i) == 0)
-	return x;                       /* x is integral */
-      math_force_eval (huge + x);               /* raise inexact flag */
-      if (i0 > 0)
-	{
-	  if (j0 == 20)
-	    i0 += 1;
-	  else
-	    {
-	      j = i1 + (1 << (52 - j0));
-	      if (j < i1)
-		i0 += 1;                /* got a carry */
-	      i1 = j;
-	    }
-	}
-      i1 &= (~i);
+      if (j0 == 0x400)
+	return x + x;			/* inf or NaN  */
+      else
+	return x;			/* x is integral  */
     }
-  INSERT_WORDS (x, i0, i1);
+  INSERT_WORDS64 (x, i0);
   return x;
+#endif /* ! USE_CEIL_BUILTIN  */
 }
 #ifndef __ceil
-weak_alias (__ceil, ceil)
-# ifdef NO_LONG_DOUBLE
-strong_alias (__ceil, __ceill)
-weak_alias (__ceil, ceill)
-# endif
+libm_alias_double (__ceil, ceil)
 #endif

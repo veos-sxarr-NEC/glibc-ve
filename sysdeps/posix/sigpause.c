@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,21 +13,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define sigpause __rename_sigpause
 #include <errno.h>
 #include <signal.h>
 #include <stddef.h>		/* For NULL.  */
-#include <sysdep-cancel.h>
 #undef sigpause
 
 #include <sigset-cvt-mask.h>
+#include <sysdep-cancel.h>
 
-/* Set the mask of blocked signals to MASK,
-   wait for a signal to arrive, and then restore the mask.  */
-static int
-do_sigpause (int sig_or_mask, int is_sig)
+int
+__sigpause (int sig_or_mask, int is_sig)
 {
   sigset_t set;
 
@@ -45,21 +43,6 @@ do_sigpause (int sig_or_mask, int is_sig)
      sigsuspend() which itself is a cancellation point we do not have
      to do anything here.  */
   return __sigsuspend (&set);
-}
-
-int
-__sigpause (int sig_or_mask, int is_sig)
-{
-  if (SINGLE_THREAD_P)
-    return do_sigpause (sig_or_mask, is_sig);
-
-  int oldtype = LIBC_CANCEL_ASYNC ();
-
-  int result = do_sigpause (sig_or_mask, is_sig);
-
-  LIBC_CANCEL_RESET (oldtype);
-
-  return result;
 }
 libc_hidden_def (__sigpause)
 

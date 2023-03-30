@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _LINUX_AARCH64_SYSDEP_H
 #define _LINUX_AARCH64_SYSDEP_H 1
@@ -108,7 +108,7 @@
 .Lsyscall_error:						\
 	adrp	x1, :gottprel:errno;				\
 	neg	w2, w0;						\
-	ldr	x1, [x1, :gottprel_lo12:errno];			\
+	ldr	PTR_REG(1), [x1, :gottprel_lo12:errno];		\
 	mrs	x3, tpidr_el0;					\
 	mov	x0, -1;						\
 	str	w2, [x1, x3];					\
@@ -151,74 +151,24 @@
 
 #else /* not __ASSEMBLER__ */
 
-# ifdef SHARED
-#  define INLINE_VSYSCALL(name, nr, args...)				      \
-  ({									      \
-    __label__ out;							      \
-    __label__ iserr;							      \
-    long sc_ret;							      \
-    INTERNAL_SYSCALL_DECL (sc_err);					      \
-									      \
-    if (__vdso_##name != NULL)						      \
-      {									      \
-	sc_ret = INTERNAL_VSYSCALL_NCS (__vdso_##name, sc_err, nr, ##args);   \
-	if (!INTERNAL_SYSCALL_ERROR_P (sc_ret, sc_err))			      \
-	  goto out;							      \
-	if (INTERNAL_SYSCALL_ERRNO (sc_ret, sc_err) != ENOSYS)		      \
-	  goto iserr;							      \
-      }									      \
-									      \
-    sc_ret = INTERNAL_SYSCALL (name, sc_err, nr, ##args);		      \
-    if (INTERNAL_SYSCALL_ERROR_P (sc_ret, sc_err))			      \
-      {									      \
-      iserr:								      \
-        __set_errno (INTERNAL_SYSCALL_ERRNO (sc_ret, sc_err));		      \
-        sc_ret = -1L;							      \
-      }									      \
-  out:									      \
-    sc_ret;								      \
-  })
+# ifdef __LP64__
+#  define VDSO_NAME  "LINUX_2.6.39"
+#  define VDSO_HASH  123718537
 # else
-#  define INLINE_VSYSCALL(name, nr, args...) \
-  INLINE_SYSCALL (name, nr, ##args)
-# endif
-
-# ifdef SHARED
-#  define INTERNAL_VSYSCALL(name, err, nr, args...)			      \
-  ({									      \
-    __label__ out;							      \
-    long v_ret;								      \
-									      \
-    if (__vdso_##name != NULL)						      \
-      {									      \
-	v_ret = INTERNAL_VSYSCALL_NCS (__vdso_##name, err, nr, ##args);	      \
-	if (!INTERNAL_SYSCALL_ERROR_P (v_ret, err)			      \
-	    || INTERNAL_SYSCALL_ERRNO (v_ret, err) != ENOSYS)		      \
-	  goto out;							      \
-      }									      \
-    v_ret = INTERNAL_SYSCALL (name, err, nr, ##args);			      \
-  out:									      \
-    v_ret;								      \
-  })
-# else
-#  define INTERNAL_VSYSCALL(name, err, nr, args...) \
-  INTERNAL_SYSCALL (name, err, nr, ##args)
+#  define VDSO_NAME  "LINUX_4.9"
+#  define VDSO_HASH  61765625
 # endif
 
 /* List of system calls which are supported as vsyscalls.  */
-# define HAVE_CLOCK_GETRES_VSYSCALL	1
-# define HAVE_CLOCK_GETTIME_VSYSCALL	1
+# define HAVE_CLOCK_GETRES64_VSYSCALL	"__kernel_clock_getres"
+# define HAVE_CLOCK_GETTIME64_VSYSCALL	"__kernel_clock_gettime"
+# define HAVE_GETTIMEOFDAY_VSYSCALL	"__kernel_gettimeofday"
 
-# define INTERNAL_VSYSCALL_NCS(funcptr, err, nr, args...)	\
-  ({								\
-    LOAD_ARGS_##nr (args)					\
-    asm volatile ("blr %1"					\
-		  : "=r" (_x0)					\
-		  : "r" (funcptr) ASM_ARGS_##nr			\
-		  : "x30", "memory");				\
-    (long) _x0;							\
-  })
+/* Previously AArch64 used the generic version without the libc_hidden_def
+   which lead in a non existent __send symbol in libc.so.  */
+# undef HAVE_INTERNAL_SEND_SYMBOL
 
+# define SINGLE_THREAD_BY_GLOBAL		1
 
 /* Define a macro which expands into the inline wrapper code for a system
    call.  */
@@ -309,16 +259,18 @@
 #endif	/* __ASSEMBLER__ */
 
 /* Pointer mangling is supported for AArch64.  */
-#if (IS_IN (rtld) || \
-     (!defined SHARED && (IS_IN (libc) \
-			  || IS_IN (libpthread))))
+#if (IS_IN (rtld) \
+     || (!defined SHARED && (IS_IN (libc) \
+			     || IS_IN (libpthread))))
 # ifdef __ASSEMBLER__
+/* Note, dst, src, guard, and tmp are all register numbers rather than
+   register names so they will work with both ILP32 and LP64. */
 #  define PTR_MANGLE(dst, src, guard, tmp)                                \
   LDST_PCREL (ldr, guard, tmp, C_SYMBOL_NAME(__pointer_chk_guard_local)); \
   PTR_MANGLE2 (dst, src, guard)
 /* Use PTR_MANGLE2 for efficiency if guard is already loaded.  */
 #  define PTR_MANGLE2(dst, src, guard)\
-  eor dst, src, guard
+  eor x##dst, x##src, x##guard
 #  define PTR_DEMANGLE(dst, src, guard, tmp)\
   PTR_MANGLE (dst, src, guard, tmp)
 #  define PTR_DEMANGLE2(dst, src, guard)\
@@ -331,12 +283,14 @@ extern uintptr_t __pointer_chk_guard_local attribute_relro attribute_hidden;
 # endif
 #else
 # ifdef __ASSEMBLER__
+/* Note, dst, src, guard, and tmp are all register numbers rather than
+   register names so they will work with both ILP32 and LP64. */
 #  define PTR_MANGLE(dst, src, guard, tmp)                             \
   LDST_GLOBAL (ldr, guard, tmp, C_SYMBOL_NAME(__pointer_chk_guard));   \
   PTR_MANGLE2 (dst, src, guard)
 /* Use PTR_MANGLE2 for efficiency if guard is already loaded.  */
 #  define PTR_MANGLE2(dst, src, guard)\
-  eor dst, src, guard
+  eor x##dst, x##src, x##guard
 #  define PTR_DEMANGLE(dst, src, guard, tmp)\
   PTR_MANGLE (dst, src, guard, tmp)
 #  define PTR_DEMANGLE2(dst, src, guard)\

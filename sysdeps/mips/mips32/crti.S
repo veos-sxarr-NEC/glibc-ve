@@ -1,5 +1,5 @@
 /* Special .init and .fini section support for MIPS (o32).
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* crti.S puts a function prologue at the beginning of the .init and
    .fini sections and defines global symbols for those addresses, so
@@ -39,6 +39,12 @@
    magic and cause the linker to emit DT_INIT and DT_FINI.  */
 
 #include <libc-symbols.h>
+
+#ifdef __mips_micromips
+# define JALR_RELOC R_MICROMIPS_JALR
+#else
+# define JALR_RELOC R_MIPS_JALR
+#endif
 
 #ifndef PREINIT_FUNCTION
 # define PREINIT_FUNCTION __gmon_start__
@@ -59,6 +65,7 @@
 	.section .init,"ax",@progbits
 	.p2align 2
 	.globl _init
+	.hidden	_init
 	.type _init, @function
 _init:
 	.set noreorder
@@ -71,18 +78,20 @@ _init:
 	lw $2,%got(PREINIT_FUNCTION)($28)
 	beq $2,$0,.Lno_weak_fn
 	lw $25,%call16(PREINIT_FUNCTION)($28)
-	.reloc 1f,R_MIPS_JALR,PREINIT_FUNCTION
+	.reloc 1f,JALR_RELOC,PREINIT_FUNCTION
 1:	jalr $25
 .Lno_weak_fn:
+	.insn
 #else
 	lw $25,%got(PREINIT_FUNCTION)($28)
-	.reloc 1f,R_MIPS_JALR,PREINIT_FUNCTION
+	.reloc 1f,JALR_RELOC,PREINIT_FUNCTION
 1:	jalr $25
 #endif
 
 	.section .fini,"ax",@progbits
 	.p2align 2
 	.globl _fini
+	.hidden	_fini
 	.type _fini, @function
 _fini:
 	.set noreorder

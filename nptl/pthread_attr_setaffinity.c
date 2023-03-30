@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -14,16 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthreadP.h>
 #include <shlib-compat.h>
-#include <check-cpuset.h>
 
 
 int
@@ -32,7 +30,6 @@ __pthread_attr_setaffinity_new (pthread_attr_t *attr, size_t cpusetsize,
 {
   struct pthread_attr *iattr;
 
-  assert (sizeof (*attr) >= sizeof (struct pthread_attr));
   iattr = (struct pthread_attr *) attr;
 
   if (cpuset == NULL || cpusetsize == 0)
@@ -43,11 +40,6 @@ __pthread_attr_setaffinity_new (pthread_attr_t *attr, size_t cpusetsize,
     }
   else
     {
-      int ret = check_cpuset_attr (cpuset, cpusetsize);
-
-      if (ret)
-        return ret;
-
       if (iattr->cpusetsize != cpusetsize)
 	{
 	  void *newp = (cpu_set_t *) realloc (iattr->cpuset, cpusetsize);

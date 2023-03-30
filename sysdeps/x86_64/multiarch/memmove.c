@@ -1,6 +1,6 @@
-/* Multiple versions of memmove.
+/* Multiple versions of memmmove.
    All versions must be listed in ifunc-impl-list.c.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2016-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,50 +15,23 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+/* Define multiple versions only for the definition in libc.  */
 #if IS_IN (libc)
-# define MEMMOVE __memmove_sse2
-# ifdef SHARED
-#  undef libc_hidden_builtin_def
-#  define libc_hidden_builtin_def(name) \
-  __hidden_ver1 (__memmove_sse2, __GI_memmove, __memmove_sse2);
-# endif
-
-/* Redefine memmove so that the compiler won't complain about the type
-   mismatch with the IFUNC selector in strong_alias, below.  */
-# undef memmove
 # define memmove __redirect_memmove
 # include <string.h>
 # undef memmove
 
-extern __typeof (__redirect_memmove) __memmove_sse2 attribute_hidden;
-extern __typeof (__redirect_memmove) __memmove_ssse3 attribute_hidden;
-extern __typeof (__redirect_memmove) __memmove_ssse3_back attribute_hidden;
-extern __typeof (__redirect_memmove) __memmove_avx_unaligned attribute_hidden;
+# define SYMBOL_NAME memmove
+# include "ifunc-memmove.h"
 
-#endif
+libc_ifunc_redirected (__redirect_memmove, __libc_memmove,
+		       IFUNC_SELECTOR ());
 
-#include "string/memmove.c"
-
-#if IS_IN (libc)
-# include <shlib-compat.h>
-# include "init-arch.h"
-
-/* Avoid DWARF definition DIE on ifunc symbol so that GDB can handle
-   ifunc symbol properly.  */
-extern __typeof (__redirect_memmove) __libc_memmove;
-libc_ifunc (__libc_memmove,
-	    HAS_AVX_FAST_UNALIGNED_LOAD
-	    ? __memmove_avx_unaligned
-	    : (HAS_SSSE3
-	       ? (HAS_FAST_COPY_BACKWARD
-	          ? __memmove_ssse3_back : __memmove_ssse3)
-	       : __memmove_sse2));
-
-strong_alias (__libc_memmove, memmove)
-
-# if SHLIB_COMPAT (libc, GLIBC_2_2_5, GLIBC_2_14)
-compat_symbol (libc, memmove, memcpy, GLIBC_2_2_5);
+strong_alias (__libc_memmove, memmove);
+# ifdef SHARED
+__hidden_ver1 (__libc_memmove, __GI_memmove, __redirect_memmove)
+  __attribute__ ((visibility ("hidden")));
 # endif
 #endif

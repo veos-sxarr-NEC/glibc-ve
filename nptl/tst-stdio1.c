@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,13 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 
+static int do_test (void);
+
+#define TEST_FUNCTION do_test ()
+#include "../test-skeleton.c"
 
 static void *tf (void *a)
 {
@@ -39,18 +43,14 @@ do_test (void)
 
   if (pthread_create (&th, NULL, tf, NULL) != 0)
     {
-      write (2, "create failed\n", 14);
+      write_message ("create failed\n");
       _exit (1);
     }
 
-  pthread_join (th, NULL);
+  delayed_exit (1);
+  xpthread_join (th);
 
   puts ("join returned");
 
-  return 0;
+  return 1;
 }
-
-
-#define EXPECTED_SIGNAL SIGALRM
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"

@@ -1,4 +1,4 @@
-/* Copyright (C) 2007-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,22 +13,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
-#include <stdlib.h>
-
-
-extern char **__libc_argv attribute_hidden;
 
 void
 __attribute__ ((noreturn))
-__fortify_fail (msg)
-     const char *msg;
+__fortify_fail (const char *msg)
 {
   /* The loop is added only to keep gcc happy.  */
   while (1)
-    __libc_message (2, "*** %s ***: %s terminated\n",
-		    msg, __libc_argv[0] ?: "<unknown>");
+    __libc_message (do_abort, "*** %s ***: terminated\n", msg);
 }
 libc_hidden_def (__fortify_fail)

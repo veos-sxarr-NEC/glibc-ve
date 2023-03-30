@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Copied from setjmp/setjmp.h, powerpc/bits/setjmp.h and modified
    appropriately to keep backward compatible with setjmp without
@@ -54,7 +54,7 @@ typedef long int __jmp_buf[40];
 typedef long int __jmp_buf[58];
 # endif
 
-# include <bits/sigset.h>		/* Get `__sigset_t'.  */
+# include <bits/types/__sigset_t.h>
 
 /* Calling environment, plus possibly a saved signal mask.  */
 typedef struct __novmx__jmp_buf_tag

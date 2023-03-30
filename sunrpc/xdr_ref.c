@@ -41,6 +41,7 @@
 #include <libintl.h>
 #include <wchar.h>
 #include <libio/iolibio.h>
+#include <shlib-compat.h>
 
 #define LASTUNSIGNED	((u_int)0-1)
 
@@ -54,11 +55,13 @@
  * proc is the routine to handle the referenced structure.
  */
 bool_t
-xdr_reference (xdrs, pp, size, proc)
-     XDR *xdrs;
-     caddr_t *pp;		/* the pointer to work on */
-     u_int size;		/* size of the object pointed to */
-     xdrproc_t proc;		/* xdr routine to handle the object */
+xdr_reference (XDR *xdrs,
+	       /* the pointer to work on */
+	       caddr_t *pp,
+	       /* size of the object pointed to */
+	       u_int size,
+	       /* xdr routine to handle the object */
+	       xdrproc_t proc)
 {
   caddr_t loc = *pp;
   bool_t stat;
@@ -113,11 +116,7 @@ libc_hidden_nolink_sunrpc (xdr_reference, GLIBC_2_0)
  *
  */
 bool_t
-xdr_pointer (xdrs, objpp, obj_size, xdr_obj)
-     XDR *xdrs;
-     char **objpp;
-     u_int obj_size;
-     xdrproc_t xdr_obj;
+xdr_pointer (XDR *xdrs, char **objpp, u_int obj_size, xdrproc_t xdr_obj)
 {
 
   bool_t more_data;

@@ -1,4 +1,4 @@
-/* Copyright (c) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <atomic.h>
@@ -25,11 +25,11 @@
 #include <string.h>
 #include <libintl.h>
 #include <arpa/inet.h>
-#include <rpcsvc/nis.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
+#include <nss.h>
 
 #include "nscd.h"
 #include "dbg_log.h"
@@ -74,7 +74,7 @@ struct datahead *
 cache_search (request_type type, const void *key, size_t len,
 	      struct database_dyn *table, uid_t owner)
 {
-  unsigned long int hash = __nis_hash (key, len) % table->head->module;
+  unsigned long int hash = __nss_hash (key, len) % table->head->module;
 
   unsigned long int nsearched = 0;
   struct datahead *result = NULL;
@@ -153,7 +153,7 @@ cache_add (int type, const void *key, size_t len, struct datahead *packet,
 	       first ? _(" (first)") : "");
     }
 
-  unsigned long int hash = __nis_hash (key, len) % table->head->module;
+  unsigned long int hash = __nss_hash (key, len) % table->head->module;
   struct hashentry *newp;
 
   newp = mempool_alloc (table, sizeof (struct hashentry), 0);
@@ -178,12 +178,12 @@ cache_add (int type, const void *key, size_t len, struct datahead *packet,
   assert ((newp->packet & BLOCK_ALIGN_M1) == 0);
 
   /* Put the new entry in the first position.  */
-  do
-    newp->next = table->head->array[hash];
-  while (atomic_compare_and_exchange_bool_rel (&table->head->array[hash],
-					       (ref_t) ((char *) newp
-							- table->data),
-					       (ref_t) newp->next));
+  /* TODO Review concurrency.  Use atomic_exchange_release.  */
+  newp->next = atomic_load_relaxed (&table->head->array[hash]);
+  while (!atomic_compare_exchange_weak_release (&table->head->array[hash],
+						(ref_t *) &newp->next,
+						(ref_t) ((char *) newp
+							 - table->data)));
 
   /* Update the statistics.  */
   if (packet->notfound)
@@ -272,28 +272,38 @@ prune_cache (struct database_dyn *table, time_t now, int fd)
       while (runp != NULL)
 	{
 #ifdef HAVE_INOTIFY
-	  if (runp->inotify_descr == -1)
+	  if (runp->inotify_descr[TRACED_FILE] == -1)
 #endif
 	    {
 	      struct stat64 st;
 
 	      if (stat64 (runp->fname, &st) < 0)
 		{
+		  /* Print a diagnostic that the traced file was missing.
+		     We must not disable tracing since the file might return
+		     shortly and we want to reload it at the next pruning.
+		     Disabling tracing here would go against the configuration
+		     as specified by the user via check-files.  */
 		  char buf[128];
-		  /* We cannot stat() the file, disable file checking if the
-		     file does not exist.  */
-		  dbg_log (_("cannot stat() file `%s': %s"),
+		  dbg_log (_("checking for monitored file `%s': %s"),
 			   runp->fname, strerror_r (errno, buf, sizeof (buf)));
-		  if (errno == ENOENT)
-		    table->check_file = 0;
 		}
 	      else
 		{
-		  if (st.st_mtime != table->file_mtime)
+		  /* This must be `!=` to catch cases where users turn the
+		     clocks back and we still want to detect any time difference
+		     in mtime.  */
+		  if (st.st_mtime != runp->mtime)
 		    {
-		      /* The file changed.  Invalidate all entries.  */
+		      dbg_log (_("monitored file `%s` changed (mtime)"),
+			       runp->fname);
+		      /* The file changed. Invalidate all entries.  */
 		      now = LONG_MAX;
-		      table->file_mtime = st.st_mtime;
+		      runp->mtime = st.st_mtime;
+#ifdef HAVE_INOTIFY
+		      /* Attempt to install a watch on the file.  */
+		      install_watches (runp);
+#endif
 		    }
 		}
 	    }

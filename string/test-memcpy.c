@@ -1,5 +1,5 @@
 /* Test and measure memcpy functions.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Jakub Jelinek <jakub@redhat.com>, 1999.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef MEMCPY_RESULT
 # define MEMCPY_RESULT(dst, len) dst
@@ -53,6 +53,12 @@ static void
 do_one_test (impl_t *impl, char *dst, const char *src,
 	     size_t len)
 {
+  size_t i;
+
+  /* Must clear the destination buffer set by the previous run.  */
+  for (i = 0; i < len; i++)
+    dst[i] = 0;
+
   if (CALL (impl, dst, src, len) != MEMCPY_RESULT (dst, len))
     {
       error (0, 0, "Wrong result in function %s %p %p", impl->name,
@@ -206,6 +212,50 @@ do_random_tests (void)
     }
 }
 
+static void
+do_test1 (void)
+{
+  size_t size = 0x100000;
+  void *large_buf;
+
+  large_buf = mmap (NULL, size * 2 + page_size, PROT_READ | PROT_WRITE,
+		    MAP_PRIVATE | MAP_ANON, -1, 0);
+  if (large_buf == MAP_FAILED)
+    {
+      puts ("Failed to allocat large_buf, skipping do_test1");
+      return;
+    }
+
+  if (mprotect (large_buf + size, page_size, PROT_NONE))
+    error (EXIT_FAILURE, errno, "mprotect failed");
+
+  size_t arrary_size = size / sizeof (uint32_t);
+  uint32_t *dest = large_buf;
+  uint32_t *src = large_buf + size + page_size;
+  size_t i;
+
+  for (i = 0; i < arrary_size; i++)
+    src[i] = (uint32_t) i;
+
+  FOR_EACH_IMPL (impl, 0)
+    {
+      memset (dest, -1, size);
+      CALL (impl, (char *) dest, (char *) src, size);
+      for (i = 0; i < arrary_size; i++)
+	if (dest[i] != src[i])
+	  {
+	    error (0, 0,
+		   "Wrong result in function %s dst \"%p\" src \"%p\" offset \"%zd\"",
+		   impl->name, dest, src, i);
+	    ret = 1;
+	    break;
+	  }
+    }
+
+  munmap ((void *) dest, size);
+  munmap ((void *) src, size);
+}
+
 int
 test_main (void)
 {
@@ -247,7 +297,10 @@ test_main (void)
   do_test (0, 0, getpagesize ());
 
   do_random_tests ();
+
+  do_test1 ();
+
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

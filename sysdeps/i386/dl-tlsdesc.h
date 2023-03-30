@@ -1,6 +1,6 @@
 /* Thread-local storage descriptor handling in the ELF dynamic linker.
    i386 version.
-   Copyright (C) 2005-2015 Free Software Foundation, Inc.
+   Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _I386_DL_TLSDESC_H
 # define _I386_DL_TLSDESC_H 1
@@ -50,8 +50,8 @@ extern ptrdiff_t attribute_hidden __attribute__ ((regparm (1)))
   _dl_tlsdesc_resolve_hold (struct tlsdesc *);
 
 # ifdef SHARED
-extern void *internal_function _dl_make_tlsdesc_dynamic (struct link_map *map,
-							 size_t ti_offset);
+extern void *_dl_make_tlsdesc_dynamic (struct link_map *map,
+				       size_t ti_offset) attribute_hidden;
 
 extern ptrdiff_t attribute_hidden __attribute__ ((regparm (1)))
   _dl_tlsdesc_dynamic (struct tlsdesc *);

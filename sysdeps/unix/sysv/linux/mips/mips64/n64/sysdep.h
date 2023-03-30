@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,12 +13,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _LINUX_MIPS_SYSDEP_H
 #define _LINUX_MIPS_SYSDEP_H 1
 
 /* There is some commonality.  */
+#include <sysdeps/unix/sysv/linux/mips/sysdep.h>
+#include <sysdeps/unix/sysv/linux/sysdep.h>
 #include <sysdeps/unix/mips/mips64/n64/sysdep.h>
 
 #include <tls.h>
@@ -47,11 +49,11 @@
    call.  */
 #undef INLINE_SYSCALL
 #define INLINE_SYSCALL(name, nr, args...)				\
-  ({ INTERNAL_SYSCALL_DECL(err);					\
-     long result_var = INTERNAL_SYSCALL (name, err, nr, args);		\
-     if ( INTERNAL_SYSCALL_ERROR_P (result_var, err) )			\
+  ({ INTERNAL_SYSCALL_DECL (_sc_err);					\
+     long result_var = INTERNAL_SYSCALL (name, _sc_err, nr, args);	\
+     if ( INTERNAL_SYSCALL_ERROR_P (result_var, _sc_err) )		\
        {								\
-	 __set_errno (INTERNAL_SYSCALL_ERRNO (result_var, err));	\
+	 __set_errno (INTERNAL_SYSCALL_ERRNO (result_var, _sc_err));	\
 	 result_var = -1L;						\
        }								\
      result_var; })
@@ -288,8 +290,14 @@
 	_sys_result;							\
 })
 
-#define __SYSCALL_CLOBBERS "$1", "$3", "$10", "$11", "$12", "$13", \
-	"$14", "$15", "$24", "$25", "hi", "lo", "memory"
+#if __mips_isa_rev >= 6
+# define __SYSCALL_CLOBBERS "$1", "$3", "$10", "$11", "$12", "$13", \
+	 "$14", "$15", "$24", "$25", "memory"
+#else
+# define __SYSCALL_CLOBBERS "$1", "$3", "$10", "$11", "$12", "$13", \
+	 "$14", "$15", "$24", "$25", "hi", "lo", "memory"
+#endif
+
 #endif /* __ASSEMBLER__ */
 
 /* Pointer mangling is not yet supported for MIPS.  */

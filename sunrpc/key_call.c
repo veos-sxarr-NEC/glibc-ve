@@ -48,7 +48,8 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <rpc/key_prot.h>
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
+#include <shlib-compat.h>
 
 #define KEY_TIMEOUT	5	/* per-try timeout in seconds */
 #define KEY_NRETRY	12	/* number of retries */
@@ -60,7 +61,7 @@ extern int _openchild (const char *command, FILE **fto, FILE **ffrom);
 #endif
 
 static int key_call (u_long, xdrproc_t xdr_arg, char *,
-		     xdrproc_t xdr_rslt, char *) internal_function;
+		     xdrproc_t xdr_rslt, char *);
 
 static const struct timeval trytimeout = {KEY_TIMEOUT, 0};
 static const struct timeval tottimeout = {KEY_TIMEOUT *KEY_NRETRY, 0};
@@ -218,7 +219,7 @@ key_gendes (des_block *key)
   sin.sin_family = AF_INET;
   sin.sin_port = 0;
   sin.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
-  __bzero (sin.sin_zero, sizeof (sin.sin_zero));
+  memset (sin.sin_zero, 0, sizeof (sin.sin_zero));
   socket = RPC_ANYSOCK;
   client = clntudp_bufcreate (&sin, (u_long) KEY_PROG, (u_long) KEY_VERS,
 			      trytimeout, &socket, RPCSMALLMSGSIZE,
@@ -295,7 +296,6 @@ des_block *(*__key_gendes_LOCAL) (uid_t, char *);
 
 #ifndef SO_PASSCRED
 static int
-internal_function
 key_call_keyenvoy (u_long proc, xdrproc_t xdr_arg, char *arg,
 		   xdrproc_t xdr_rslt, char *rslt)
 {
@@ -304,7 +304,7 @@ key_call_keyenvoy (u_long proc, xdrproc_t xdr_arg, char *arg,
   FILE *fargs;
   FILE *frslt;
   sigset_t oldmask, mask;
-  union wait status;
+  int status;
   int pid;
   int success;
   uid_t ruid;
@@ -362,7 +362,7 @@ key_call_keyenvoy (u_long proc, xdrproc_t xdr_arg, char *arg,
 	success = 0;
     }
   else
-    if (status.w_retcode)
+    if (status != 0)
       {
 	debug ("wait4 1");
 	success = 0;
@@ -378,11 +378,7 @@ struct  key_call_private {
   pid_t   pid;            /* process-id at moment of creation */
   uid_t   uid;            /* user-id at last authorization */
 };
-#ifdef _RPC_THREAD_SAFE_
 #define key_call_private_main RPC_THREAD_VARIABLE(key_call_private_s)
-#else
-static struct key_call_private *key_call_private_main;
-#endif
 __libc_lock_define_initialized (static, keycall_lock)
 
 /*
@@ -480,7 +476,6 @@ getkeyserv_handle (int vers)
 
 /* returns  0 on failure, 1 on success */
 static int
-internal_function
 key_call_socket (u_long proc, xdrproc_t xdr_arg, char *arg,
 	       xdrproc_t xdr_rslt, char *rslt)
 {
@@ -514,7 +509,6 @@ key_call_socket (u_long proc, xdrproc_t xdr_arg, char *arg,
 
 /* returns 0 on failure, 1 on success */
 static int
-internal_function
 key_call (u_long proc, xdrproc_t xdr_arg, char *arg,
 	  xdrproc_t xdr_rslt, char *rslt)
 {
@@ -557,7 +551,6 @@ key_call (u_long proc, xdrproc_t xdr_arg, char *arg,
 #endif
 }
 
-#ifdef _RPC_THREAD_SAFE_
 void
 __rpc_thread_key_cleanup (void)
 {
@@ -572,4 +565,3 @@ __rpc_thread_key_cleanup (void)
 		free (kcp);
 	}
 }
-#endif /* _RPC_THREAD_SAFE_ */

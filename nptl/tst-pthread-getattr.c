@@ -1,7 +1,7 @@
 /* Make sure that the stackaddr returned by pthread_getattr_np is
    reachable.
 
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <string.h>
@@ -35,15 +35,17 @@
    results in a test case failure.  To avoid these problems, we cap the stack
    size to one less than 8M.  See the following mailing list threads for more
    information about this problem:
-   <http://sourceware.org/ml/libc-alpha/2012-06/msg00599.html>
-   <http://sourceware.org/ml/libc-alpha/2012-06/msg00713.html>.  */
+   <https://sourceware.org/ml/libc-alpha/2012-06/msg00599.html>
+   <https://sourceware.org/ml/libc-alpha/2012-06/msg00713.html>.  */
 #define MAX_STACK_SIZE (8192 * 1024 - 1)
 
 static size_t pagesize;
 
-/* Check if the page in which TARGET lies is accessible.  This will segfault
-   if it fails.  */
-static volatile char *
+/* Test that the page in which TARGET lies is accessible.  This will
+   segfault if the write fails.  This function has only half a page
+   of thread stack left and so should not do anything and immediately
+   return the address to which the stack reached.  */
+static volatile uintptr_t
 allocate_and_test (char *target)
 {
   volatile char *mem = (char *) &mem;
@@ -51,7 +53,7 @@ allocate_and_test (char *target)
   mem = alloca ((size_t) (mem - target));
 
   *mem = 42;
-  return mem;
+  return (uintptr_t) mem;
 }
 
 static int
@@ -84,7 +86,6 @@ check_stack_top (void)
 {
   struct rlimit stack_limit;
   void *stackaddr;
-  volatile void *mem;
   size_t stacksize = 0;
   int ret;
   uintptr_t pagemask = ~(pagesize - 1);
@@ -130,14 +131,14 @@ check_stack_top (void)
      stack and test access there.  It is however sufficient to simply check if
      the top page is accessible, so we target our access halfway up the top
      page.  Thanks Chris Metcalf for this idea.  */
-  mem = allocate_and_test (stackaddr + pagesize / 2);
+  uintptr_t mem = allocate_and_test (stackaddr + pagesize / 2);
 
   /* Before we celebrate, make sure we actually did test the same page.  */
-  if (((uintptr_t) stackaddr & pagemask) != ((uintptr_t) mem & pagemask))
+  if (((uintptr_t) stackaddr & pagemask) != (mem & pagemask))
     {
       printf ("We successfully wrote into the wrong page.\n"
 	      "Expected %#" PRIxPTR ", but got %#" PRIxPTR "\n",
-	      (uintptr_t) stackaddr & pagemask, (uintptr_t) mem & pagemask);
+	      (uintptr_t) stackaddr & pagemask, mem & pagemask);
 
       return 1;
     }

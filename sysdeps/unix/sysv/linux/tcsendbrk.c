@@ -1,5 +1,5 @@
 /* Send break to terminal.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
@@ -39,7 +39,6 @@ tcsendbreak (int fd, int duration)
   /* ioctl can't send a break of any other duration for us.
      This could be changed to use trickery (e.g. lower speed and
      send a '\0') to send the break, but for now just return an error.  */
-  __set_errno (EINVAL);
-  return -1;
+  return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
 #endif
 }

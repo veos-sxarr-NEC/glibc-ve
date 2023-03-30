@@ -47,10 +47,11 @@
 #include <errno.h>
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
-long double __cosl(long double x)
+_Float128 __cosl(_Float128 x)
 {
-	long double y[2],z=0.0L;
+	_Float128 y[2],z=0;
 	int64_t n, ix;
 
     /* High word of x. */
@@ -83,4 +84,4 @@ long double __cosl(long double x)
 	    }
 	}
 }
-weak_alias (__cosl, cosl)
+libm_alias_ldouble (__cos, cos)

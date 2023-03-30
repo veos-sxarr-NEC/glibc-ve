@@ -1,5 +1,5 @@
 /* Convert between the kernel's `struct stat' format, and libc's.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,12 +14,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/stat.h>
 #include <kernel_stat.h>
-#include <kernel-features.h>
 
 #ifdef STAT_IS_KERNEL_STAT
 
@@ -31,7 +30,7 @@ struct kernel_stat;
 #include <string.h>
 
 
-#ifdef XSTAT_IS_XSTAT64
+#if XSTAT_IS_XSTAT64
 int
 __xstat_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
 {
@@ -96,8 +95,7 @@ __xstat_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
       break;
 
     default:
-      __set_errno (EINVAL);
-      return -1;
+      return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
     }
 
   return 0;
@@ -107,7 +105,7 @@ __xstat_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
 int
 __xstat64_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
 {
-#ifdef XSTAT_IS_XSTAT64
+#if XSTAT_IS_XSTAT64
   return __xstat_conv (vers, kbuf, ubuf);
 #else
   switch (vers)
@@ -170,8 +168,7 @@ __xstat64_conv (int vers, struct kernel_stat *kbuf, void *ubuf)
 	 _STAT_VER_KERNEL does not make sense.  */
     case _STAT_VER_KERNEL:
     default:
-      __set_errno (EINVAL);
-      return -1;
+      return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
     }
 
   return 0;
@@ -191,30 +188,10 @@ __xstat32_conv (int vers, struct stat64 *kbuf, struct stat *buf)
 #ifdef _HAVE_STAT___PAD1
 	buf->__pad1 = 0;
 #endif
-#ifdef _HAVE_STAT64___ST_INO
-# if __ASSUME_ST_INO_64_BIT == 0
-	if (kbuf->st_ino == 0)
-	  buf->st_ino = kbuf->__st_ino;
-	else
-# endif
-	  {
-	    buf->st_ino = kbuf->st_ino;
-	    if (sizeof (buf->st_ino) != sizeof (kbuf->st_ino)
-		&& buf->st_ino != kbuf->st_ino)
-	      {
-		__set_errno (EOVERFLOW);
-		return -1;
-	      }
-	  }
-#else
 	buf->st_ino = kbuf->st_ino;
 	if (sizeof (buf->st_ino) != sizeof (kbuf->st_ino)
 	    && buf->st_ino != kbuf->st_ino)
-	  {
-	    __set_errno (EOVERFLOW);
-	    return -1;
-	  }
-#endif
+	  return INLINE_SYSCALL_ERROR_RETURN_VALUE (EOVERFLOW);
 	buf->st_mode = kbuf->st_mode;
 	buf->st_nlink = kbuf->st_nlink;
 	buf->st_uid = kbuf->st_uid;
@@ -227,19 +204,13 @@ __xstat32_conv (int vers, struct stat64 *kbuf, struct stat *buf)
 	/* Check for overflow.  */
 	if (sizeof (buf->st_size) != sizeof (kbuf->st_size)
 	    && buf->st_size != kbuf->st_size)
-	  {
-	    __set_errno (EOVERFLOW);
-	    return -1;
-	  }
+	  return INLINE_SYSCALL_ERROR_RETURN_VALUE (EOVERFLOW);
 	buf->st_blksize = kbuf->st_blksize;
 	buf->st_blocks = kbuf->st_blocks;
 	/* Check for overflow.  */
 	if (sizeof (buf->st_blocks) != sizeof (kbuf->st_blocks)
 	    && buf->st_blocks != kbuf->st_blocks)
-	  {
-	    __set_errno (EOVERFLOW);
-	    return -1;
-	  }
+	  return INLINE_SYSCALL_ERROR_RETURN_VALUE (EOVERFLOW);
 #ifdef _HAVE_STAT_NSEC
 	buf->st_atim.tv_sec = kbuf->st_atim.tv_sec;
 	buf->st_atim.tv_nsec = kbuf->st_atim.tv_nsec;
@@ -275,8 +246,7 @@ __xstat32_conv (int vers, struct stat64 *kbuf, struct stat *buf)
 	 _STAT_VER_KERNEL does not make sense.  */
     case _STAT_VER_KERNEL:
     default:
-      __set_errno (EINVAL);
-      return -1;
+      return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
     }
 
   return 0;

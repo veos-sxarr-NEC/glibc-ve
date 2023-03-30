@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <errno.h>
 #include <stdarg.h>
@@ -38,6 +38,11 @@ int __new_semctl (int semid, int semnum, int cmd, ...);
 int
 __new_semctl (int semid, int semnum, int cmd, ...)
 {
+	/* POSIX states ipc_perm mode should have type of mode_t.  */
+	_Static_assert (sizeof ((struct semid_ds){0}.sem_perm.mode)
+			== sizeof (mode_t),
+			"sizeof (msqid_ds.msg_perm.mode) != sizeof (mode_t)");
+
 	union semun arg = {0};
 	va_list ap;
 

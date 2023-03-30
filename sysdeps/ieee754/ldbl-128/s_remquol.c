@@ -1,5 +1,5 @@
 /* Compute remainder and a congruent to the quotient.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997 and
 		  Jakub Jelinek <jj@ultra.linux.cz>, 1999.
@@ -16,21 +16,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
 
-static const long double zero = 0.0;
+static const _Float128 zero = 0.0;
 
 
-long double
-__remquol (long double x, long double y, int *quo)
+_Float128
+__remquol (_Float128 x, _Float128 y, int *quo)
 {
   int64_t hx,hy;
-  u_int64_t sx,lx,ly,qs;
+  uint64_t sx,lx,ly,qs;
   int cquo;
 
   GET_LDOUBLE_WORDS64 (hx, lx, x);
@@ -61,12 +62,12 @@ __remquol (long double x, long double y, int *quo)
   y  = fabsl (y);
   cquo = 0;
 
-  if (x >= 4 * y)
+  if (hy <= 0x7ffcffffffffffffLL && x >= 4 * y)
     {
       x -= 4 * y;
       cquo += 4;
     }
-  if (x >= 2 * y)
+  if (hy <= 0x7ffdffffffffffffLL && x >= 2 * y)
     {
       x -= 2 * y;
       cquo += 2;
@@ -87,7 +88,7 @@ __remquol (long double x, long double y, int *quo)
     }
   else
     {
-      long double y_half = 0.5L * y;
+      _Float128 y_half = L(0.5) * y;
       if (x > y_half)
 	{
 	  x -= y;
@@ -102,8 +103,11 @@ __remquol (long double x, long double y, int *quo)
 
   *quo = qs ? -cquo : cquo;
 
+  /* Ensure correct sign of zero result in round-downward mode.  */
+  if (x == 0)
+    x = 0;
   if (sx)
     x = -x;
   return x;
 }
-weak_alias (__remquol, remquol)
+libm_alias_ldouble (__remquo, remquo)

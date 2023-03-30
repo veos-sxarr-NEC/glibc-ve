@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stddef.h>
@@ -24,9 +24,7 @@
 
 /* Suspend or restart transmission on FD.  */
 int
-tcflow (fd, action)
-     int fd;
-     int action;
+tcflow (int fd, int action)
 {
   switch (action)
     {
@@ -42,7 +40,7 @@ tcflow (fd, action)
 	   `write'.  Is there another way to do this?  */
 	struct termios attr;
 	unsigned char c;
-	if (tcgetattr (fd, &attr) < 0)
+	if (__tcgetattr (fd, &attr) < 0)
 	  return -1;
 	c = attr.c_cc[action == TCIOFF ? VSTOP : VSTART];
 	if (c != _POSIX_VDISABLE && write (fd, &c, 1) < 1)

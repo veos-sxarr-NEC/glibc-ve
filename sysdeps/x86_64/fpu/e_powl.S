@@ -1,5 +1,5 @@
 /* ix87 specific implementation of pow function.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,9 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <machine/asm.h>
+#include <x86_64-math-asm.h>
+#include <libm-alias-finite.h>
 
 	.section .rodata.cst8,"aM",@progbits,8
 
@@ -25,9 +27,9 @@
 	.type one,@object
 one:	.double 1.0
 	ASM_SIZE_DIRECTIVE(one)
-	.type p3,@object
-p3:	.byte 0, 0, 0, 0, 0, 0, 0x20, 0x40
-	ASM_SIZE_DIRECTIVE(p3)
+	.type p2,@object
+p2:	.byte 0, 0, 0, 0, 0, 0, 0x10, 0x40
+	ASM_SIZE_DIRECTIVE(p2)
 	.type p63,@object
 p63:	.byte 0, 0, 0, 0, 0, 0, 0xe0, 0x43
 	ASM_SIZE_DIRECTIVE(p63)
@@ -59,6 +61,7 @@ minfinity:
 mzero:
 	.byte 0, 0, 0, 0, 0, 0, 0, 0x80
 	ASM_SIZE_DIRECTIVE(minf_mzero)
+DEFINE_LDBL_MIN
 
 #ifdef PIC
 # define MO(op) op##(%rip)
@@ -134,12 +137,12 @@ ENTRY(__ieee754_powl)
 	jmp	3f
 
 9:	/* OK, we have an integer value for y.  Unless very small
-	   (we use < 8), use the algorithm for real exponent to avoid
+	   (we use < 4), use the algorithm for real exponent to avoid
 	   accumulation of errors.  */
-	fldl	MO(p3)		// 8 : y : x
-	fld	%st(1)		// y : 8 : y : x
-	fabs			// |y| : 8 : y : x
-	fcomip	%st(1), %st	// 8 : y : x
+	fldl	MO(p2)		// 4 : y : x
+	fld	%st(1)		// y : 4 : y : x
+	fabs			// |y| : 4 : y : x
+	fcomip	%st(1), %st	// 4 : y : x
 	fstp	%st(0)		// y : x
 	jnc	3f
 	mov	-8(%rsp),%eax
@@ -175,15 +178,22 @@ ENTRY(__ieee754_powl)
 	orl	%edx, %ecx
 	jnz	6b
 	fstp	%st(0)		// ST*x
+	LDBL_CHECK_FORCE_UFLOW_NONNAN
 	ret
 
 	/* y is ±NAN */
 30:	fldt	8(%rsp)		// x : y
 	fldl	MO(one)		// 1.0 : x : y
 	fucomip	%st(1),%st	// x : y
-	je	31f
-	fxch			// y : x
-31:	fstp	%st(1)
+	je	32f
+31:	/* At least one argument NaN, and result should be NaN.  */
+	faddp
+	ret
+32:	jc	31b
+	/* pow (1, NaN); check if the NaN signaling.  */
+	testb	$0x40, 31(%rsp)
+	jz	31b
+	fstp	%st(1)
 	ret
 
 	.align ALIGNARG(4)
@@ -214,10 +224,22 @@ ENTRY(__ieee754_powl)
 	cfi_adjust_cfa_offset (-40)
 	ret
 
-	// pow(x,±0) = 1
+	// pow(x,±0) = 1, unless x is sNaN
 	.align ALIGNARG(4)
 11:	fstp	%st(0)		// pop y
+	fldt	8(%rsp)		// x
+	fxam
+	fnstsw
+	andb	$0x45, %ah
+	cmpb	$0x01, %ah
+	je	112f		// x is NaN
+111:	fstp	%st(0)
 	fldl	MO(one)
+	ret
+
+112:	testb	$0x40, 15(%rsp)
+	jnz	111b
+	fadd	%st(0)
 	ret
 
 	// y == ±inf
@@ -252,6 +274,7 @@ ENTRY(__ieee754_powl)
 
 	.align ALIGNARG(4)
 13:	fldt	8(%rsp)		// load x == NaN
+	fadd	%st(0)
 	ret
 
 	.align ALIGNARG(4)
@@ -408,4 +431,4 @@ ENTRY(__ieee754_powl)
 	ret
 
 END(__ieee754_powl)
-strong_alias (__ieee754_powl, __powl_finite)
+libm_alias_finite (__ieee754_powl, __powl)

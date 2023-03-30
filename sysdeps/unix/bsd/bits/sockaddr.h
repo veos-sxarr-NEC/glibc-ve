@@ -1,5 +1,5 @@
-/* Definition of `struct sockaddr_*' common members.  4.4 BSD version.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Definition of struct sockaddr_* common members and sizes, BSD version.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /*
  * Never include this file directly; use <sys/socket.h> instead.
@@ -38,5 +38,8 @@ typedef unsigned char sa_family_t;
 #define __SOCKADDR_COMMON_SIZE	(2 * sizeof (unsigned char))
 
 #define _HAVE_SA_LEN	1	/* We have the sa_len field.  */
+
+/* Size of struct sockaddr_storage.  */
+#define _SS_SIZE 128
 
 #endif	/* bits/sockaddr.h */

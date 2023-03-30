@@ -47,10 +47,11 @@
 #include <errno.h>
 #include <math.h>
 #include <math_private.h>
+#include <libm-alias-ldouble.h>
 
-long double __tanl(long double x)
+_Float128 __tanl(_Float128 x)
 {
-	long double y[2],z=0.0L;
+	_Float128 y[2],z=0;
 	int64_t n, ix;
 
     /* High word of x. */
@@ -77,4 +78,4 @@ long double __tanl(long double x)
 							-1 -- n odd */
 	}
 }
-weak_alias (__tanl, tanl)
+libm_alias_ldouble (__tan, tan)

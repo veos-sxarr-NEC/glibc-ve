@@ -1,5 +1,5 @@
 /* BSD-like signal function.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,35 +14,33 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <signal.h>
-#include <string.h>	/* For the real memset prototype.  */
-
+#include <sigsetops.h>
+#include <internal-signals.h>
 
 sigset_t _sigintr attribute_hidden;		/* Set by siginterrupt.  */
 
 /* Set the handler for the signal SIG to HANDLER,
    returning the old handler, or SIG_ERR on error.  */
 __sighandler_t
-__bsd_signal (sig, handler)
-     int sig;
-     __sighandler_t handler;
+__bsd_signal (int sig, __sighandler_t handler)
 {
   struct sigaction act, oact;
 
   /* Check signal extents to protect __sigismember.  */
-  if (handler == SIG_ERR || sig < 1 || sig >= NSIG)
+  if (handler == SIG_ERR || sig < 1 || sig >= NSIG
+      || __is_internal_signal (sig))
     {
       __set_errno (EINVAL);
       return SIG_ERR;
     }
 
   act.sa_handler = handler;
-  if (__sigemptyset (&act.sa_mask) < 0
-      || __sigaddset (&act.sa_mask, sig) < 0)
-    return SIG_ERR;
+  __sigemptyset (&act.sa_mask);
+  __sigaddset (&act.sa_mask, sig);
   act.sa_flags = __sigismember (&_sigintr, sig) ? 0 : SA_RESTART;
   if (__sigaction (sig, &act, &oact) < 0)
     return SIG_ERR;

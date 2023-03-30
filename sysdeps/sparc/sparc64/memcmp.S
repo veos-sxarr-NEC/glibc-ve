@@ -1,8 +1,8 @@
 /* Compare two memory blocks for differences in the first COUNT bytes.
    For SPARC v9.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
-   Contributed by Jan Vondrak <jvon4518@ss1000.ms.mff.cuni.cz> and
+   Contributed by Jan Vondrák <jvon4518@ss1000.ms.mff.cuni.cz> and
                   Jakub Jelinek <jj@ultra.linux.cz>.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -17,7 +17,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <asm/asi.h>
@@ -51,7 +51,7 @@ ENTRY(memcmp)
 2:	mov		%g1, %o3			/* IEU0		Group		*/
 	subcc		%o2, 8, %o2			/* IEU1				*/
 
-	bl,pn		%XCC, 5f			/* CTI				*/
+	bcs,pn		%XCC, 5f			/* CTI				*/
 	 ldxa		[%o0] ASI_PNF, %g1		/* Load		Group		*/
 	mov		%g2, %o4			/* IEU0				*/
 	ldxa		[%o0 + %o1] ASI_PNF, %g2	/* Load		Group		*/
@@ -125,7 +125,7 @@ ENTRY(memcmp)
 
 	ldxa		[%o0] ASI_PNF, %g5		/* Load				*/
 	subcc		%o2, 8, %o2			/* IEU1		Group		*/
-	bl,pn		%XCC, 6b			/* CTI				*/
+	bcs,pn		%XCC, 6b			/* CTI				*/
 	 or		%o4, %o5, %o4			/* IEU0				*/
 
 	cmp		%o3, %o4			/* IEU1		Group		*/

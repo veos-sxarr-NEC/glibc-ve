@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -13,14 +13,13 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
 #include <errno.h>
-#include <error.h>
 #include <limits.h>
 #include <obstack.h>
 #include <search.h>
@@ -38,7 +37,7 @@
 
 /* Simple keyword hashing for the repertoiremap.  */
 static const struct keyword_t *repertoiremap_hash (const char *str,
-						   unsigned int len);
+						   size_t len);
 static void repertoire_new_char (struct linereader *lr, hash_table *ht,
 				 hash_table *rt, struct obstack *ob,
 				 uint32_t value, const char *from,
@@ -325,14 +324,14 @@ argument to <%s> must be a single character"),
     }
 
   if (state != 2 && state != 90 && !be_quiet)
-    WITH_CUR_LOCALE (error (0, 0, _("%s: premature end of file"),
-			    repfile->fname));
+    record_error (0, 0, _("%s: premature end of file"),
+		  repfile->fname);
 
   lr_close (repfile);
 
   if (tsearch (result, &known, &repertoire_compare) == NULL)
     /* Something went wrong.  */
-    WITH_CUR_LOCALE (error (0, errno, _("cannot save new repertoire map")));
+    record_error (0, errno, _("cannot save new repertoire map"));
 
   return result;
 }
@@ -343,8 +342,8 @@ repertoire_complain (const char *name)
 {
   if (tfind (name, &unavailable, (__compar_fn_t) strcmp) == NULL)
     {
-      WITH_CUR_LOCALE (error (0, errno, _("\
-repertoire map file `%s' not found"), name));
+      record_error (0, errno, _("\
+repertoire map file `%s' not found"), name);
 
       /* Remember that we reported this map.  */
       tsearch (name, &unavailable, (__compar_fn_t) strcmp);
@@ -363,7 +362,7 @@ repertoire_compare (const void *p1, const void *p2)
 
 
 static const struct keyword_t *
-repertoiremap_hash (const char *str, unsigned int len)
+repertoiremap_hash (const char *str, size_t len)
 {
   static const struct keyword_t wordlist[] =
   {

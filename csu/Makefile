@@ -1,5 +1,5 @@
 # Makefile for csu code for GNU C library.
-# Copyright (C) 1995-2015 Free Software Foundation, Inc.
+# Copyright (C) 1995-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # This directory contains the C startup code (that which calls main).  This
 # consists of the startfile, built from start.c and installed as crt0.o
@@ -27,35 +27,68 @@ subdir := csu
 include ../Makeconfig
 
 routines = init-first libc-start __setPthreadStruct $(libc-init) sysdep version check_fds \
-	   libc-tls elf-init dso_handle rodata
+          libc-tls elf-init dso_handle rodata
 aux	 = errno
 elide-routines.os = libc-tls
 static-only-routines = elf-init
 csu-dummies = $(filter-out $(start-installed-name),crt1.o Mcrt1.o)
-extra-objs = start.o gmon-start.o \
+extra-objs = start.o \
 	     $(start-installed-name) g$(start-installed-name) $(csu-dummies) \
 	     S$(start-installed-name)
 omit-deps = $(patsubst %.o,%,$(start-installed-name) g$(start-installed-name) \
 			     b$(start-installed-name) $(csu-dummies) \
-			     S$(start-installed-name))
+			     S$(start-installed-name) \
+			     r$(start-installed-name) \
+			     gr$(start-installed-name))
 install-lib = $(start-installed-name) g$(start-installed-name) $(csu-dummies)
-generated += version-info.h
-before-compile += $(objpfx)version-info.h
 
-tests := tst-empty
-tests-static := tst-empty
+# No tests are allowed in the csu/ subdirectory because the startup
+# code is compiled with special flags.
+tests =
+
+CFLAGS-.o += $(no-stack-protector)
+CFLAGS-.op += $(no-stack-protector)
+CFLAGS-.os += $(no-stack-protector)
+
+# Dummy object not actually used for anything.  It is linked into
+# crt1.o nevertheless, which in turn is statically linked into
+# applications, so that build flags matter.
+# See <https://sourceware.org/ml/libc-alpha/2018-07/msg00101.html>.
+# NB: Using $(stack-protector) in this way causes a wrong definition
+# STACK_PROTECTOR_LEVEL due to the preceding $(no-stack-protector),
+# but it does not matter for this source file.
+CFLAGS-static-reloc.os += $(stack-protector)
+
+# This file is not actually part of the startup code in the nonshared
+# case and statically linked into applications.  See
+# <https://sourceware.org/bugzilla/show_bug.cgi?id=23323>,
+# <https://sourceware.org/ml/libc-alpha/2018-06/msg00717.html>.
+# Also see the note above regarding STACK_PROTECTOR_LEVEL.
+CFLAGS-elf-init.oS += $(stack-protector)
 
 ifeq (yes,$(build-shared))
-extra-objs += S$(start-installed-name)
+extra-objs += S$(start-installed-name) gmon-start.os
+ifneq ($(start-installed-name),$(static-start-installed-name))
+extra-objs += gmon-start.o
+endif
 install-lib += S$(start-installed-name)
 generated += start.os
+else
+extra-objs += gmon-start.o
 endif
 
 ifneq ($(start-installed-name),$(static-start-installed-name))
+# FIXME: Only Hurd defines static-start-installed-name.  Hurd needs to
+# provide special rules to support static PIE.
 extra-objs += $(static-start-installed-name) g$(static-start-installed-name)
 omit-deps += $(patsubst %.o,%,$(static-start-installed-name) \
 			     g$(static-start-installed-name))
 install-lib += $(static-start-installed-name) g$(static-start-installed-name)
+else
+ifeq (yes,$(enable-static-pie))
+extra-objs += r$(start-installed-name) gr$(start-installed-name)
+install-lib += r$(start-installed-name) gr$(start-installed-name)
+endif
 endif
 
 before-compile += $(objpfx)abi-tag.h
@@ -69,8 +102,19 @@ crtstuff = crti crtn
 install-lib += $(crtstuff:=.o)
 extra-objs += $(crtstuff:=.o)
 
-extra-objs += abi-note.o init.o
+ifneq ($(multidir),.)
+multilib-extra-objs = $(addprefix $(multidir)/, $(install-lib))
+extra-objs += $(multilib-extra-objs)
+endif
+
+extra-objs += abi-note.o init.o static-reloc.o
+ifeq (yes,$(build-shared))
+extra-objs += static-reloc.os
+endif
 asm-CPPFLAGS += -I$(objpfx).
+
+# Enable unwinding so backtrace unwinds to __libc_start_main
+CFLAGS-libc-start.c += -funwind-tables
 
 include ../Rules
 
@@ -85,6 +129,9 @@ ifndef start-installed-name-rule
 # We link the ELF startfile along with a SHT_NOTE section indicating
 # the kernel ABI the binaries linked with this library will require.
 $(objpfx)$(start-installed-name): $(objpfx)start.o $(objpfx)abi-note.o \
+				  $(objpfx)init.o $(objpfx)static-reloc.o
+	$(link-relocatable)
+$(objpfx)r$(start-installed-name): $(objpfx)start.o $(objpfx)abi-note.o \
 				  $(objpfx)init.o
 	$(link-relocatable)
 $(objpfx)S$(start-installed-name): $(objpfx)start.os $(objpfx)abi-note.o \
@@ -95,10 +142,24 @@ endif
 # The profiling startfile is made by linking together the normal
 # startfile with gmon-start.o, which defines a constructor function
 # to turn on profiling code at startup.
+ifeq (yes,$(build-shared))
+$(objpfx)g$(start-installed-name): \
+  $(objpfx)g%: $(objpfx)S% $(objpfx)gmon-start.os $(objpfx)static-reloc.os
+	$(link-relocatable)
+$(objpfx)gr$(start-installed-name): \
+  $(objpfx)gr%: $(objpfx)r% $(objpfx)gmon-start.o
+	$(link-relocatable)
+ifneq ($(start-installed-name),$(static-start-installed-name))
+$(objpfx)g$(static-start-installed-name): \
+  $(objpfx)g%: $(objpfx)% $(objpfx)gmon-start.o
+	$(link-relocatable)
+endif
+else
 $(addprefix $(objpfx),$(sort g$(start-installed-name) \
 			     g$(static-start-installed-name))): \
   $(objpfx)g%: $(objpfx)% $(objpfx)gmon-start.o
 	$(link-relocatable)
+endif
 
 # These extra files are sometimes expected by system standard linking
 # procedures, but we have nothing for them to do.  So compile empty files.
@@ -126,15 +187,7 @@ $(objpfx)abi-tag.h: $(..)abi-tags
 	if test -r $@.new; then mv -f $@.new $@; \
 	else echo >&2 'This configuration not matched in $<'; exit 1; fi
 
-all-Banner-files = $(wildcard $(addsuffix /Banner,\
-					  $(sort $(subdir-srcdirs) \
-						 $(sysdeps-srcdirs))))
-$(objpfx)version-info.h: $(common-objpfx)config.make $(all-Banner-files)
-	$(make-target-directory)
-	(files="$(all-Banner-files)";				\
-	 if test -n "$$files"; then				\
-	   printf '"Available extensions:\\n"\n';		\
-	   sed -e '/^#/d' -e 's/^[[:space:]]*/	/'		\
-	       -e 's/^\(.*\)$$/\"\1\\n\"/' $$files;		\
-	 fi) > $@T
-	mv -f $@T $@
+ifneq ($(multidir),.)
+$(addprefix $(objpfx)$(multidir)/, $(install-lib)): $(addprefix $(objpfx), $(install-lib))
+	$(make-link-multidir)
+endif

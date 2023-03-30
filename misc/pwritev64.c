@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <unistd.h>
@@ -26,11 +26,7 @@
    <unistd.h>) except that the data are taken from VECTOR instead of a
    contiguous buffer.  */
 ssize_t
-pwritev64 (fd, vector, count, offset)
-     int fd;
-     const struct iovec *vector;
-     int count;
-     off64_t offset;
+pwritev64 (int fd, const struct iovec *vector, int count, off64_t offset)
 {
   __set_errno (ENOSYS);
   return -1;

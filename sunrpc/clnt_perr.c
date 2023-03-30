@@ -36,19 +36,16 @@
 #include <rpc/rpc.h>
 #include <wchar.h>
 #include <libio/iolibio.h>
+#include <shlib-compat.h>
 
-static char *auth_errmsg (enum auth_stat stat) internal_function;
+static char *auth_errmsg (enum auth_stat stat);
 
-#ifdef _RPC_THREAD_SAFE_
 /*
  * Making buf a preprocessor macro requires renaming the local
  * buf variable in a few functions.  Overriding a global variable
  * with a local variable of the same name is a bad idea, anyway.
  */
 #define buf RPC_THREAD_VARIABLE(clnt_perr_buf_s)
-#else
-static char *buf;
-#endif
 
 /*
  * Print reply error info
@@ -373,7 +370,6 @@ static const struct auth_errtab auth_errlist[] =
 };
 
 static char *
-internal_function
 auth_errmsg (enum auth_stat stat)
 {
   size_t i;

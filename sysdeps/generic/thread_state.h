@@ -1,5 +1,5 @@
 /* Mach thread state definitions for machine-independent code.  Stub version.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Everything else is called `thread_state', but CMU's header file is
    called `thread_status'.  Oh boy.  */
@@ -22,6 +22,11 @@
 
 /* Replace <machine> with "i386" or "mips" or whatever.  */
 
+/* This lets the kernel define architecture-specific registers for a new
+   thread.  */
+#define MACHINE_NEW_THREAD_STATE_FLAVOR	<machine>_NEW_THREAD_STATE
+/* This makes the kernel load all architectures-specific registers for the
+   thread.  */
 #define MACHINE_THREAD_STATE_FLAVOR	<machine>_THREAD_STATE
 #define MACHINE_THREAD_STATE_COUNT	<machine>_THREAD_STATE_COUNT
 

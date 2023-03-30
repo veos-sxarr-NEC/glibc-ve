@@ -1,5 +1,5 @@
 /* Optimized memset implementation for PowerPC64/POWER7.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,25 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sysdep.h>
-
-#undef EALIGN
-#define EALIGN(name, alignt, words)				\
-  .section ".text";						\
-  ENTRY_2(__memset_power7)					\
-  .align ALIGNARG(alignt);					\
-  EALIGN_W_##words;						\
-  BODY_LABEL(__memset_power7):					\
-  cfi_startproc;						\
-  LOCALENTRY(__memset_power7)
-
-#undef END_GEN_TB
-#define END_GEN_TB(name, mask)					\
-  cfi_endproc;							\
-  TRACEBACK_MASK(__memset_power7,mask)				\
-  END_2(__memset_power7)
+#define MEMSET __memset_power7
 
 #undef libc_hidden_builtin_def
 #define libc_hidden_builtin_def(name)

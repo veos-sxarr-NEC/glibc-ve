@@ -1,5 +1,5 @@
 /* copysign function, sparc32 version.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by David S. Miller <davem@davemloft.net>, 2012.
 
@@ -15,9 +15,11 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
+#include <math_ldbl_opt.h>
+#include <libm-alias-double.h>
 
 ENTRY (__copysign)
 	sethi	%hi(0x80000000), %g1
@@ -28,4 +30,7 @@ ENTRY (__copysign)
 	retl
 	 ldd	[%sp + 72], %f0
 END (__copysign)
-weak_alias (__copysign, copysign)
+libm_alias_double (__copysign, copysign)
+#if LONG_DOUBLE_COMPAT (libc, GLIBC_2_0)
+compat_symbol (libc, __copysign, copysignl, GLIBC_2_0);
+#endif

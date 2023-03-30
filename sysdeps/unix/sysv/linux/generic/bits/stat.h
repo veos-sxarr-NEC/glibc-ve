@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Chris Metcalf <cmetcalf@tilera.com>, 2011.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #if !defined _SYS_STAT_H && !defined _FCNTL_H
 # error "Never include <bits/stat.h> directly; use <sys/stat.h> instead."
@@ -23,7 +23,7 @@
 #ifndef _BITS_STAT_H
 #define _BITS_STAT_H	1
 
-#include <endian.h>
+#include <bits/endian.h>
 #include <bits/wordsize.h>
 
 /* 64-bit libc uses the kernel's 'struct stat', accessed via the
@@ -42,7 +42,10 @@
 
 #if defined __USE_FILE_OFFSET64
 # define __field64(type, type64, name) type64 name
-#elif __WORDSIZE == 64
+#elif __WORDSIZE == 64 || defined __INO_T_MATCHES_INO64_T
+# if defined __INO_T_MATCHES_INO64_T && !defined __OFF_T_MATCHES_OFF64_T
+#  error "ino_t and off_t must both be the same type"
+# endif
 # define __field64(type, type64, name) type name
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
 # define __field64(type, type64, name) \
@@ -66,7 +69,7 @@ struct stat
     __blksize_t st_blksize;	/* Optimal block size for I/O.  */
     int __pad2;
     __field64(__blkcnt_t, __blkcnt64_t, st_blocks);  /* 512-byte blocks */
-#ifdef __USE_MISC
+#ifdef __USE_XOPEN2K8
     /* Nanosecond resolution timestamps are stored in a format
        equivalent to 'struct timespec'.  This is the type used
        whenever possible but the Unix namespace rules do not allow the
@@ -107,7 +110,7 @@ struct stat64
     __blksize_t st_blksize;	/* Optimal block size for I/O.  */
     int __pad2;
     __blkcnt64_t st_blocks;	/* Nr. 512-byte blocks allocated.  */
-#ifdef __USE_MISC
+#ifdef __USE_XOPEN2K8
     /* Nanosecond resolution timestamps are stored in a format
        equivalent to 'struct timespec'.  This is the type used
        whenever possible but the Unix namespace rules do not allow the

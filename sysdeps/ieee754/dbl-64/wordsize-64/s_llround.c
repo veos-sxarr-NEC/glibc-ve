@@ -1,5 +1,5 @@
 /* Round double value to long long int.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define lround __hidden_lround
 #define __lround __hidden___lround
@@ -24,6 +24,7 @@
 #include <sysdep.h>
 
 #include <math_private.h>
+#include <libm-alias-double.h>
 
 
 long long int
@@ -63,33 +64,12 @@ __llround (double x)
   return sign * result;
 }
 
-weak_alias (__llround, llround)
-#ifdef NO_LONG_DOUBLE
-strong_alias (__llround, __llroundl)
-weak_alias (__llround, llroundl)
-#endif
+libm_alias_double (__llround, llround)
 
-/* long has the same width as long long on LP64 machines, so use an alias.
-   If building for ILP32 on a machine with 64-bit registers, however,
-   use a cast if necessary.  */
+/* long has the same width as long long on LP64 machines, so use an alias.  */
 #undef lround
 #undef __lround
-#if !defined (_LP64) && REGISTER_CAST_INT32_TO_INT64
-long int
-__lround (double x)
-{
-  return __llround (x);
-}
-weak_alias (__lround, lround)
-# ifdef NO_LONG_DOUBLE
-strong_alias (__lround, __lroundl)
-weak_alias (__lround, lroundl)
-# endif
-#else
+#ifdef _LP64
 strong_alias (__llround, __lround)
-weak_alias (__llround, lround)
-# ifdef NO_LONG_DOUBLE
-strong_alias (__llround, __lroundl)
-weak_alias (__llround, lroundl)
-# endif
+libm_alias_double (__lround, lround)
 #endif

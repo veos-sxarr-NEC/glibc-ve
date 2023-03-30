@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 1999.
 
@@ -14,18 +14,43 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#define SIGCONTEXT struct sigcontext *
-#define SIGCONTEXT_EXTRA_ARGS
-#define GET_PC(__ctx)	((void *) ((__ctx)->si_regs.pc))
-#define FIRST_FRAME_POINTER \
-  ({ void *ret;							\
-     asm volatile ("ta 3; add %%fp, 56, %0" : "=r" (ret)); ret; })
-#define ADVANCE_STACK_FRAME(__next) \
-	((void *) (((unsigned *)(__next))+14))
+#ifndef _SIGCONTEXTINFO_H
+#define _SIGCONTEXTINFO_H
 
-#define GET_STACK(__ctx)	((void *) (__ctx)->si_regs.u_regs[14])
-#define GET_FRAME(__ctx)	ADVANCE_STACK_FRAME (GET_STACK(__ctx))
-#define CALL_SIGHANDLER(handler, signo, ctx) \
-  (handler)((signo), SIGCONTEXT_EXTRA_ARGS (ctx))
+/* The sparc32 kernel signal frame for SA_SIGINFO is defined as:
+
+  struct rt_signal_frame32
+  {
+    struct sparc_stackf32 ss;
+    compat_siginfo_t info;
+    struct pt_regs32 regs;          <- void *ctx
+    compat_sigset_t mask;
+    u32 fpu_save;
+    unsigned int insns[2];
+    compat_stack_t stack;
+    unsigned int extra_size;
+    siginfo_extra_v8plus_t v8plus;
+    u32 rwin_save;
+  } __attribute__((aligned(8)));
+
+  Unlike other architectures, sparc32 passes pt_regs32 REGS pointer as
+  the third argument to a sa_sigaction handler with SA_SIGINFO enabled.  */
+
+struct pt_regs32
+{
+  unsigned int psr;
+  unsigned int pc;
+  unsigned int npc;
+  unsigned int y;
+  unsigned int u_regs[16];
+};
+
+static inline uintptr_t
+sigcontext_get_pc (const struct pt_regs32 *ctx)
+{
+  return ctx->pc;
+}
+
+#endif

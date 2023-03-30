@@ -1,5 +1,5 @@
 /* Compute remainder and a congruent to the quotient.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
 
@@ -23,13 +23,14 @@
 
 
 static const float zero = 0.0;
+#include <libm-alias-float.h>
 
 
 float
 __remquof (float x, float y, int *quo)
 {
   int32_t hx,hy;
-  u_int32_t sx;
+  uint32_t sx;
   int cquo, qs;
 
   GET_FLOAT_WORD (hx, x);
@@ -59,12 +60,12 @@ __remquof (float x, float y, int *quo)
   y  = fabsf (y);
   cquo = 0;
 
-  if (x >= 4 * y)
+  if (hy <= 0x7e7fffff && x >= 4 * y)
     {
       x -= 4 * y;
       cquo += 4;
     }
-  if (x >= 2 * y)
+  if (hy <= 0x7effffff && x >= 2 * y)
     {
       x -= 2 * y;
       cquo += 2;
@@ -100,8 +101,11 @@ __remquof (float x, float y, int *quo)
 
   *quo = qs ? -cquo : cquo;
 
+  /* Ensure correct sign of zero result in round-downward mode.  */
+  if (x == 0.0f)
+    x = 0.0f;
   if (sx)
     x = -x;
   return x;
 }
-weak_alias (__remquof, remquof)
+libm_alias_float (__remquo, remquo)

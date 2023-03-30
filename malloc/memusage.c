@@ -1,5 +1,5 @@
 /* Profile heap and stack memory usage of running program.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <atomic.h>
@@ -256,6 +256,7 @@ me (void)
 
       if (!start_sp)
         start_sp = GETSP ();
+
 #ifdef __ve__
       outname = getenv ("VE_MEMUSAGE_OUTPUT");
 #else
@@ -284,14 +285,13 @@ me (void)
                  environment variable is not present.  */
               buffer_size = DEFAULT_BUFFER_SIZE;
 #ifdef __ve__
-              if (getenv ("VE_MEMUSAGE_BUFFER_SIZE") != NULL)
-                {
-                  buffer_size = atoi (getenv ("VE_MEMUSAGE_BUFFER_SIZE"));
+              const char *str_buffer_size = getenv ("VE_MEMUSAGE_BUFFER_SIZE");
 #else
-              if (getenv ("MEMUSAGE_BUFFER_SIZE") != NULL)
-                {
-                  buffer_size = atoi (getenv ("MEMUSAGE_BUFFER_SIZE"));
+              const char *str_buffer_size = getenv ("MEMUSAGE_BUFFER_SIZE");
 #endif
+              if (str_buffer_size != NULL)
+                {
+                  buffer_size = atoi (str_buffer_size);
                   if (buffer_size == 0 || buffer_size > DEFAULT_BUFFER_SIZE)
                     buffer_size = DEFAULT_BUFFER_SIZE;
                 }

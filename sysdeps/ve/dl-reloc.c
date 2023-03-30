@@ -1,5 +1,5 @@
 /* Relocate a shared object and resolve its references to other loaded objects.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+   /* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <errno.h>
 #include <libintl.h>
@@ -26,6 +26,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <_itoa.h>
+#include <libc-pointer-arith.h>
 #include "dynamic-link.h"
 
 /* Statistics function.  */
@@ -45,7 +46,6 @@
    directly, as static TLS should be rare and code handling it should
    not be inlined as much as possible.  */
 int
-internal_function
 _dl_try_allocate_static_tls (struct link_map *map)
 {
   /* If we've already used the variable with dynamic access, or if the
@@ -75,9 +75,9 @@ _dl_try_allocate_static_tls (struct link_map *map)
   map->l_tls_offset = GL(dl_tls_static_used) = offset;
 #elif TLS_DTV_AT_TP
   /* dl_tls_static_used includes the TCB at the beginning.  */
-  size_t offset = (((GL(dl_tls_static_used)
-		     - map->l_tls_firstbyte_offset
-		     + map->l_tls_align - 1) & -map->l_tls_align)
+  size_t offset = (ALIGN_UP(GL(dl_tls_static_used)
+			    - map->l_tls_firstbyte_offset,
+			    map->l_tls_align)
 		   + map->l_tls_firstbyte_offset);
   size_t used = offset + map->l_tls_blocksize;
 
@@ -112,7 +112,7 @@ _dl_try_allocate_static_tls (struct link_map *map)
 }
 
 void
-internal_function __attribute_noinline__
+__attribute_noinline__
 _dl_allocate_static_tls (struct link_map *map)
 {
   if (map->l_tls_offset == FORCED_DYNAMIC_TLS_OFFSET
@@ -141,7 +141,6 @@ _dl_nothread_init_static_tls (struct link_map *map)
   dtv_t *dtv = THREAD_DTV ();
   assert (map->l_tls_modid <= dtv[-1].counter);
   dtv[map->l_tls_modid].pointer.val = dest;
-  dtv[map->l_tls_modid].pointer.is_static = true;
 
   /* Initialize the memory.  */
   memset (__mempcpy (dest, map->l_tls_initimage, map->l_tls_initimage_size),
@@ -202,23 +201,11 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
 	    struct textrels *newp;
 
 	    newp = (struct textrels *) alloca (sizeof (*newp));
-	    newp->len = (((ph->p_vaddr + ph->p_memsz + ph->p_align - 1)
-			  & ~(ph->p_align - 1))
-			 - (ph->p_vaddr & ~(ph->p_align - 1)));
-	    newp->start = ((ph->p_vaddr & ~(ph->p_align - 1))
-			   + (caddr_t) l->l_addr);
+	    newp->len = ALIGN_UP (ph->p_vaddr + ph->p_memsz, ph->p_align)
+			- ALIGN_DOWN (ph->p_vaddr, ph->p_align);
+	    newp->start = PTR_ALIGN_DOWN (ph->p_vaddr, ph->p_align)
+			  + (caddr_t) l->l_addr;
 
-	    if (__mprotect (newp->start, newp->len, PROT_READ|PROT_WRITE) < 0)
-	      {
-		errstring = N_("cannot make segment writable for relocation");
-	      call_error:
-		_dl_signal_error (errno, l->l_name, NULL, errstring);
-	      }
-
-#if (PF_R | PF_W | PF_X) == 7 && (PROT_READ | PROT_WRITE | PROT_EXEC) == 7
-	    newp->prot = (PF_TO_PROT
-			  >> ((ph->p_flags & (PF_R | PF_W | PF_X)) * 4)) & 0xf;
-#else
 	    newp->prot = 0;
 	    if (ph->p_flags & PF_R)
 	      newp->prot |= PROT_READ;
@@ -226,7 +213,14 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
 	      newp->prot |= PROT_WRITE;
 	    if (ph->p_flags & PF_X)
 	      newp->prot |= PROT_EXEC;
-#endif
+
+	    if (__mprotect (newp->start, newp->len, newp->prot|PROT_WRITE) < 0)
+	      {
+		errstring = N_("cannot make segment writable for relocation");
+	      call_error:
+		_dl_signal_error (errno, l->l_name, NULL, errstring);
+	      }
+
 	    newp->next = textrels;
 	    textrels = newp;
 	  }
@@ -240,7 +234,8 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
 
     /* This macro is used as a callback from the ELF_DYNAMIC_RELOCATE code.  */
 #define RESOLVE_MAP(ref, version, r_type) \
-    (ELFW(ST_BIND) ((*ref)->st_info) != STB_LOCAL			      \
+    ((ELFW(ST_BIND) ((*ref)->st_info) != STB_LOCAL			      \
+      && __glibc_likely (!dl_symbol_visibility_binds_local_p (*ref)))	      \
      ? ((__builtin_expect ((*ref) == l->l_lookup_cache.sym, 0)		      \
 	 && elf_machine_type_class (r_type) == l->l_lookup_cache.type_class)  \
 	? (bump_num_cache_relocations (),				      \
@@ -255,7 +250,8 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
 	       v = (version);						      \
 	     _lr = _dl_lookup_symbol_x (strtab + (*ref)->st_name, l, (ref),   \
 					scope, v, _tc,			      \
-					DL_LOOKUP_ADD_DEPENDENCY, NULL);      \
+					DL_LOOKUP_ADD_DEPENDENCY	      \
+					| DL_LOOKUP_FOR_RELOCATE, NULL);      \
 	     l->l_lookup_cache.ret = (*ref);				      \
 	     l->l_lookup_cache.value = _lr; }))				      \
      : l)
@@ -265,21 +261,13 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
     ELF_DYNAMIC_RELOCATE (l, lazy, consider_profiling, skip_ifunc);
 
 #ifndef PROF
-    if (__glibc_unlikely (consider_profiling))
+    if (__glibc_unlikely (consider_profiling)
+	&& l->l_info[DT_PLTRELSZ] != NULL)
       {
 	/* Allocate the array which will contain the already found
 	   relocations.  If the shared object lacks a PLT (for example
 	   if it only contains lead function) the l_info[DT_PLTRELSZ]
 	   will be NULL.  */
-	if (l->l_info[DT_PLTRELSZ] == NULL)
-	  {
-	    errstring = N_("%s: no PLTREL found in object %s\n");
-	  fatal:
-	    _dl_fatal_printf (errstring,
-			      RTLD_PROGNAME,
-			      l->l_name);
-	  }
-
 	size_t sizeofrel = l->l_info[DT_PLTREL]->d_un.d_val == DT_RELA
 			   ? sizeof (ElfW(Rela))
 			   : sizeof (ElfW(Rel));
@@ -290,7 +278,7 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
 	  {
 	    errstring = N_("\
 %s: out of memory to store relocation results for %s\n");
-	    goto fatal;
+	    _dl_fatal_printf (errstring, RTLD_PROGNAME, l->l_name);
 	  }
       }
 #endif
@@ -322,7 +310,7 @@ _dl_relocate_object (struct link_map *l, struct r_scope_elem *scope[],
 }
 
 
-void internal_function
+void
 _dl_protect_relro (struct link_map *l)
 {
   /*Track ticket #1361*/
@@ -334,11 +322,13 @@ _dl_protect_relro (struct link_map *l)
 	break;
   }
 
-  ElfW(Addr) start = ((l->l_addr + l->l_relro_addr)
-                      & (~(ph->p_align - 1)));
-  ElfW(Addr) end = ((l->l_addr + l->l_relro_addr + l->l_relro_size)
-                    & (~(ph->p_align - 1)));
-
+  ElfW(Addr) start = ALIGN_DOWN((l->l_addr
+				 + l->l_relro_addr),
+				ph->p_align);
+  ElfW(Addr) end = ALIGN_DOWN((l->l_addr
+			       + l->l_relro_addr
+			       + l->l_relro_size),
+			      ph->p_align);
   if (start != end
       && __mprotect ((void *) start, end - start, PROT_READ) < 0)
     {
@@ -349,7 +339,7 @@ cannot apply additional memory protection after relocation");
 }
 
 void
-internal_function __attribute_noinline__
+__attribute_noinline__
 _dl_reloc_bad_type (struct link_map *map, unsigned int type, int plt)
 {
 #define DIGIT(b)	_itoa_lower_digits[(b) & 0xf];

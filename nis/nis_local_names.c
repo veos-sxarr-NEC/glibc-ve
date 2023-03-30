@@ -1,4 +1,4 @@
-/* Copyright (c) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (c) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Thorsten Kukuk <kukuk@vt.uni-paderborn.de>, 1997.
 
@@ -14,13 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <libintl.h>
 #include <rpcsvc/nis.h>
+#include <shlib-compat.h>
 
 nis_name
 nis_local_group (void)
@@ -49,7 +50,7 @@ nis_local_group (void)
 
   return __nisgroup;
 }
-libnsl_hidden_def (nis_local_group)
+libnsl_hidden_nolink_def (nis_local_group, GLIBC_2_1)
 
 nis_name
 nis_local_directory (void)
@@ -75,7 +76,7 @@ nis_local_directory (void)
 
   return __nisdomainname;
 }
-libnsl_hidden_def (nis_local_directory)
+libnsl_hidden_nolink_def (nis_local_directory, GLIBC_2_1)
 
 nis_name
 nis_local_principal (void)
@@ -105,8 +106,8 @@ nis_local_principal (void)
 	      buf[len] = '\0';
 	    }
 
-	  res = nis_list (buf, USE_DGRAM + NO_AUTHINFO + FOLLOW_LINKS +
-			  FOLLOW_PATH, NULL, NULL);
+	  res = nis_list (buf, USE_DGRAM + NO_AUTHINFO + FOLLOW_LINKS
+			  + FOLLOW_PATH, NULL, NULL);
 
 	  if (res == NULL)
 	    goto nobody;
@@ -140,7 +141,7 @@ LOCAL entry for UID %d in directory %s not unique\n"),
     }
   return __principal;
 }
-libnsl_hidden_def (nis_local_principal)
+libnsl_hidden_nolink_def (nis_local_principal, GLIBC_2_1)
 
 nis_name
 nis_local_host (void)
@@ -174,4 +175,4 @@ nis_local_host (void)
 
   return __nishostname;
 }
-libnsl_hidden_def (nis_local_host)
+libnsl_hidden_nolink_def (nis_local_host, GLIBC_2_1)

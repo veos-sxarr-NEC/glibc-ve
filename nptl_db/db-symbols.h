@@ -1,5 +1,5 @@
 /* List of symbols in libpthread examined by libthread_db.
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,13 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#ifdef HAVE_ASM_GLOBAL_DOT_NAME
-# define DOT(x)	.##x		/* PPC64 requires . prefix on code symbols.  */
-#else
-# define DOT(x)	x		/* No prefix.  */
-#endif
+#define DOT(x)	x		/* No prefix.  */
 
 #define STRINGIFY(name)		STRINGIFY_1(name)
 #define STRINGIFY_1(name)	#name
@@ -29,6 +25,7 @@
   DB_LOOKUP_NAME (SYM_SIZEOF_##type, _thread_db_sizeof_##type)
 #define DB_STRUCT_FIELD(type, field) \
   DB_LOOKUP_NAME (SYM_##type##_FIELD_##field, _thread_db_##type##_##field)
+#define DB_STRUCT_FLEXIBLE_ARRAY(type, field) DB_STRUCT_FIELD (type, field)
 #define DB_SYMBOL(name) \
   DB_LOOKUP_NAME (SYM_##name, name)
 #define DB_FUNCTION(name) \
@@ -40,6 +37,8 @@
 # include "structs.def"
 
 # undef DB_STRUCT
+# undef DB_STRUCT_FIELD
+# undef DB_STRUCT_FLEXIBLE_ARRAY
 # undef DB_FUNCTION
 # undef DB_SYMBOL
 # undef DB_VARIABLE

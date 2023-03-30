@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -41,9 +41,7 @@
 #  define localtime_r my_localtime_r
 static struct tm *localtime_r (const time_t *, struct tm *);
 static struct tm *
-localtime_r (t, tp)
-     const time_t *t;
-     struct tm *tp;
+localtime_r (const time_t *t, struct tm *tp)
 {
   struct tm *l = localtime (t);
   if (! l)
@@ -126,6 +124,10 @@ extern const struct __locale_data _nl_C_LC_TIME attribute_hidden;
   (&_nl_C_LC_TIME.values[_NL_ITEM_INDEX (ABDAY_1)].string)
 # define month_name (&_nl_C_LC_TIME.values[_NL_ITEM_INDEX (MON_1)].string)
 # define ab_month_name (&_nl_C_LC_TIME.values[_NL_ITEM_INDEX (ABMON_1)].string)
+# define alt_month_name \
+  (&_nl_C_LC_TIME.values[_NL_ITEM_INDEX (ALTMON_1)].string)
+# define ab_alt_month_name \
+  (&_nl_C_LC_TIME.values[_NL_ITEM_INDEX (_NL_ABALTMON_1)].string)
 # define HERE_D_T_FMT (_nl_C_LC_TIME.values[_NL_ITEM_INDEX (D_T_FMT)].string)
 # define HERE_D_FMT (_nl_C_LC_TIME.values[_NL_ITEM_INDEX (D_FMT)].string)
 # define HERE_AM_STR (_nl_C_LC_TIME.values[_NL_ITEM_INDEX (AM_STR)].string)
@@ -183,17 +185,13 @@ static const unsigned short int __mon_yday[2][13] =
 # undef _NL_CURRENT_WORD
 # define _NL_CURRENT_WORD(category, item) \
   (current->values[_NL_ITEM_INDEX (item)].word)
-# define LOCALE_PARAM , locale
+# define LOCALE_PARAM , locale_t locale
 # define LOCALE_ARG , locale
-# define LOCALE_PARAM_PROTO , __locale_t locale
-# define LOCALE_PARAM_DECL __locale_t locale;
 # define HELPER_LOCALE_ARG , current
 # define ISSPACE(Ch) __isspace_l (Ch, locale)
 #else
 # define LOCALE_PARAM
 # define LOCALE_ARG
-# define LOCALE_PARAM_DECL
-# define LOCALE_PARAM_PROTO
 # define HELPER_LOCALE_ARG
 # define ISSPACE(Ch) isspace (Ch)
 #endif
@@ -237,16 +235,11 @@ day_of_the_year (struct tm *tm)
 
 #ifdef _LIBC
 char *
-internal_function
 #else
 static char *
 #endif
-__strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
-     const char *rp;
-     const char *fmt;
-     struct tm *tmp;
-     void *statep;
-     LOCALE_PARAM_DECL
+__strptime_internal (const char *rp, const char *fmt, struct tm *tmp,
+		     void *statep LOCALE_PARAM)
 {
 #ifdef _LIBC
   struct __locale_data *const current = locale->__locales[LC_TIME];
@@ -313,7 +306,7 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 	}
 
       /* Any character but `%' must be matched by the same character
-	 in the iput string.  */
+	 in the input string.  */
       if (*fmt != '%')
 	{
 	  match_char (*fmt++, *rp++);
@@ -330,10 +323,9 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
       while (*fmt >= '0' && *fmt <= '9')
 	++fmt;
 
-#ifndef _NL_CURRENT
-      /* We need this for handling the `E' modifier.  */
+      /* In some cases, modifiers are handled by adjusting state and
+         then restarting the switch statement below.  */
     start_over:
-#endif
 
       /* Make back up of current processing pointer.  */
       rp_backup = rp;
@@ -434,13 +426,46 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 				     ab_month_name[cnt]))
 			decided_longest = loc;
 		    }
+#ifdef _LIBC
+		  /* Now check the alt month.  */
+		  trp = rp;
+		  if (match_string (_NL_CURRENT (LC_TIME, ALTMON_1 + cnt), trp)
+		      && trp > rp_longest)
+		    {
+		      rp_longest = trp;
+		      cnt_longest = cnt;
+		      if (s.decided == not
+			  && strcmp (_NL_CURRENT (LC_TIME, ALTMON_1 + cnt),
+				     alt_month_name[cnt]))
+			decided_longest = loc;
+		    }
+		  trp = rp;
+		  if (match_string (_NL_CURRENT (LC_TIME, _NL_ABALTMON_1 + cnt),
+				    trp)
+		      && trp > rp_longest)
+		    {
+		      rp_longest = trp;
+		      cnt_longest = cnt;
+		      if (s.decided == not
+			  && strcmp (_NL_CURRENT (LC_TIME, _NL_ABALTMON_1 + cnt),
+				     alt_month_name[cnt]))
+			decided_longest = loc;
+		    }
+#endif
 		}
 #endif
 	      if (s.decided != loc
 		  && (((trp = rp, match_string (month_name[cnt], trp))
 		       && trp > rp_longest)
 		      || ((trp = rp, match_string (ab_month_name[cnt], trp))
-			  && trp > rp_longest)))
+			  && trp > rp_longest)
+#ifdef _LIBC
+		      || ((trp = rp, match_string (alt_month_name[cnt], trp))
+			  && trp > rp_longest)
+		      || ((trp = rp, match_string (ab_alt_month_name[cnt], trp))
+			  && trp > rp_longest)
+#endif
+	      ))
 		{
 		  rp_longest = trp;
 		  cnt_longest = cnt;
@@ -470,8 +495,8 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 		}
 	      else
 		{
-		  if (s.decided == not &&
-		      strcmp (_NL_CURRENT (LC_TIME, D_T_FMT), HERE_D_T_FMT))
+		  if (s.decided == not
+		      && strcmp (_NL_CURRENT (LC_TIME, D_T_FMT), HERE_D_T_FMT))
 		    s.decided = loc;
 		  s.want_xday = 1;
 		  break;
@@ -616,9 +641,9 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 		}
 	      else
 		{
-		  if (s.decided == not &&
-		      strcmp (_NL_CURRENT (LC_TIME, T_FMT_AMPM),
-			      HERE_T_FMT_AMPM))
+		  if (s.decided == not
+		      && strcmp (_NL_CURRENT (LC_TIME, T_FMT_AMPM),
+				 HERE_T_FMT_AMPM))
 		    s.decided = loc;
 		  break;
 		}
@@ -749,13 +774,21 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 	    rp++;
 	  break;
 	case 'z':
-	  /* We recognize two formats: if two digits are given, these
-	     specify hours.  If fours digits are used, minutes are
-	     also specified.  */
+	  /* We recognize four formats:
+	     1. Two digits specify hours.
+	     2. Four digits specify hours and minutes.
+	     3. Two digits, ':', and two digits specify hours and minutes.
+	     4. 'Z' is equivalent to +0000.  */
 	  {
 	    val = 0;
 	    while (ISSPACE (*rp))
 	      ++rp;
+	    if (*rp == 'Z')
+	      {
+		++rp;
+		tm->tm_gmtoff = 0;
+		break;
+	      }
 	    if (*rp != '+' && *rp != '-')
 	      return NULL;
 	    bool neg = *rp++ == '-';
@@ -764,22 +797,18 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 	      {
 		val = val * 10 + *rp++ - '0';
 		++n;
+		if (*rp == ':' && n == 2 && isdigit (*(rp + 1)))
+		  ++rp;
 	      }
 	    if (n == 2)
 	      val *= 100;
 	    else if (n != 4)
 	      /* Only two or four digits recognized.  */
 	      return NULL;
-	    else
-	      {
-		/* We have to convert the minutes into decimal.  */
-		if (val % 100 >= 60)
-		  return NULL;
-		val = (val / 100) * 100 + ((val % 100) * 50) / 30;
-	      }
-	    if (val > 1200)
+	    else if (val % 100 >= 60)
+	      /* Minutes valid range is 0 through 59.  */
 	      return NULL;
-	    tm->tm_gmtoff = (val * 3600) / 100;
+	    tm->tm_gmtoff = (val / 100) * 3600 + (val % 100) * 60;
 	    if (neg)
 	      tm->tm_gmtoff = -tm->tm_gmtoff;
 	  }
@@ -878,10 +907,15 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 			{
 			  int delta = ((tm->tm_year - era->offset)
 				       * era->absolute_direction);
+			  /* The difference between two sets of years
+			     does not include the final year itself,
+			     therefore add 1 to the difference to
+			     account for that final year.  */
 			  match = (delta >= 0
 				   && delta < (((int64_t) era->stop_date[0]
 						- (int64_t) era->start_date[0])
-					       * era->absolute_direction));
+					       * era->absolute_direction
+					       + 1));
 			}
 		      if (! match)
 			return NULL;
@@ -899,10 +933,12 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 			{
 			  int delta = ((tm->tm_year - era->offset)
 				       * era->absolute_direction);
+			  /* See comment above about year difference + 1.  */
 			  if (delta >= 0
 			      && delta < (((int64_t) era->stop_date[0]
 					   - (int64_t) era->start_date[0])
-					  * era->absolute_direction))
+					  * era->absolute_direction
+					  + 1))
 			    {
 			      s.decided = loc;
 			      break;
@@ -1022,6 +1058,12 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 	case 'O':
 	  switch (*fmt++)
 	    {
+	    case 'b':
+	    case 'B':
+	    case 'h':
+	      /* Match month name.  Reprocess as plain 'B'.  */
+	      fmt--;
+	      goto start_over;
 	    case 'd':
 	    case 'e':
 	      /* Match day of month using alternate numeric symbols.  */
@@ -1207,11 +1249,7 @@ __strptime_internal (rp, fmt, tmp, statep LOCALE_PARAM)
 
 
 char *
-strptime (buf, format, tm LOCALE_PARAM)
-     const char *buf;
-     const char *format;
-     struct tm *tm;
-     LOCALE_PARAM_DECL
+strptime (const char *buf, const char *format, struct tm *tm LOCALE_PARAM)
 {
   return __strptime_internal (buf, format, tm, NULL LOCALE_ARG);
 }

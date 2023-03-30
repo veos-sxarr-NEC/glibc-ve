@@ -1,9 +1,11 @@
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 
 static void prepare (void);
@@ -129,13 +131,11 @@ do_test (void)
     if (strcmp (d->d_name, "some-fifo") == 0)
       {
 	has_some_fifo = true;
-#ifdef _DIRENT_HAVE_D_TYPE
 	if (d->d_type != DT_UNKNOWN && d->d_type != DT_FIFO)
 	  {
 	    puts ("d_type for some-fifo wrong");
 	    return 1;
 	  }
-#endif
       }
     else if (strcmp (d->d_name, ".") != 0 && strcmp (d->d_name, "..") != 0)
       {

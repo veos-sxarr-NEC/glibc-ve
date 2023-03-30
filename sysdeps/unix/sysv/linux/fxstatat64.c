@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -26,27 +26,33 @@
 #include <sysdep.h>
 #include <sys/syscall.h>
 
+#include <statx_cp.h>
+
 /* Get information about the file NAME in BUF.  */
 
 int
 __fxstatat64 (int vers, int fd, const char *file, struct stat64 *st, int flag)
 {
   if (__glibc_unlikely (vers != _STAT_VER_LINUX))
-    {
-      __set_errno (EINVAL);
-      return -1;
-    }
+    return INLINE_SYSCALL_ERROR_RETURN_VALUE (EINVAL);
 
   int result;
   INTERNAL_SYSCALL_DECL (err);
 
+#ifdef __NR_fstatat64
   result = INTERNAL_SYSCALL (fstatat64, err, 4, fd, file, st, flag);
+#else
+  struct statx tmp;
+
+  result = INTERNAL_SYSCALL (statx, err, 5, fd, file, AT_NO_AUTOMOUNT | flag,
+                             STATX_BASIC_STATS, &tmp);
+  if (result == 0)
+    __cp_stat64_statx (st, &tmp);
+#endif
   if (!__builtin_expect (INTERNAL_SYSCALL_ERROR_P (result, err), 1))
     return 0;
   else
-    {
-      __set_errno (INTERNAL_SYSCALL_ERRNO (result, err));
-      return -1;
-    }
+    return INLINE_SYSCALL_ERROR_RETURN_VALUE (INTERNAL_SYSCALL_ERRNO (result,
+								      err));
 }
 libc_hidden_def (__fxstatat64)

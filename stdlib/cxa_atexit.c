@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,18 +13,20 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
 
-#include <bits/libc-lock.h>
+#include <libc-lock.h>
 #include "exit.h"
-#include <atomic.h>
 #include <sysdep.h>
 
 #undef __cxa_atexit
+
+/* See concurrency notes in stdlib/exit.h where this lock is declared.  */
+__libc_lock_define_initialized (, __exit_funcs_lock)
 
 
 int
@@ -32,10 +34,20 @@ attribute_hidden
 __internal_atexit (void (*func) (void *), void *arg, void *d,
 		   struct exit_function_list **listp)
 {
-  struct exit_function *new = __new_exitfn (listp);
+  struct exit_function *new;
+
+  /* As a QoI issue we detect NULL early with an assertion instead
+     of a SIGSEGV at program exit when the handler is run (bug 20544).  */
+  assert (func != NULL);
+
+  __libc_lock_lock (__exit_funcs_lock);
+  new = __new_exitfn (listp);
 
   if (new == NULL)
-    return -1;
+    {
+      __libc_lock_unlock (__exit_funcs_lock);
+      return -1;
+    }
 
 #ifdef PTR_MANGLE
   PTR_MANGLE (func);
@@ -43,8 +55,8 @@ __internal_atexit (void (*func) (void *), void *arg, void *d,
   new->func.cxa.fn = (void (*) (void *, int)) func;
   new->func.cxa.arg = arg;
   new->func.cxa.dso_handle = d;
-  atomic_write_barrier ();
   new->flavor = ef_cxa;
+  __libc_lock_unlock (__exit_funcs_lock);
   return 0;
 }
 
@@ -60,14 +72,11 @@ __cxa_atexit (void (*func) (void *), void *arg, void *d)
 libc_hidden_def (__cxa_atexit)
 
 
-/* We change global data, so we need locking.  */
-__libc_lock_define_initialized (static, lock)
-
-
 static struct exit_function_list initial;
 struct exit_function_list *__exit_funcs = &initial;
 uint64_t __new_exitfn_called;
 
+/* Must be called with __exit_funcs_lock held.  */
 struct exit_function *
 __new_exitfn (struct exit_function_list **listp)
 {
@@ -76,7 +85,10 @@ __new_exitfn (struct exit_function_list **listp)
   struct exit_function *r = NULL;
   size_t i = 0;
 
-  __libc_lock_lock (lock);
+  if (__exit_funcs_done)
+    /* Exit code is finished processing all registered exit functions,
+       therefore we fail this registration.  */
+    return NULL;
 
   for (l = *listp; l != NULL; p = l, l = l->next)
     {
@@ -126,8 +138,6 @@ __new_exitfn (struct exit_function_list **listp)
       r->flavor = ef_us;
       ++__new_exitfn_called;
     }
-
-  __libc_lock_unlock (lock);
 
   return r;
 }

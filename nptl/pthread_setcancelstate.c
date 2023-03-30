@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include "pthreadP.h"
@@ -22,9 +22,7 @@
 
 
 int
-__pthread_setcancelstate (state, oldstate)
-     int state;
-     int *oldstate;
+__pthread_setcancelstate (int state, int *oldstate)
 {
   volatile struct pthread *self;
 
@@ -70,3 +68,4 @@ __pthread_setcancelstate (state, oldstate)
   return 0;
 }
 strong_alias (__pthread_setcancelstate, pthread_setcancelstate)
+hidden_def (__pthread_setcancelstate)

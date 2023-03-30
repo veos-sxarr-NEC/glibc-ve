@@ -1,5 +1,5 @@
 /* Remove SIG from the calling process' signal mask.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,26 +15,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define __need_NULL
 #include <stddef.h>
 #include <signal.h>
 
 int
-sigrelse (sig)
-     int sig;
+sigrelse (int sig)
 {
   sigset_t set;
 
-  /* Retrieve current signal set.  */
-  if (__sigprocmask (SIG_SETMASK, NULL, &set) < 0)
+  sigemptyset (&set);
+  if (sigaddset (&set, sig) < 0)
     return -1;
-
-  /* Remove the specified signal.  */
-  if (sigdelset (&set, sig) < 0)
-    return -1;
-
-  /* Set the new mask.  */
-  return __sigprocmask (SIG_SETMASK, &set, NULL);
+  return __sigprocmask (SIG_UNBLOCK, &set, NULL);
 }

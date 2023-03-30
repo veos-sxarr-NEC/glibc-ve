@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
 
@@ -14,17 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _ICONV_PROG_H
 #define _ICONV_PROG_H	1
 
 #include <stdio.h>
+
 #include <charmap.h>
-
-
-/* Nonzero if verbose ouput is wanted.  */
-extern int verbose;
+#include <record-status.h>
 
 /* If nonzero omit invalid character from output.  */
 extern int omit_invalid;

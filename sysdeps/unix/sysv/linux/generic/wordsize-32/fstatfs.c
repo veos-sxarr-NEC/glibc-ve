@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Chris Metcalf <cmetcalf@tilera.com>, 2011.
 
@@ -14,12 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/statfs.h>
+#include <kernel_stat.h>
 #include <stddef.h>
 
+#if !STATFS_IS_STATFS64
 #include "overflow.h"
 
 /* Return information about the filesystem on which FD resides.  */
@@ -30,3 +32,4 @@ __fstatfs (int fd, struct statfs *buf)
   return rc ?: statfs_overflow (buf);
 }
 weak_alias (__fstatfs, fstatfs)
+#endif

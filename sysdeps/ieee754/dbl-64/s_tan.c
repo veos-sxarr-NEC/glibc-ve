@@ -1,7 +1,7 @@
 /*
  * IBM Accurate Mathematical Library
  * written by International Business Machines Corp.
- * Copyright (C) 2001-2015 Free Software Foundation, Inc.
+ * Copyright (C) 2001-2020 Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,7 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 /*********************************************************************/
 /*  MODULE_NAME: utan.c                                              */
@@ -34,12 +34,16 @@
 /*********************************************************************/
 
 #include <errno.h>
+#include <float.h>
 #include "endian.h"
 #include <dla.h>
 #include "mpa.h"
 #include "MathLib.h"
 #include <math.h>
 #include <math_private.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
+#include <libm-alias-double.h>
 #include <fenv.h>
 #include <stap-probe.h>
 
@@ -52,7 +56,7 @@ void __mptan (double, mp_no *, int);
 
 double
 SECTION
-tan (double x)
+__tan (double x)
 {
 #include "utan.h"
 #include "utan.tbl"
@@ -91,6 +95,7 @@ tan (double x)
   /* (I) The case abs(x) <= 1.259e-8 */
   if (w <= g1.d)
     {
+      math_check_force_underflow_nonneg (w);
       retval = x;
       goto ret;
     }
@@ -841,6 +846,6 @@ tanMp (double x)
   return y;
 }
 
-#ifdef NO_LONG_DOUBLE
-weak_alias (tan, tanl)
+#ifndef __tan
+libm_alias_double (__tan, tan)
 #endif

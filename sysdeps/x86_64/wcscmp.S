@@ -1,5 +1,5 @@
 /* Optimized wcscmp for x86-64 with SSE2.
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,14 +15,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
 /* Note: wcscmp uses signed comparison, not unsighed as in strcmp function. */
 
 	.text
-ENTRY (wcscmp)
+ENTRY (__wcscmp)
 /*
 	* This implementation uses SSE to compare up to 16 bytes at a time.
 */
@@ -945,5 +945,8 @@ L(equal):
 	xor	%rax, %rax
 	ret
 
-END (wcscmp)
-libc_hidden_def (wcscmp)
+END (__wcscmp)
+#ifndef __wcscmp
+libc_hidden_def (__wcscmp)
+weak_alias (__wcscmp, wcscmp)
+#endif

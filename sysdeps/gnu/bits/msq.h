@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SYS_MSG_H
 # error "Never use <bits/msq.h> directly; include <sys/msg.h> instead."
@@ -43,8 +43,8 @@ struct msqid_ds
   __time_t msg_stime;		/* time of last msgsnd command */
   __time_t msg_rtime;		/* time of last msgrcv command */
   __time_t msg_ctime;		/* time of last change */
-  struct wait_queue *__wwait;	/* ??? */
-  struct wait_queue *__rwait;	/* ??? */
+  struct __wait_queue *__wwait;	/* ??? */
+  struct __wait_queue *__rwait;	/* ??? */
   unsigned short int __msg_cbytes;/* current number of bytes on queue */
   msgqnum_t msg_qnum;		/* number of messages currently on queue */
   msglen_t msg_qbytes;		/* max number of bytes allowed on queue */

@@ -1,5 +1,5 @@
 /* ix87 specific implementation of arcsinh.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -15,8 +15,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <libm-alias-ldouble.h>
 #include <machine/asm.h>
 
 	.section .rodata
@@ -88,6 +89,7 @@ ENTRY(__asinhl)
 4:	ret
 
 7:	fldt	4(%esp)
+	fadd	%st
 	ret
 
 6:	faddl	MO(one)
@@ -108,7 +110,12 @@ ENTRY(__asinhl)
 	fldt	MO(huge)		// huge : x : x
 	faddp				// huge+x : x
 	fstp	%st(0)			// x
-	ret
+	cmpl	$0x0001, %eax
+	jae	8f
+	fld	%st(0)
+	fmul	%st(0)
+	fstp	%st(0)
+8:	ret
 
 	// |x| > 2^34 => y = sign(x) * (log(|x|) + log(2))
 	.align ALIGNARG(4)
@@ -135,4 +142,4 @@ ENTRY(__asinhl)
 	fchs
 4:	ret
 END(__asinhl)
-weak_alias (__asinhl, asinhl)
+libm_alias_ldouble (__asinh, asinh)

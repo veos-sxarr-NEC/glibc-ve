@@ -202,8 +202,7 @@ more_memory(int size, free_list_t fl)
 
 /* Declaration changed to standard one for GNU.  */
 void *
-malloc(size)
-	size_t size;
+malloc (size_t size)
 {
 	int i, n;
 	free_list_t fl;
@@ -269,8 +268,7 @@ malloc(size)
 
 /* Declaration changed to standard one for GNU.  */
 void
-free(base)
-	void *base;
+free (void *base)
 {
 	header_t h;
 	free_list_t fl;
@@ -318,9 +316,7 @@ free(base)
 
 /* Declaration changed to standard one for GNU.  */
 void *
-realloc(old_base, new_size)
-        void *old_base;
-        size_t new_size;
+realloc (void *old_base, size_t new_size)
 {
 	header_t h;
 	free_list_t fl;
@@ -409,8 +405,8 @@ print_malloc_free_list (void)
 }
 #endif	/* DEBUG */
 
-static void
-malloc_fork_prepare(void)
+void
+_hurd_malloc_fork_prepare(void)
 /*
  * Prepare the malloc module for a fork by insuring that no thread is in a
  * malloc critical section.
@@ -423,8 +419,8 @@ malloc_fork_prepare(void)
     }
 }
 
-static void
-malloc_fork_parent(void)
+void
+_hurd_malloc_fork_parent(void)
 /*
  * Called in the parent process after a fork() to resume normal operation.
  */
@@ -436,8 +432,8 @@ malloc_fork_parent(void)
     }
 }
 
-static void
-malloc_fork_child(void)
+void
+_hurd_malloc_fork_child(void)
 /*
  * Called in the child process after a fork() to resume normal operation.
  */
@@ -450,7 +446,4 @@ malloc_fork_child(void)
 }
 
 
-text_set_element (_hurd_fork_prepare_hook, malloc_fork_prepare);
-text_set_element (_hurd_fork_parent_hook, malloc_fork_parent);
-text_set_element (_hurd_fork_child_hook, malloc_fork_child);
 text_set_element (_hurd_preinit_hook, malloc_init);

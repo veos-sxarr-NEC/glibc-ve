@@ -1,4 +1,5 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Old SysV permission definition for Linux.  Default version.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,34 +14,43 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sys/ipc.h>
+#include <sys/ipc.h>  /* For __key_t  */
+#include <kernel-features.h>
 
-#define __IPC_64	0x100
+#ifdef __ASSUME_SYSVIPC_DEFAULT_IPC_64
+# define __IPC_64      0x0
+#else
+# define __IPC_64      0x100
+#endif
+
+#ifndef __OLD_IPC_ID_TYPE
+# define __OLD_IPC_ID_TYPE unsigned short int
+#endif
+#ifndef __OLD_IPC_MODE_TYPE
+# define __OLD_IPC_MODE_TYPE unsigned short int
+#endif
 
 struct __old_ipc_perm
 {
   __key_t __key;			/* Key.  */
-  unsigned short int uid;		/* Owner's user ID.  */
-  unsigned short int gid;		/* Owner's group ID.  */
-  unsigned short int cuid;		/* Creator's user ID.  */
-  unsigned short int cgid;		/* Creator's group ID.  */
-  unsigned short int mode;		/* Read/write permission.  */
+  __OLD_IPC_ID_TYPE uid;		/* Owner's user ID.  */
+  __OLD_IPC_ID_TYPE gid;		/* Owner's group ID.  */
+  __OLD_IPC_ID_TYPE cuid;		/* Creator's user ID.  */
+  __OLD_IPC_ID_TYPE cgid;		/* Creator's group ID.  */
+  __OLD_IPC_MODE_TYPE mode;		/* Read/write permission.  */
   unsigned short int __seq;		/* Sequence number.  */
 };
 
+#define SEMCTL_ARG_ADDRESS(__arg) &__arg.array
 
-/* The codes for the functions to use the ipc syscall multiplexer.  */
-#define IPCOP_semop	 1
-#define IPCOP_semget	 2
-#define IPCOP_semctl	 3
-#define IPCOP_semtimedop 4
-#define IPCOP_msgsnd	11
-#define IPCOP_msgrcv	12
-#define IPCOP_msgget	13
-#define IPCOP_msgctl	14
-#define IPCOP_shmat	21
-#define IPCOP_shmdt	22
-#define IPCOP_shmget	23
-#define IPCOP_shmctl	24
+#define MSGRCV_ARGS(__msgp, __msgtyp) \
+  ((long int []){ (long int) __msgp, __msgtyp })
+
+/* This macro is required to handle the s390 variants, which passes the
+   arguments in a different order than default.  */
+#define SEMTIMEDOP_IPC_ARGS(__nsops, __sops, __timeout) \
+  (__nsops), 0, (__sops), (__timeout)
+
+#include <ipc_ops.h>

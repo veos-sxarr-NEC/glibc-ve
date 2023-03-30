@@ -1,5 +1,5 @@
 /* Machine-dependent ELF dynamic relocation inline functions.  MIPS version.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Kazumoto Kojima <kkojima@info.kanagawa-u.ac.jp>.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /*  FIXME: Profiling of shared libraries is not implemented yet.  */
 #ifndef dl_machine_h
@@ -68,10 +68,17 @@
    in l_info array.  */
 #define DT_MIPS(x) (DT_MIPS_##x - DT_LOPROC + DT_NUM)
 
-/* If there is a DT_MIPS_RLD_MAP entry in the dynamic section, fill it in
-   with the run-time address of the r_debug structure  */
+/* If there is a DT_MIPS_RLD_MAP_REL or DT_MIPS_RLD_MAP entry in the dynamic
+   section, fill in the debug map pointer with the run-time address of the
+   r_debug structure.  */
 #define ELF_MACHINE_DEBUG_SETUP(l,r) \
-do { if ((l)->l_info[DT_MIPS (RLD_MAP)]) \
+do { if ((l)->l_info[DT_MIPS (RLD_MAP_REL)]) \
+       { \
+	 char *ptr = (char *)(l)->l_info[DT_MIPS (RLD_MAP_REL)]; \
+	 ptr += (l)->l_info[DT_MIPS (RLD_MAP_REL)]->d_un.d_val; \
+	 *(ElfW(Addr) *)ptr = (ElfW(Addr)) (r); \
+       } \
+     else if ((l)->l_info[DT_MIPS (RLD_MAP)]) \
        *(ElfW(Addr) *)((l)->l_info[DT_MIPS (RLD_MAP)]->d_un.d_ptr) = \
        (ElfW(Addr)) (r); \
    } while (0)
@@ -144,7 +151,7 @@ elf_machine_load_address (void)
 #ifndef __mips16
   asm ("	.set noreorder\n"
        "	" STRINGXP (PTR_LA) " %0, 0f\n"
-# if __mips_isa_rev < 6
+# if !defined __mips_isa_rev || __mips_isa_rev < 6
        "	bltzal $0, 0f\n"
        "	nop\n"
        "0:	" STRINGXP (PTR_SUBU) " %0, $31, %0\n"
@@ -183,7 +190,7 @@ elf_machine_load_address (void)
    fiddles with global data.  */
 #define ELF_MACHINE_BEFORE_RTLD_RELOC(dynamic_info)			\
 do {									\
-  struct link_map *map = &bootstrap_map;				\
+  struct link_map *map = BOOTSTRAP_MAP;					\
   ElfW(Sym) *sym;							\
   ElfW(Addr) *got;							\
   int i, n;								\
@@ -213,7 +220,7 @@ do {									\
   while (i--)								\
     {									\
       if (sym->st_shndx == SHN_UNDEF || sym->st_shndx == SHN_COMMON)	\
-	*got = map->l_addr + sym->st_value;				\
+	*got = SYMBOL_ADDRESS (map, sym, true);				\
       else if (ELFW(ST_TYPE) (sym->st_info) == STT_FUNC			\
 	       && *got != sym->st_value)				\
 	*got += map->l_addr;						\
@@ -223,7 +230,7 @@ do {									\
 	    *got += map->l_addr;					\
 	}								\
       else								\
-	*got = map->l_addr + sym->st_value;				\
+	*got = SYMBOL_ADDRESS (map, sym, true);				\
 									\
       got++;								\
       sym++;								\
@@ -252,7 +259,7 @@ do {									\
       and not just plain _start.  */
 
 #ifndef __mips16
-# if __mips_isa_rev < 6
+# if !defined __mips_isa_rev || __mips_isa_rev < 6
 #  define LCOFF STRINGXP(.Lcof2)
 #  define LOAD_31 STRINGXP(bltzal $8) "," STRINGXP(.Lcof2)
 # else
@@ -446,6 +453,7 @@ dl_platform_init (void)
    the corresponding PLT entry instead.  */
 static inline ElfW(Addr)
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const ElfW(Rel) *reloc,
 		       ElfW(Addr) *reloc_addr, ElfW(Addr) value)
 {
@@ -590,7 +598,7 @@ elf_machine_reloc (struct link_map *map, ElfW(Addr) r_info,
 #ifndef RTLD_BOOTSTRAP
 		if (map != &GL(dl_rtld_map))
 #endif
-		  reloc_value += sym->st_value + map->l_addr;
+		  reloc_value += SYMBOL_ADDRESS (map, sym, true);
 	      }
 	    else
 	      {
@@ -655,7 +663,7 @@ elf_machine_reloc (struct link_map *map, ElfW(Addr) r_info,
 			    "found jump slot relocation with non-zero addend");
 
 	sym_map = RESOLVE_MAP (&sym, version, r_type);
-	value = sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value;
+	value = SYMBOL_ADDRESS (sym_map, sym, true);
 	*addr_field = value;
 
 	break;
@@ -669,7 +677,7 @@ elf_machine_reloc (struct link_map *map, ElfW(Addr) r_info,
 
 	/* Calculate the address of the symbol.  */
 	sym_map = RESOLVE_MAP (&sym, version, r_type);
-	value = sym_map == NULL ? 0 : sym_map->l_addr + sym->st_value;
+	value = SYMBOL_ADDRESS (sym_map, sym, true);
 
 	if (__builtin_expect (sym == NULL, 0))
 	  /* This can happen in trace mode if an object could not be
@@ -687,7 +695,8 @@ elf_machine_reloc (struct link_map *map, ElfW(Addr) r_info,
 			      RTLD_PROGNAME, strtab + refsym->st_name);
 	  }
 	memcpy (reloc_addr, (void *) value,
-		MIN (sym->st_size, refsym->st_size));
+		sym->st_size < refsym->st_size
+		? sym->st_size : refsym->st_size);
 	break;
       }
 
@@ -703,8 +712,8 @@ elf_machine_reloc (struct link_map *map, ElfW(Addr) r_info,
 	 it's totally unnecessary.  */
       if (ELFW(R_SYM) (r_info) == 0)
 	break;
-      /* Fall through.  */
 #endif
+      /* Fall through.  */
     default:
       _dl_reloc_bad_type (map, r_type, 0);
       break;
@@ -789,7 +798,7 @@ elf_machine_got_rel (struct link_map *map, int lazy)
 	= vernum ? &map->l_versions[vernum[sym_index] & 0x7fff] : NULL;	  \
       struct link_map *sym_map;						  \
       sym_map = RESOLVE_MAP (&ref, version, reloc);			  \
-      ref ? sym_map->l_addr + ref->st_value : 0;			  \
+      SYMBOL_ADDRESS (sym_map, ref, true);				  \
     })
 
   if (map->l_info[VERSYMIDX (DT_VERSYM)] != NULL)
@@ -833,7 +842,7 @@ elf_machine_got_rel (struct link_map *map, int lazy)
 	      && !(sym->st_other & STO_MIPS_PLT))
 	    {
 	      if (lazy)
-		*got = sym->st_value + map->l_addr;
+		*got = SYMBOL_ADDRESS (map, sym, true);
 	      else
 		/* This is a lazy-binding stub, so we don't need the
 		   canonical address.  */

@@ -3,7 +3,6 @@
 chown		-	chown32		i:sii	__chown		chown
 lchown		-	lchown32	i:sii	__lchown	lchown
 fchown		-	fchown32	i:iii	__fchown	fchown
-waitpid		-	waitpid		Ci:ipi	__waitpid	waitpid
 
 getegid		-	getegid32	Ei:	__getegid	getegid
 geteuid		-	geteuid32	Ei:	__geteuid	geteuid
@@ -19,3 +18,4 @@ setfsuid	-	setfsuid32	Ei:i	setfsuid
 cacheflush	EXTRA	cacheflush	i:iiii	__cacheflush	cacheflush
 prlimit64	EXTRA	prlimit64	i:iipp	prlimit64
 fanotify_mark	EXTRA	fanotify_mark	i:iiiiis	fanotify_mark
+personality	EXTRA	personality	Ei:i	__personality	personality

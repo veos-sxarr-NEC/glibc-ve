@@ -1,5 +1,5 @@
-/* `ptrace' debugger support interface.  Linux version.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* `ptrace' debugger support interface.  Linux/S390 version.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    Contributed by Denis Joseph Barrow (djbarrow@de.ibm.com).
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SYS_PTRACE_H
 #define _SYS_PTRACE_H	1
@@ -24,24 +24,66 @@
 #include <bits/types.h>
 
 __BEGIN_DECLS
-#ifdef _LINUX_PTRACE_H
+#if defined _LINUX_PTRACE_H || defined _S390_PTRACE_H
 /* Kludge to stop stuff gdb & strace compiles from getting upset
  */
-#undef PTRACE_TRACEME
-#undef PTRACE_PEEKTEXT
-#undef PTRACE_PEEKDATA
-#undef PTRACE_PEEKUSR
-#undef PTRACE_POKETEXT
-#undef PTRACE_POKEDATA
-#undef PTRACE_POKEUSR
-#undef PTRACE_CONT
-#undef PTRACE_KILL
-#undef PTRACE_SINGLESTEP
-
-#undef PTRACE_ATTACH
-#undef PTRACE_DETACH
-
-#undef PTRACE_SYSCALL
+# undef PTRACE_TRACEME
+# undef PTRACE_PEEKTEXT
+# undef PTRACE_PEEKDATA
+# undef PTRACE_POKETEXT
+# undef PTRACE_POKEDATA
+# undef PTRACE_CONT
+# undef PTRACE_KILL
+# undef PTRACE_SINGLESTEP
+# undef PTRACE_SINGLEBLOCK
+# undef PTRACE_ATTACH
+# undef PTRACE_DETACH
+# undef PTRACE_SYSCALL
+# undef PTRACE_SETOPTIONS
+# undef PTRACE_GETEVENTMSG
+# undef PTRACE_GETSIGINFO
+# undef PTRACE_SETSIGINFO
+# undef PTRACE_GETREGSET
+# undef PTRACE_SETREGSET
+# undef PTRACE_SEIZE
+# undef PTRACE_INTERRUPT
+# undef PTRACE_LISTEN
+# undef PTRACE_PEEKSIGINFO
+# undef PTRACE_GETSIGMASK
+# undef PTRACE_SETSIGMASK
+# undef PTRACE_SECCOMP_GET_FILTER
+# undef PTRACE_SECCOMP_GET_METADATA
+# undef PTRACE_PEEKUSR_AREA
+# undef PTRACE_POKEUSR_AREA
+# undef PTRACE_GET_LAST_BREAK
+# undef PTRACE_ENABLE_TE
+# undef PTRACE_DISABLE_TE
+# undef PTRACE_TE_ABORT_RAND
+# undef PTRACE_O_TRACESYSGOOD
+# undef PTRACE_O_TRACEFORK
+# undef PTRACE_O_TRACEVFORK
+# undef PTRACE_O_TRACECLONE
+# undef PTRACE_O_TRACEEXEC
+# undef PTRACE_O_TRACEVFORKDONE
+# undef PTRACE_O_TRACEEXIT
+# undef PTRACE_O_TRACESECCOMP
+# undef PTRACE_O_EXITKILL
+# undef PTRACE_O_SUSPEND_SECCOMP
+# undef PTRACE_O_MASK
+# undef PTRACE_EVENT_FORK
+# undef PTRACE_EVENT_VFORK
+# undef PTRACE_EVENT_CLONE
+# undef PTRACE_EVENT_EXEC
+# undef PTRACE_EVENT_VFORK_DONE
+# undef PTRACE_EVENT_EXIT
+# undef PTRACE_EVENT_SECCOMP
+# undef PTRACE_EVENT_STOP
+# undef PTRACE_PEEKSIGINFO_SHARED
+# undef PTRACE_GET_SYSCALL_INFO
+# undef PTRACE_SYSCALL_INFO_NONE
+# undef PTRACE_SYSCALL_INFO_ENTRY
+# undef PTRACE_SYSCALL_INFO_EXIT
+# undef PTRACE_SYSCALL_INFO_SECCOMP
 #endif
 /* Type of the REQUEST argument to `ptrace.'  */
 enum __ptrace_request
@@ -84,30 +126,13 @@ enum __ptrace_request
   PTRACE_KILL = 8,
 #define PT_KILL PTRACE_KILL
 
-  /* Single step the process.
-     This is not supported on all machines.  */
+  /* Single step the process.  */
   PTRACE_SINGLESTEP = 9,
 #define PT_STEP PTRACE_SINGLESTEP
 
-  /* Get all general purpose registers used by a processes.
-     This is not supported on all machines.  */
-   PTRACE_GETREGS = 12,
-#define PT_GETREGS PTRACE_GETREGS
-
-  /* Set all general purpose registers used by a processes.
-     This is not supported on all machines.  */
-   PTRACE_SETREGS = 13,
-#define PT_SETREGS PTRACE_SETREGS
-
-  /* Get all floating point registers used by a processes.
-     This is not supported on all machines.  */
-   PTRACE_GETFPREGS = 14,
-#define PT_GETFPREGS PTRACE_GETFPREGS
-
-  /* Set all floating point registers used by a processes.
-     This is not supported on all machines.  */
-   PTRACE_SETFPREGS = 15,
-#define PT_SETFPREGS PTRACE_SETFPREGS
+  /* Execute process until next taken branch.  */
+  PTRACE_SINGLEBLOCK = 12,
+#define PT_STEPBLOCK PTRACE_SINGLEBLOCK
 
   /* Attach to a process that is already running. */
   PTRACE_ATTACH = 16,
@@ -117,7 +142,7 @@ enum __ptrace_request
   PTRACE_DETACH = 17,
 #define PT_DETACH PTRACE_DETACH
 
-  /* Continue and stop at the next (return from) syscall.  */
+  /* Continue and stop at the next entry to or return from syscall.  */
   PTRACE_SYSCALL = 24,
 #define PT_SYSCALL PTRACE_SYSCALL
 
@@ -158,68 +183,51 @@ enum __ptrace_request
   PTRACE_LISTEN = 0x4208,
 #define PTRACE_LISTEN PTRACE_LISTEN
 
-  PTRACE_PEEKSIGINFO = 0x4209
+  /* Retrieve siginfo_t structures without removing signals from a queue.  */
+  PTRACE_PEEKSIGINFO = 0x4209,
 #define PTRACE_PEEKSIGINFO PTRACE_PEEKSIGINFO
+
+  /* Get the mask of blocked signals.  */
+  PTRACE_GETSIGMASK = 0x420a,
+#define PTRACE_GETSIGMASK PTRACE_GETSIGMASK
+
+  /* Change the mask of blocked signals.  */
+  PTRACE_SETSIGMASK = 0x420b,
+#define PTRACE_SETSIGMASK PTRACE_SETSIGMASK
+
+  /* Get seccomp BPF filters.  */
+  PTRACE_SECCOMP_GET_FILTER = 0x420c,
+#define PTRACE_SECCOMP_GET_FILTER PTRACE_SECCOMP_GET_FILTER
+
+  /* Get seccomp BPF filter metadata.  */
+  PTRACE_SECCOMP_GET_METADATA = 0x420d,
+#define PTRACE_SECCOMP_GET_METADATA PTRACE_SECCOMP_GET_METADATA
+
+  /* Get information about system call.  */
+  PTRACE_GET_SYSCALL_INFO = 0x420e,
+#define PTRACE_GET_SYSCALL_INFO PTRACE_GET_SYSCALL_INFO
+
+  PTRACE_PEEKUSR_AREA = 0x5000,
+#define PTRACE_PEEKUSR_AREA PTRACE_PEEKUSR_AREA
+
+  PTRACE_POKEUSR_AREA = 0x5001,
+#define PTRACE_POKEUSR_AREA PTRACE_POKEUSR_AREA
+
+  PTRACE_GET_LAST_BREAK = 0x5006,
+#define PTRACE_GET_LAST_BREAK PTRACE_GET_LAST_BREAK
+
+  PTRACE_ENABLE_TE = 0x5009,
+#define PTRACE_ENABLE_TE PTRACE_ENABLE_TE
+
+  PTRACE_DISABLE_TE = 0x5010,
+#define PTRACE_DISABLE_TE PTRACE_DISABLE_TE
+
+  PTRACE_TE_ABORT_RAND = 0x5011
+#define PTRACE_TE_ABORT_RAND PTRACE_TE_ABORT_RAND
 };
 
 
-/* Flag for PTRACE_LISTEN.  */
-enum __ptrace_flags
-{
-  PTRACE_SEIZE_DEVEL = 0x80000000
-};
-
-/* Options set using PTRACE_SETOPTIONS.  */
-enum __ptrace_setoptions
-{
-  PTRACE_O_TRACESYSGOOD	= 0x00000001,
-  PTRACE_O_TRACEFORK	= 0x00000002,
-  PTRACE_O_TRACEVFORK   = 0x00000004,
-  PTRACE_O_TRACECLONE	= 0x00000008,
-  PTRACE_O_TRACEEXEC	= 0x00000010,
-  PTRACE_O_TRACEVFORKDONE = 0x00000020,
-  PTRACE_O_TRACEEXIT	= 0x00000040,
-  PTRACE_O_TRACESECCOMP = 0x00000080,
-  PTRACE_O_EXITKILL	= 0x00100000,
-  PTRACE_O_MASK		= 0x001000ff
-};
-
-/* Wait extended result codes for the above trace options.  */
-enum __ptrace_eventcodes
-{
-  PTRACE_EVENT_FORK	= 1,
-  PTRACE_EVENT_VFORK	= 2,
-  PTRACE_EVENT_CLONE	= 3,
-  PTRACE_EVENT_EXEC	= 4,
-  PTRACE_EVENT_VFORK_DONE = 5,
-  PTRACE_EVENT_EXIT	= 6,
-  PTRACE_EVENT_SECCOMP  = 7
-};
-
-/* Arguments for PTRACE_PEEKSIGINFO.  */
-struct __ptrace_peeksiginfo_args
-{
-  __uint64_t off;	/* From which siginfo to start.  */
-  __uint32_t flags;	/* Flags for peeksiginfo.  */
-  __int32_t nr;		/* How many siginfos to take.  */
-};
-
-enum __ptrace_peeksiginfo_flags
-{
-  /* Read signals from a shared (process wide) queue.  */
-  PTRACE_PEEKSIGINFO_SHARED = (1 << 0)
-};
-
-/* Perform process tracing functions.  REQUEST is one of the values
-   above, and determines the action to be taken.
-   For all requests except PTRACE_TRACEME, PID specifies the process to be
-   traced.
-
-   PID and the other arguments described above for the various requests should
-   appear (those that are used for the particular request) as:
-     pid_t PID, void *ADDR, int DATA, void *ADDR2
-   after REQUEST.  */
-extern long int ptrace (enum __ptrace_request __request, ...) __THROW;
+#include <bits/ptrace-shared.h>
 
 __END_DECLS
 

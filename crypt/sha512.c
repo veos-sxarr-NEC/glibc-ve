@@ -1,6 +1,6 @@
 /* Functions to compute SHA512 message digest of files or memory blocks.
    according to the definition of SHA512 in FIPS 180-2.
-   Copyright (C) 2007-2015 Free Software Foundation, Inc.
+   Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Written by Ulrich Drepper <drepper@redhat.com>, 2007.  */
 
@@ -101,14 +101,13 @@ static const uint64_t K[80] =
     UINT64_C (0x5fcb6fab3ad6faec), UINT64_C (0x6c44198c4a475817)
   };
 
-void
-sha512_process_block (const void *buffer, size_t len, struct sha512_ctx *ctx);
+void __sha512_process_block (const void *buffer, size_t len,
+			     struct sha512_ctx *ctx);
 
 /* Initialize structure containing state of computation.
    (FIPS 180-2:5.3.3)  */
 void
-__sha512_init_ctx (ctx)
-     struct sha512_ctx *ctx;
+__sha512_init_ctx (struct sha512_ctx *ctx)
 {
   ctx->H[0] = UINT64_C (0x6a09e667f3bcc908);
   ctx->H[1] = UINT64_C (0xbb67ae8584caa73b);
@@ -130,9 +129,7 @@ __sha512_init_ctx (ctx)
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 void *
-__sha512_finish_ctx (ctx, resbuf)
-     struct sha512_ctx *ctx;
-     void *resbuf;
+__sha512_finish_ctx (struct sha512_ctx *ctx, void *resbuf)
 {
   /* Take yet unprocessed bytes into account.  */
   uint64_t bytes = ctx->buflen;
@@ -152,11 +149,11 @@ __sha512_finish_ctx (ctx, resbuf)
 
   /* Put the 128-bit file length in *bits* at the end of the buffer.  */
   ctx->buffer64[(bytes + pad + 8) / 8] = SWAP (ctx->total[TOTAL128_low] << 3);
-  ctx->buffer64[(bytes + pad) / 8] = SWAP ((ctx->total[TOTAL128_high] << 3) |
-					   (ctx->total[TOTAL128_low] >> 61));
+  ctx->buffer64[(bytes + pad) / 8] = SWAP ((ctx->total[TOTAL128_high] << 3)
+					   | (ctx->total[TOTAL128_low] >> 61));
 
   /* Process last bytes.  */
-  sha512_process_block (ctx->buffer, bytes + pad + 16, ctx);
+  __sha512_process_block (ctx->buffer, bytes + pad + 16, ctx);
 
   /* Put result from CTX in first 64 bytes following RESBUF.  */
   for (unsigned int i = 0; i < 8; ++i)
@@ -167,10 +164,7 @@ __sha512_finish_ctx (ctx, resbuf)
 
 
 void
-__sha512_process_bytes (buffer, len, ctx)
-     const void *buffer;
-     size_t len;
-     struct sha512_ctx *ctx;
+__sha512_process_bytes (const void *buffer, size_t len, struct sha512_ctx *ctx)
 {
   /* When we already have some bits in our internal buffer concatenate
      both inputs first.  */
@@ -184,7 +178,7 @@ __sha512_process_bytes (buffer, len, ctx)
 
       if (ctx->buflen > 128)
 	{
-	  sha512_process_block (ctx->buffer, ctx->buflen & ~127, ctx);
+	  __sha512_process_block (ctx->buffer, ctx->buflen & ~127, ctx);
 
 	  ctx->buflen &= 127;
 	  /* The regions in the following copy operation cannot overlap.  */
@@ -210,7 +204,7 @@ __sha512_process_bytes (buffer, len, ctx)
       if (UNALIGNED_P (buffer))
 	while (len > 128)
 	  {
-	    sha512_process_block (memcpy (ctx->buffer, buffer, 128), 128,
+	    __sha512_process_block (memcpy (ctx->buffer, buffer, 128), 128,
 				    ctx);
 	    buffer = (const char *) buffer + 128;
 	    len -= 128;
@@ -218,7 +212,7 @@ __sha512_process_bytes (buffer, len, ctx)
       else
 #endif
 	{
-	  sha512_process_block (buffer, len & ~127, ctx);
+	  __sha512_process_block (buffer, len & ~127, ctx);
 	  buffer = (const char *) buffer + (len & ~127);
 	  len &= 127;
 	}
@@ -233,7 +227,7 @@ __sha512_process_bytes (buffer, len, ctx)
       left_over += len;
       if (left_over >= 128)
 	{
-	  sha512_process_block (ctx->buffer, 128, ctx);
+	  __sha512_process_block (ctx->buffer, 128, ctx);
 	  left_over -= 128;
 	  memcpy (ctx->buffer, &ctx->buffer[128], left_over);
 	}

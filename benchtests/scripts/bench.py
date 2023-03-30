@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (C) 2014-2015 Free Software Foundation, Inc.
+# Copyright (C) 2014-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 #
 # The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 """Benchmark program generator script
 
@@ -45,7 +45,7 @@ DEFINES_TEMPLATE = '''
 # variant is represented by the _VARIANT structure.  The ARGS structure
 # represents a single set of arguments.
 STRUCT_TEMPLATE = '''
-#define CALL_BENCH_FUNC(v, i) %(func)s (%(func_args)s)
+#define CALL_BENCH_FUNC(v, i, x) %(func)s (x %(func_args)s)
 
 struct args
 {
@@ -84,7 +84,9 @@ EPILOGUE = '''
 #define RESULT(__v, __i) (variants[(__v)].in[(__i)].timing)
 #define RESULT_ACCUM(r, v, i, old, new) \\
         ((RESULT ((v), (i))) = (RESULT ((v), (i)) * (old) + (r)) / ((new) + 1))
-#define BENCH_FUNC(i, j) ({%(getret)s CALL_BENCH_FUNC (i, j);})
+#define BENCH_FUNC(i, j) ({%(getret)s CALL_BENCH_FUNC (i, j, );})
+#define BENCH_FUNC_LAT(i, j) ({%(getret)s CALL_BENCH_FUNC (i, j, %(latarg)s);})
+#define BENCH_VARS %(defvar)s
 #define FUNCNAME "%(func)s"
 #include "bench-skeleton.c"'''
 
@@ -122,17 +124,23 @@ def gen_source(func, directives, all_vals):
     # If we have a return value from the function, make sure it is
     # assigned to prevent the compiler from optimizing out the
     # call.
+    getret = ''
+    latarg = ''
+    defvar = ''
+
     if directives['ret']:
         print('static %s volatile ret;' % directives['ret'])
-        getret = 'ret = '
-    else:
-        getret = ''
+        print('static %s zero __attribute__((used)) = 0;' % directives['ret'])
+        getret = 'ret = func_res = '
+        # Note this may not work if argument and result type are incompatible.
+        latarg = 'func_res * zero +'
+        defvar = '%s func_res = 0;' % directives['ret']
 
     # Test initialization.
     if directives['init']:
         print('#define BENCH_INIT %s' % directives['init'])
 
-    print(EPILOGUE % {'getret': getret, 'func': func})
+    print(EPILOGUE % {'getret': getret, 'func': func, 'latarg': latarg, 'defvar': defvar })
 
 
 def _print_arg_data(func, directives, all_vals):
@@ -164,7 +172,7 @@ def _print_arg_data(func, directives, all_vals):
             if pos == -1:
                 die('Output argument must be a pointer type')
 
-            outargs.append('static %s out%d;' % (arg[1:pos], i))
+            outargs.append('static %s out%d __attribute__((used));' % (arg[1:pos], i))
             func_args.append(' &out%d' % i)
         else:
             arg_struct.append('  %s volatile arg%d;' % (arg, i))

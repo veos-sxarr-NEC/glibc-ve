@@ -1,4 +1,4 @@
-/* Copyright (C) 2003-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -12,14 +12,14 @@
    Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   License along with the GNU C Library.  If not, see
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 /* Default stack size.  */
 #define ARCH_STACK_DEFAULT_SIZE	(4 * 1024 * 1024)
 
-/* Required stack pointer alignment at beginning.  */
+/* Required stack pointer alignment at beginning. */
 #define STACK_ALIGN		16
 
 /* Minimal stack size after allocating thread descriptor and guard size.  */

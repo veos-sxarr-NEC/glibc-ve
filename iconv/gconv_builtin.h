@@ -1,5 +1,5 @@
 /* Builtin transformations.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* All encoding named must be in upper case.  There must be no extra
    spaces.  */
@@ -84,7 +84,7 @@ BUILTIN_ALIAS ("OSF00010020//", "ANSI_X3.4-1968//")
 
 BUILTIN_TRANSFORMATION ("ANSI_X3.4-1968//", "INTERNAL", 1, "=ascii->INTERNAL",
 			__gconv_transform_ascii_internal, __gconv_btwoc_ascii,
-			4, 4, 1, 1)
+			1, 1, 4, 4)
 
 BUILTIN_TRANSFORMATION ("INTERNAL", "ANSI_X3.4-1968//", 1, "=INTERNAL->ascii",
 			__gconv_transform_internal_ascii, NULL, 4, 4, 1, 1)

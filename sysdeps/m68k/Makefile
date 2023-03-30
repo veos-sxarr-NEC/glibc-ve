@@ -1,4 +1,4 @@
-# Copyright (C) 1993-2015 Free Software Foundation, Inc.
+# Copyright (C) 1993-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library.  If not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # The mpn functions need this.  All existing 68k ports use MIT syntax.  If
 # a new port wants to use Motorola or Sony syntax, it can redefine this
@@ -26,15 +26,24 @@ asm-CPPFLAGS += $(m68k-syntax-flag)
 
 pic-ccflag = -fpic
 
+ifeq ($(subdir),csu)
+# Make sure gcrt1.o uses the large PIC model
+CFLAGS-gmon-start.c := -fPIC
+ifeq ($(build-pie-default),yes)
+# Override default PIE
+ASFLAGS-.o += -fno-pie
+endif
+endif
+
 ifeq ($(subdir),setjmp)
 # Make sure setjmp.c is compiled with a frame pointer
 CFLAGS-setjmp.c := -fno-omit-frame-pointer
 endif
 
-ifeq ($(subdir),debug)
-CFLAGS-backtrace.c += -funwind-tables
-endif
-
 ifeq ($(subdir),elf)
 CFLAGS-rtld.c += -Wno-uninitialized -Wno-unused
+endif
+
+ifeq ($(subdir),gmon)
+CFLAGS-mcount.c += -Wno-frame-address
 endif

@@ -1,5 +1,5 @@
 /* Implementation of gamma function according to ISO C.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,11 +15,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <fenv_private.h>
+#include <math-underflow.h>
 #include <float.h>
+#include <libm-alias-finite.h>
 
 /* Coefficients B_2k / 2k(2k-1) of x^-(2k-1) inside exp in Stirling's
    approximation to gamma function.  */
@@ -68,12 +72,8 @@ gammaf_positive (float x, int *exp2_adj)
 	{
 	  /* Adjust into the range for applying Stirling's
 	     approximation.  */
-	  float n = __ceilf (4.0f - x);
-#if FLT_EVAL_METHOD != 0
-	  volatile
-#endif
-	  float x_tmp = x + n;
-	  x_adj = x_tmp;
+	  float n = ceilf (4.0f - x);
+	  x_adj = math_narrow_eval (x + n);
 	  x_eps = (x - (x_adj - n));
 	  prod = __gamma_productf (x_adj - n, x_eps, n, &eps);
 	}
@@ -82,7 +82,7 @@ gammaf_positive (float x, int *exp2_adj)
 	 starting by computing pow (X_ADJ, X_ADJ) with a power of 2
 	 factored out.  */
       float exp_adj = -eps;
-      float x_adj_int = __roundf (x_adj);
+      float x_adj_int = roundf (x_adj);
       float x_adj_frac = x_adj - x_adj_int;
       int x_adj_log2;
       float x_adj_mant = __frexpf (x_adj, &x_adj_log2);
@@ -95,9 +95,9 @@ gammaf_positive (float x, int *exp2_adj)
       float ret = (__ieee754_powf (x_adj_mant, x_adj)
 		   * __ieee754_exp2f (x_adj_log2 * x_adj_frac)
 		   * __ieee754_expf (-x_adj)
-		   * __ieee754_sqrtf (2 * (float) M_PI / x_adj)
+		   * sqrtf (2 * (float) M_PI / x_adj)
 		   / prod);
-      exp_adj += x_eps * __ieee754_logf (x);
+      exp_adj += x_eps * __ieee754_logf (x_adj);
       float bsum = gamma_coeff[NCOEFF - 1];
       float x_adj2 = x_adj * x_adj;
       for (size_t i = 1; i <= NCOEFF - 1; i++)
@@ -111,6 +111,7 @@ float
 __ieee754_gammaf_r (float x, int *signgamp)
 {
   int32_t hx;
+  float ret;
 
   GET_FLOAT_WORD (hx, x);
 
@@ -121,7 +122,7 @@ __ieee754_gammaf_r (float x, int *signgamp)
       return 1.0 / x;
     }
   if (__builtin_expect (hx < 0, 0)
-      && (u_int32_t) hx < 0xff800000 && __rintf (x) == x)
+      && (uint32_t) hx < 0xff800000 && rintf (x) == x)
     {
       /* Return value for integer x < 0 is NaN with invalid exception.  */
       *signgamp = 0;
@@ -145,37 +146,71 @@ __ieee754_gammaf_r (float x, int *signgamp)
     {
       /* Overflow.  */
       *signgamp = 0;
-      return FLT_MAX * FLT_MAX;
-    }
-  else if (x > 0.0f)
-    {
-      *signgamp = 0;
-      int exp2_adj;
-      float ret = gammaf_positive (x, &exp2_adj);
-      return __scalbnf (ret, exp2_adj);
-    }
-  else if (x >= -FLT_EPSILON / 4.0f)
-    {
-      *signgamp = 0;
-      return 1.0f / x;
+      ret = math_narrow_eval (FLT_MAX * FLT_MAX);
+      return ret;
     }
   else
     {
-      float tx = __truncf (x);
-      *signgamp = (tx == 2.0f * __truncf (tx / 2.0f)) ? -1 : 1;
-      if (x <= -42.0f)
-	/* Underflow.  */
-	return FLT_MIN * FLT_MIN;
-      float frac = tx - x;
-      if (frac > 0.5f)
-	frac = 1.0f - frac;
-      float sinpix = (frac <= 0.25f
-		      ? __sinf ((float) M_PI * frac)
-		      : __cosf ((float) M_PI * (0.5f - frac)));
-      int exp2_adj;
-      float ret = (float) M_PI / (-x * sinpix
-				  * gammaf_positive (-x, &exp2_adj));
-      return __scalbnf (ret, -exp2_adj);
+      SET_RESTORE_ROUNDF (FE_TONEAREST);
+      if (x > 0.0f)
+	{
+	  *signgamp = 0;
+	  int exp2_adj;
+	  float tret = gammaf_positive (x, &exp2_adj);
+	  ret = __scalbnf (tret, exp2_adj);
+	}
+      else if (x >= -FLT_EPSILON / 4.0f)
+	{
+	  *signgamp = 0;
+	  ret = 1.0f / x;
+	}
+      else
+	{
+	  float tx = truncf (x);
+	  *signgamp = (tx == 2.0f * truncf (tx / 2.0f)) ? -1 : 1;
+	  if (x <= -42.0f)
+	    /* Underflow.  */
+	    ret = FLT_MIN * FLT_MIN;
+	  else
+	    {
+	      float frac = tx - x;
+	      if (frac > 0.5f)
+		frac = 1.0f - frac;
+	      float sinpix = (frac <= 0.25f
+			      ? __sinf ((float) M_PI * frac)
+			      : __cosf ((float) M_PI * (0.5f - frac)));
+	      int exp2_adj;
+	      float tret = (float) M_PI / (-x * sinpix
+					   * gammaf_positive (-x, &exp2_adj));
+	      ret = __scalbnf (tret, -exp2_adj);
+	      math_check_force_underflow_nonneg (ret);
+	    }
+	}
+      ret = math_narrow_eval (ret);
     }
+  if (isinf (ret) && x != 0)
+    {
+      if (*signgamp < 0)
+	{
+	  ret = math_narrow_eval (-copysignf (FLT_MAX, ret) * FLT_MAX);
+	  ret = -ret;
+	}
+      else
+	ret = math_narrow_eval (copysignf (FLT_MAX, ret) * FLT_MAX);
+      return ret;
+    }
+  else if (ret == 0)
+    {
+      if (*signgamp < 0)
+	{
+	  ret = math_narrow_eval (-copysignf (FLT_MIN, ret) * FLT_MIN);
+	  ret = -ret;
+	}
+      else
+	ret = math_narrow_eval (copysignf (FLT_MIN, ret) * FLT_MIN);
+      return ret;
+    }
+  else
+    return ret;
 }
-strong_alias (__ieee754_gammaf_r, __gammaf_r_finite)
+libm_alias_finite (__ieee754_gammaf_r, __gammaf_r)

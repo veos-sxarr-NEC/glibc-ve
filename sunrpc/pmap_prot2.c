@@ -35,6 +35,7 @@
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <rpc/pmap_prot.h>
+#include <shlib-compat.h>
 
 
 /*
@@ -76,9 +77,7 @@
  * this sounds like a job for xdr_reference!
  */
 bool_t
-xdr_pmaplist (xdrs, rp)
-     XDR *xdrs;
-     struct pmaplist **rp;
+xdr_pmaplist (XDR *xdrs, struct pmaplist **rp)
 {
   /*
    * more_elements is pre-computed in case the direction is

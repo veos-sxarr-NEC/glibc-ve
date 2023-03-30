@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* Based on the FreeBSD version of this file. Curiously, that file
    lacks a copyright in the header. */
@@ -23,6 +23,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <stdint.h>
 #include <net/if_ether.h>     /* IEEE 802.3 Ethernet constants */
 
 __BEGIN_DECLS
@@ -31,15 +32,15 @@ __BEGIN_DECLS
    systems.  */
 struct ether_addr
 {
-  u_int8_t ether_addr_octet[ETH_ALEN];
+  uint8_t ether_addr_octet[ETH_ALEN];
 };
 
 /* 10Mb/s ethernet header */
 struct ether_header
 {
-  u_int8_t  ether_dhost[ETH_ALEN];	/* destination eth addr	*/
-  u_int8_t  ether_shost[ETH_ALEN];	/* source ether addr	*/
-  u_int16_t ether_type;		        /* packet type ID field	*/
+  uint8_t  ether_dhost[ETH_ALEN];	/* destination eth addr	*/
+  uint8_t  ether_shost[ETH_ALEN];	/* source ether addr	*/
+  uint16_t ether_type;		        /* packet type ID field	*/
 };
 
 /* Ethernet protocol ID's */

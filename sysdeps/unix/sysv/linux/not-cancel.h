@@ -1,5 +1,5 @@
 /* Uncancelable versions of cancelable interfaces.  Linux/NPTL version.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2003.
 
@@ -15,85 +15,73 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#ifndef NOT_CANCEL_H
+# define NOT_CANCEL_H
+
+#include <fcntl.h>
 #include <sysdep.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
+#include <time.h>
 
-#if IS_IN (libc) || IS_IN (libpthread) || IS_IN (librt)
-extern int __open_nocancel (const char *, int, ...) attribute_hidden;
-extern int __close_nocancel (int) attribute_hidden;
-extern int __read_nocancel (int, void *, size_t) attribute_hidden;
-extern int __write_nocancel (int, const void *, size_t) attribute_hidden;
-extern pid_t __waitpid_nocancel (pid_t, int *, int) attribute_hidden;
-extern int __openat_nocancel (int fd, const char *fname, int oflag,
-				mode_t mode) attribute_hidden;
-extern int __openat64_nocancel (int fd, const char *fname, int oflag,
-				  mode_t mode) attribute_hidden;
-#else
-# define __open_nocancel(name, ...) __open (name, __VA_ARGS__)
-# define __close_nocancel(fd) __close (fd)
-# define __read_nocancel(fd, buf, len) __read (fd, buf, len)
-# define __write_nocancel(fd, buf, len) __write (fd, buf, len)
-# define __waitpid_nocancel(pid, stat_loc, options) \
-  __waitpid (pid, stat_loc, options)
-# define __openat_nocancel(fd, fname, oflag, mode) \
-  openat (fd, fname, oflag, mode)
-# define __openat64_nocancel(fd, fname, oflag, mode) \
-  openat64 (fd, fname, oflag, mode)
-#endif
+/* Non cancellable open syscall.  */
+__typeof (open) __open_nocancel;
 
-/* Uncancelable open.  */
-#define open_not_cancel(name, flags, mode) \
-   __open_nocancel (name, flags, mode)
-#define open_not_cancel_2(name, flags) \
-   __open_nocancel (name, flags)
+/* Non cancellable open syscall (LFS version).  */
+__typeof (open64) __open64_nocancel;
 
-/* Uncancelable openat.  */
-#define openat_not_cancel(fd, fname, oflag, mode) \
-  __openat_nocancel (fd, fname, oflag, mode)
-#define openat_not_cancel_3(fd, fname, oflag) \
-  __openat_nocancel (fd, fname, oflag, 0)
-#define openat64_not_cancel(fd, fname, oflag, mode) \
-  __openat64_nocancel (fd, fname, oflag, mode)
-#define openat64_not_cancel_3(fd, fname, oflag) \
-  __openat64_nocancel (fd, fname, oflag, 0)
+/* Non cancellable openat syscall.  */
+__typeof (openat) __openat_nocancel;
 
-/* Uncancelable close.  */
-#define close_not_cancel(fd) \
-  __close_nocancel (fd)
-#define close_not_cancel_no_status(fd) \
-  (void) ({ INTERNAL_SYSCALL_DECL (err);				      \
-	    INTERNAL_SYSCALL (close, err, 1, (fd)); })
+/* Non cacellable openat syscall (LFS version).  */
+__typeof (openat64) __openat64_nocancel;
 
-/* Uncancelable read.  */
-#define read_not_cancel(fd, buf, n) \
-  __read_nocancel (fd, buf, n)
+/* Non cancellable read syscall.  */
+__typeof (__read) __read_nocancel;
+
+/* Non cancellable pread syscall (LFS version).  */
+__typeof (__pread64) __pread64_nocancel;
 
 /* Uncancelable write.  */
-#define write_not_cancel(fd, buf, n) \
-  __write_nocancel (fd, buf, n)
+__typeof (__write) __write_nocancel;
 
-/* Uncancelable writev.  */
-#define writev_not_cancel_no_status(fd, iov, n) \
-  (void) ({ INTERNAL_SYSCALL_DECL (err);				      \
-	    INTERNAL_SYSCALL (writev, err, 3, (fd), (iov), (n)); })
+/* Uncancelable close.  */
+__typeof (__close) __close_nocancel;
+
+/* Non cancellable close syscall that does not also set errno in case of
+   failure.  */
+static inline void
+__close_nocancel_nostatus (int fd)
+{
+  __close_nocancel (fd);
+}
+
+/* Non cancellable writev syscall that does not also set errno in case of
+   failure.  */
+static inline void
+__writev_nocancel_nostatus (int fd, const struct iovec *iov, int iovcnt)
+{
+  INTERNAL_SYSCALL_DECL (err);
+  INTERNAL_SYSCALL_CALL (writev, err, fd, iov, iovcnt);
+}
 
 /* Uncancelable fcntl.  */
-#define fcntl_not_cancel(fd, cmd, val) \
-  __fcntl_nocancel (fd, cmd, val)
+__typeof (__fcntl) __fcntl64_nocancel;
 
-/* Uncancelable waitpid.  */
-#define waitpid_not_cancel(pid, stat_loc, options) \
-  INLINE_SYSCALL (wait4, 4, pid, stat_loc, options, NULL)
+#if IS_IN (libc) || IS_IN (rtld)
+hidden_proto (__open_nocancel)
+hidden_proto (__open64_nocancel)
+hidden_proto (__openat_nocancel)
+hidden_proto (__openat64_nocancel)
+hidden_proto (__read_nocancel)
+hidden_proto (__pread64_nocancel)
+hidden_proto (__write_nocancel)
+hidden_proto (__close_nocancel)
+hidden_proto (__fcntl64_nocancel)
+#endif
 
-/* Uncancelable pause.  */
-#define pause_not_cancel() \
-  __pause_nocancel ()
-
-/* Uncancelable nanosleep.  */
-#define nanosleep_not_cancel(requested_time, remaining) \
-  __nanosleep_nocancel (requested_time, remaining)
-
-/* Uncancelable sigsuspend.  */
-#define sigsuspend_not_cancel(set) \
-  __sigsuspend_nocancel (set)
+#endif /* NOT_CANCEL_H  */

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stdlib.h>
@@ -22,9 +22,7 @@
 
 
 int
-__pthread_setspecific (key, value)
-     pthread_key_t key;
-     const void *value;
+__pthread_setspecific (pthread_key_t key, const void *value)
 {
   struct pthread *self;
   unsigned int idx1st;
@@ -91,5 +89,5 @@ __pthread_setspecific (key, value)
 
   return 0;
 }
-strong_alias (__pthread_setspecific, pthread_setspecific)
+weak_alias (__pthread_setspecific, pthread_setspecific)
 hidden_def (__pthread_setspecific)

@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -12,15 +12,16 @@
    Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   License along with the GNU C Library.  If not, see
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef	_LINK_H
 # error "Never include <bits/link.h> directly; use <link.h> instead."
 #endif
 
 
+/* Registers for entry into PLT on Alpha.  */
 typedef struct La_ve_regs
 {
   uint64_t lr_s0;
@@ -46,19 +47,19 @@ typedef struct La_ve_retval
 __BEGIN_DECLS
 
 extern Elf64_Addr la_ve_gnu_pltenter (Elf64_Sym *__sym,
+					 unsigned int __ndx,
+				         uintptr_t *__refcook,
+				         uintptr_t *__defcook,
+				         La_ve_regs *__regs,
+				         unsigned int *__flags,
+				         const char *__symname,
+				         long int *__framesizep);
+extern unsigned int la_ve_gnu_pltexit (Elf64_Sym *__sym,
 					  unsigned int __ndx,
 					  uintptr_t *__refcook,
 					  uintptr_t *__defcook,
-					  La_ve_regs *__regs,
-					  unsigned int *__flags,
-					  const char *__symname,
-					  long int *__framesizep);
-extern unsigned int la_ve_gnu_pltexit (Elf64_Sym *__sym,
-					   unsigned int __ndx,
-					   uintptr_t *__refcook,
-					   uintptr_t *__defcook,
-					   const La_ve_regs *__inregs,
-					   La_ve_retval *__outregs,
-					   const char *__symname);
+					  const La_ve_regs *__inregs,
+					  La_ve_retval *__outregs,
+					  const char *__symname);
 
 __END_DECLS

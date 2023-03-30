@@ -1,5 +1,5 @@
 /* Thread-local storage handling in the ELF dynamic linker.  Generic version.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -44,7 +44,6 @@ oom (void)
 
 
 size_t
-internal_function
 _dl_next_tls_modid (void)
 {
   size_t result;
@@ -105,7 +104,6 @@ _dl_next_tls_modid (void)
 
 
 size_t
-internal_function
 _dl_count_modids (void)
 {
   /* It is rare that we have gaps; see elf/dl-open.c (_dl_open) where
@@ -133,7 +131,6 @@ _dl_count_modids (void)
 
 #ifdef SHARED
 void
-internal_function
 _dl_determine_tlsoffset (void)
 {
   size_t max_align = TLS_TCB_ALIGN;
@@ -274,42 +271,9 @@ _dl_determine_tlsoffset (void)
   /* The alignment requirement for the static TLS block.  */
   GL(dl_tls_static_align) = max_align;
 }
-
-
-/* This is called only when the data structure setup was skipped at startup,
-   when there was no need for it then.  Now we have dynamically loaded
-   something needing TLS, or libpthread needs it.  */
-int
-internal_function
-_dl_tls_setup (void)
-{
-  assert (GL(dl_tls_dtv_slotinfo_list) == NULL);
-  assert (GL(dl_tls_max_dtv_idx) == 0);
-
-  const size_t nelem = 2 + TLS_SLOTINFO_SURPLUS;
-
-  GL(dl_tls_dtv_slotinfo_list)
-    = calloc (1, (sizeof (struct dtv_slotinfo_list)
-		  + nelem * sizeof (struct dtv_slotinfo)));
-  if (GL(dl_tls_dtv_slotinfo_list) == NULL)
-    return -1;
-
-  GL(dl_tls_dtv_slotinfo_list)->len = nelem;
-
-  /* Number of elements in the static TLS block.  It can't be zero
-     because of various assumptions.  The one element is null.  */
-  GL(dl_tls_static_nelem) = GL(dl_tls_max_dtv_idx) = 1;
-
-  /* This initializes more variables for us.  */
-  _dl_determine_tlsoffset ();
-
-  return 0;
-}
-rtld_hidden_def (_dl_tls_setup)
-#endif
+#endif /* SHARED */
 
 static void *
-internal_function
 allocate_dtv (void *result)
 {
   dtv_t *dtv;
@@ -340,16 +304,30 @@ allocate_dtv (void *result)
 
 /* Get size and alignment requirements of the static TLS block.  */
 void
-internal_function
 _dl_get_tls_static_info (size_t *sizep, size_t *alignp)
 {
   *sizep = GL(dl_tls_static_size);
   *alignp = GL(dl_tls_static_align);
 }
 
+/* Derive the location of the pointer to the start of the original
+   allocation (before alignment) from the pointer to the TCB.  */
+static inline void **
+tcb_to_pointer_to_free_location (void *tcb)
+{
+#if TLS_TCB_AT_TP
+  /* The TCB follows the TLS blocks, and the pointer to the front
+     follows the TCB.  */
+  void **original_pointer_location = tcb + TLS_TCB_SIZE;
+#elif TLS_DTV_AT_TP
+  /* The TCB comes first, preceded by the pre-TCB, and the pointer is
+     before that.  */
+  void **original_pointer_location = tcb - TLS_PRE_TCB_SIZE - sizeof (void *);
+#endif
+  return original_pointer_location;
+}
 
 void *
-internal_function
 _dl_allocate_tls_storage (void)
 {
   void *result;
@@ -359,39 +337,50 @@ _dl_allocate_tls_storage (void)
   /* Memory layout is:
      [ TLS_PRE_TCB_SIZE ] [ TLS_TCB_SIZE ] [ TLS blocks ]
 			  ^ This should be returned.  */
-  size += (TLS_PRE_TCB_SIZE + GL(dl_tls_static_align) - 1)
-	  & ~(GL(dl_tls_static_align) - 1);
+  size += TLS_PRE_TCB_SIZE;
 #endif
 
-  /* Allocate a correctly aligned chunk of memory.  */
-  result = __libc_memalign (GL(dl_tls_static_align), size);
-  if (__builtin_expect (result != NULL, 1))
-    {
-      /* Allocate the DTV.  */
-      void *allocated = result;
+  /* Perform the allocation.  Reserve space for the required alignment
+     and the pointer to the original allocation.  */
+  size_t alignment = GL(dl_tls_static_align);
+  void *allocated = malloc (size + alignment + sizeof (void *));
+  if (__glibc_unlikely (allocated == NULL))
+    return NULL;
 
+  /* Perform alignment and allocate the DTV.  */
 #if TLS_TCB_AT_TP
-      /* The TCB follows the TLS blocks.  */
-      result = (char *) result + size - TLS_TCB_SIZE;
+  /* The TCB follows the TLS blocks, which determine the alignment.
+     (TCB alignment requirements have been taken into account when
+     calculating GL(dl_tls_static_align).)  */
+  void *aligned = (void *) roundup ((uintptr_t) allocated, alignment);
+  result = aligned + size - TLS_TCB_SIZE;
 
-      /* Clear the TCB data structure.  We can't ask the caller (i.e.
-	 libpthread) to do it, because we will initialize the DTV et al.  */
-      memset (result, '\0', TLS_TCB_SIZE);
+  /* Clear the TCB data structure.  We can't ask the caller (i.e.
+     libpthread) to do it, because we will initialize the DTV et al.  */
+  memset (result, '\0', TLS_TCB_SIZE);
 #elif TLS_DTV_AT_TP
-      result = (char *) result + size - GL(dl_tls_static_size);
+  /* Pre-TCB and TCB come before the TLS blocks.  The layout computed
+     in _dl_determine_tlsoffset assumes that the TCB is aligned to the
+     TLS block alignment, and not just the TLS blocks after it.  This
+     can leave an unused alignment gap between the TCB and the TLS
+     blocks.  */
+  result = (void *) roundup
+    (sizeof (void *) + TLS_PRE_TCB_SIZE + (uintptr_t) allocated,
+     alignment);
 
-      /* Clear the TCB data structure and TLS_PRE_TCB_SIZE bytes before it.
-	 We can't ask the caller (i.e. libpthread) to do it, because we will
-	 initialize the DTV et al.  */
-      memset ((char *) result - TLS_PRE_TCB_SIZE, '\0',
-	      TLS_PRE_TCB_SIZE + TLS_TCB_SIZE);
+  /* Clear the TCB data structure and TLS_PRE_TCB_SIZE bytes before
+     it.  We can't ask the caller (i.e. libpthread) to do it, because
+     we will initialize the DTV et al.  */
+  memset (result - TLS_PRE_TCB_SIZE, '\0', TLS_PRE_TCB_SIZE + TLS_TCB_SIZE);
 #endif
 
-      result = allocate_dtv (result);
-      if (result == NULL)
-	free (allocated);
-    }
+  /* Record the value of the original pointer for later
+     deallocation.  */
+  *tcb_to_pointer_to_free_location (result) = allocated;
 
+  result = allocate_dtv (result);
+  if (result == NULL)
+    free (allocated);
   return result;
 }
 
@@ -444,7 +433,6 @@ _dl_resize_dtv (dtv_t *dtv)
 
 
 void *
-internal_function
 _dl_allocate_tls_init (void *result)
 {
   if (result == NULL)
@@ -493,17 +481,14 @@ _dl_allocate_tls_init (void *result)
 	  assert (listp->slotinfo[cnt].gen <= GL(dl_tls_generation));
 	  maxgen = MAX (maxgen, listp->slotinfo[cnt].gen);
 
+	  dtv[map->l_tls_modid].pointer.val = TLS_DTV_UNALLOCATED;
+	  dtv[map->l_tls_modid].pointer.to_free = NULL;
+
 	  if (map->l_tls_offset == NO_TLS_OFFSET
 	      || map->l_tls_offset == FORCED_DYNAMIC_TLS_OFFSET)
-	    {
-	      /* For dynamically loaded modules we simply store
-		 the value indicating deferred allocation.  */
-	      dtv[map->l_tls_modid].pointer.val = TLS_DTV_UNALLOCATED;
-	      dtv[map->l_tls_modid].pointer.is_static = false;
-	      continue;
-	    }
+	    continue;
 
-	  assert (map->l_tls_modid == cnt);
+	  assert (map->l_tls_modid == total + cnt);
 	  assert (map->l_tls_blocksize >= map->l_tls_initimage_size);
 #if TLS_TCB_AT_TP
 	  assert ((size_t) map->l_tls_offset >= map->l_tls_blocksize);
@@ -514,9 +499,11 @@ _dl_allocate_tls_init (void *result)
 # error "Either TLS_TCB_AT_TP or TLS_DTV_AT_TP must be defined"
 #endif
 
-	  /* Copy the initialization image and clear the BSS part.  */
+	  /* Set up the DTV entry.  The simplified __tls_get_addr that
+	     some platforms use in static programs requires it.  */
 	  dtv[map->l_tls_modid].pointer.val = dest;
-	  dtv[map->l_tls_modid].pointer.is_static = true;
+
+	  /* Copy the initialization image and clear the BSS part.  */
 	  memset (__mempcpy (dest, map->l_tls_initimage,
 			     map->l_tls_initimage_size), '\0',
 		  map->l_tls_blocksize - map->l_tls_initimage_size);
@@ -538,7 +525,6 @@ _dl_allocate_tls_init (void *result)
 rtld_hidden_def (_dl_allocate_tls_init)
 
 void *
-internal_function
 _dl_allocate_tls (void *mem)
 {
   return _dl_allocate_tls_init (mem == NULL
@@ -549,33 +535,20 @@ rtld_hidden_def (_dl_allocate_tls)
 
 
 void
-internal_function
 _dl_deallocate_tls (void *tcb, bool dealloc_tcb)
 {
   dtv_t *dtv = GET_DTV (tcb);
 
   /* We need to free the memory allocated for non-static TLS.  */
   for (size_t cnt = 0; cnt < dtv[-1].counter; ++cnt)
-    if (! dtv[1 + cnt].pointer.is_static
-	&& dtv[1 + cnt].pointer.val != TLS_DTV_UNALLOCATED)
-      free (dtv[1 + cnt].pointer.val);
+    free (dtv[1 + cnt].pointer.to_free);
 
   /* The array starts with dtv[-1].  */
   if (dtv != GL(dl_initial_dtv))
     free (dtv - 1);
 
   if (dealloc_tcb)
-    {
-#if TLS_TCB_AT_TP
-      /* The TCB follows the TLS blocks.  Back up to free the whole block.  */
-      tcb -= GL(dl_tls_static_size) - TLS_TCB_SIZE;
-#elif TLS_DTV_AT_TP
-      /* Back up the TLS_PRE_TCB_SIZE bytes.  */
-      tcb -= (TLS_PRE_TCB_SIZE + GL(dl_tls_static_align) - 1)
-	     & ~(GL(dl_tls_static_align) - 1);
-#endif
-      free (tcb);
-    }
+    free (*tcb_to_pointer_to_free_location (tcb));
 }
 rtld_hidden_def (_dl_deallocate_tls)
 
@@ -599,21 +572,49 @@ rtld_hidden_def (_dl_deallocate_tls)
 #  define GET_ADDR_OFFSET ti->ti_offset
 # endif
 
+/* Allocate one DTV entry.  */
+static struct dtv_pointer
+allocate_dtv_entry (size_t alignment, size_t size)
+{
+  if (powerof2 (alignment) && alignment <= _Alignof (max_align_t))
+    {
+      /* The alignment is supported by malloc.  */
+      void *ptr = malloc (size);
+      return (struct dtv_pointer) { ptr, ptr };
+    }
 
-static void *
+  /* Emulate memalign to by manually aligning a pointer returned by
+     malloc.  First compute the size with an overflow check.  */
+  size_t alloc_size = size + alignment;
+  if (alloc_size < size)
+    return (struct dtv_pointer) {};
+
+  /* Perform the allocation.  This is the pointer we need to free
+     later.  */
+  void *start = malloc (alloc_size);
+  if (start == NULL)
+    return (struct dtv_pointer) {};
+
+  /* Find the aligned position within the larger allocation.  */
+  void *aligned = (void *) roundup ((uintptr_t) start, alignment);
+
+  return (struct dtv_pointer) { .val = aligned, .to_free = start };
+}
+
+static struct dtv_pointer
 allocate_and_init (struct link_map *map)
 {
-  void *newp;
-
-  newp = __libc_memalign (map->l_tls_align, map->l_tls_blocksize);
-  if (newp == NULL)
+  struct dtv_pointer result = allocate_dtv_entry
+    (map->l_tls_align, map->l_tls_blocksize);
+  if (result.val == NULL)
     oom ();
 
   /* Initialize the memory.  */
-  memset (__mempcpy (newp, map->l_tls_initimage, map->l_tls_initimage_size),
+  memset (__mempcpy (result.val, map->l_tls_initimage,
+		     map->l_tls_initimage_size),
 	  '\0', map->l_tls_blocksize - map->l_tls_initimage_size);
 
-  return newp;
+  return result;
 }
 
 
@@ -679,13 +680,13 @@ _dl_update_slotinfo (unsigned long int req_modid)
 	      struct link_map *map = listp->slotinfo[cnt].map;
 	      if (map == NULL)
 		{
-		  /* If this modid was used at some point the memory
-		     might still be allocated.  */
-		  if (! dtv[total + cnt].pointer.is_static
-		      && dtv[total + cnt].pointer.val != TLS_DTV_UNALLOCATED)
+		  if (dtv[-1].counter >= total + cnt)
 		    {
-		      free (dtv[total + cnt].pointer.val);
+		      /* If this modid was used at some point the memory
+			 might still be allocated.  */
+		      free (dtv[total + cnt].pointer.to_free);
 		      dtv[total + cnt].pointer.val = TLS_DTV_UNALLOCATED;
+		      dtv[total + cnt].pointer.to_free = NULL;
 		    }
 
 		  continue;
@@ -710,18 +711,9 @@ _dl_update_slotinfo (unsigned long int req_modid)
 		 dtv entry free it.  */
 	      /* XXX Ideally we will at some point create a memory
 		 pool.  */
-	      if (! dtv[modid].pointer.is_static
-		  && dtv[modid].pointer.val != TLS_DTV_UNALLOCATED)
-		/* Note that free is called for NULL is well.  We
-		   deallocate even if it is this dtv entry we are
-		   supposed to load.  The reason is that we call
-		   memalign and not malloc.  */
-		free (dtv[modid].pointer.val);
-
-	      /* This module is loaded dynamically- We defer memory
-		 allocation.  */
-	      dtv[modid].pointer.is_static = false;
+	      free (dtv[modid].pointer.to_free);
 	      dtv[modid].pointer.val = TLS_DTV_UNALLOCATED;
+	      dtv[modid].pointer.to_free = NULL;
 
 	      if (modid == req_modid)
 		the_map = map;
@@ -759,13 +751,12 @@ tls_get_addr_tail (GET_ADDR_ARGS, dtv_t *dtv, struct link_map *the_map)
       the_map = listp->slotinfo[idx].map;
     }
 
- again:
   /* Make sure that, if a dlopen running in parallel forces the
      variable into static storage, we'll wait until the address in the
      static TLS block is set up, and use that.  If we're undecided
      yet, make sure we make the decision holding the lock as well.  */
-  if (__builtin_expect (the_map->l_tls_offset
-			!= FORCED_DYNAMIC_TLS_OFFSET, 0))
+  if (__glibc_unlikely (the_map->l_tls_offset
+			!= FORCED_DYNAMIC_TLS_OFFSET))
     {
       __rtld_lock_lock_recursive (GL(dl_load_lock));
       if (__glibc_likely (the_map->l_tls_offset == NO_TLS_OFFSET))
@@ -773,24 +764,31 @@ tls_get_addr_tail (GET_ADDR_ARGS, dtv_t *dtv, struct link_map *the_map)
 	  the_map->l_tls_offset = FORCED_DYNAMIC_TLS_OFFSET;
 	  __rtld_lock_unlock_recursive (GL(dl_load_lock));
 	}
-      else
+      else if (__glibc_likely (the_map->l_tls_offset
+			       != FORCED_DYNAMIC_TLS_OFFSET))
 	{
+#if TLS_TCB_AT_TP
+	  void *p = (char *) THREAD_SELF - the_map->l_tls_offset;
+#elif TLS_DTV_AT_TP
+	  void *p = (char *) THREAD_SELF + the_map->l_tls_offset + TLS_PRE_TCB_SIZE;
+#else
+# error "Either TLS_TCB_AT_TP or TLS_DTV_AT_TP must be defined"
+#endif
 	  __rtld_lock_unlock_recursive (GL(dl_load_lock));
-	  if (__builtin_expect (the_map->l_tls_offset
-				!= FORCED_DYNAMIC_TLS_OFFSET, 1))
-	    {
-	      void *p = dtv[GET_ADDR_MODULE].pointer.val;
-	      if (__glibc_unlikely (p == TLS_DTV_UNALLOCATED))
-		goto again;
 
-	      return (char *) p + GET_ADDR_OFFSET;
-	    }
+	  dtv[GET_ADDR_MODULE].pointer.to_free = NULL;
+	  dtv[GET_ADDR_MODULE].pointer.val = p;
+
+	  return (char *) p + GET_ADDR_OFFSET;
 	}
+      else
+	__rtld_lock_unlock_recursive (GL(dl_load_lock));
     }
-  void *p = dtv[GET_ADDR_MODULE].pointer.val = allocate_and_init (the_map);
-  dtv[GET_ADDR_MODULE].pointer.is_static = false;
+  struct dtv_pointer result = allocate_and_init (the_map);
+  dtv[GET_ADDR_MODULE].pointer = result;
+  assert (result.to_free != NULL);
 
-  return (char *) p + GET_ADDR_OFFSET;
+  return (char *) result.val + GET_ADDR_OFFSET;
 }
 
 
@@ -885,7 +883,7 @@ _dl_tls_get_addr_soft (struct link_map *l)
 
 
 void
-_dl_add_to_slotinfo (struct link_map *l)
+_dl_add_to_slotinfo (struct link_map *l, bool do_add)
 {
   /* Now that we know the object is loaded successfully add
      modules containing TLS data to the dtv info table.  We
@@ -941,6 +939,9 @@ cannot create TLS data structures"));
     }
 
   /* Add the information into the slotinfo data structure.  */
-  listp->slotinfo[idx].map = l;
-  listp->slotinfo[idx].gen = GL(dl_tls_generation) + 1;
+  if (do_add)
+    {
+      listp->slotinfo[idx].map = l;
+      listp->slotinfo[idx].gen = GL(dl_tls_generation) + 1;
+    }
 }

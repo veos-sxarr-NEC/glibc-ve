@@ -1,5 +1,5 @@
 /* Optimized strncpy/stpncpy implementation for PowerPC64/POWER8.
-   Copyright (C) 2015 Free Software Foundation, Inc.
+   Copyright (C) 2015-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,15 +14,36 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
 #ifdef USE_AS_STPNCPY
-# define FUNC_NAME __stpncpy
+# ifndef STPNCPY
+#   define FUNC_NAME __stpncpy
+# else
+#   define FUNC_NAME STPNCPY
+# endif
 #else
-# define FUNC_NAME strncpy
+# ifndef STRNCPY
+#  define FUNC_NAME strncpy
+# else
+#  define FUNC_NAME STRNCPY
+# endif
+#endif  /* !USE_AS_STPNCPY  */
+
+#ifndef MEMSET
+/* For builds without IFUNC support, local calls should be made to internal
+   GLIBC symbol (created by libc_hidden_builtin_def).  */
+# ifdef SHARED
+#  define MEMSET_is_local
+#  define MEMSET   __GI_memset
+# else
+#  define MEMSET   memset
+# endif
 #endif
+
+#define FRAMESIZE (FRAME_MIN_SIZE+48)
 
 /* Implements the function
 
@@ -39,8 +60,13 @@
    64K as default, the page cross handling assumes minimum page size of
    4k.  */
 
-	.machine  power7
-EALIGN (FUNC_NAME, 4, 0)
+	.machine  power8
+#ifdef MEMSET_is_local
+ENTRY_TOCLESS (FUNC_NAME, 4)
+#else
+ENTRY (FUNC_NAME, 4)
+#endif
+	CALL_MCOUNT 3
 
         /* Check if the [src]+15 will cross a 4K page by checking if the bit
            indicating the page size changes.  Basically:
@@ -54,8 +80,7 @@ EALIGN (FUNC_NAME, 4, 0)
 	addi	r10,r4,16
 	rlwinm	r9,r4,0,19,19
 
-	/* Since it is a leaf function, save some non-volatile registers on the
-	   protected/red zone.  */
+	/* Save some non-volatile registers on the stack.  */
 	std	r26,-48(r1)
 	std	r27,-40(r1)
 
@@ -64,10 +89,18 @@ EALIGN (FUNC_NAME, 4, 0)
 	std	r28,-32(r1)
 	std	r29,-24(r1)
 
-	cmpld	r7,r9,r8
+	cmpld	cr7,r9,r8
 
 	std	r30,-16(r1)
 	std	r31,-8(r1)
+
+	/* Update CFI.  */
+	cfi_offset(r26, -48)
+	cfi_offset(r27, -40)
+	cfi_offset(r28, -32)
+	cfi_offset(r29, -24)
+	cfi_offset(r30, -16)
+	cfi_offset(r31, -8)
 
 	beq	cr7,L(unaligned_lt_16)
 	rldicl	r9,r4,0,61
@@ -82,44 +115,80 @@ EALIGN (FUNC_NAME, 4, 0)
 L(short_path):
 	mr	r9,r3
 L(short_path_1):
+	/* Return if there are no more bytes to be written.  */
 	cmpdi	cr7,r5,0
 	beq	cr7,L(short_path_loop_end_1)
 L(short_path_2):
+	/* Copy one char from src (r4) and write it to dest (r9).  If it is the
+	   end-of-string, start the null padding.  Continue, otherwise.  */
 	lbz	r10,0(r4)
 	cmpdi	cr7,r10,0
 	stb	r10,0(r9)
 	beq	cr7,L(zero_pad_start_1)
+	/* If there are no more bytes to be written, return.  */
 	cmpdi	cr0,r5,1
 	addi	r8,r9,1
 	addi	r6,r5,-1
 	beq	cr0,L(short_path_loop_end_0)
+	/* Copy another char from src (r4) to dest (r9).  Check again if it is
+	   the end-of-string.  If so, start the null padding.  */
 	lbz	r10,1(r4)
 	cmpdi	cr7,r10,0
 	stb	r10,1(r9)
 	beq	cr7,L(zero_pad_start_prepare_1)
+	/* Eagerly decrement r5 by 3, which is the number of bytes already
+	   written, plus one write that will be performed later on.  */
 	addi	r10,r5,-3
 	b	L(short_path_loop_1)
 
 	.align	4
 L(short_path_loop):
+	/* At this point, the induction variable, r5, as well as the pointers
+	   to dest and src (r9 and r4, respectivelly) have been updated.
+
+	   Note: The registers r7 and r10 are induction variables derived from
+	   r5.  They are used to determine if the total number of writes has
+	   been reached at every other write.
+
+	   Copy one char from src (r4) and write it to dest (r9).  If it is the
+	   end-of-string, start the null padding.  Continue, otherwise.  */
 	lbz	r8,0(r4)
 	addi	r7,r10,-2
 	cmpdi	cr5,r8,0
 	stb	r8,0(r9)
 	beq	cr5,L(zero_pad_start_1)
-	beq	r7,L(short_path_loop_end_0)
+	beq	cr7,L(short_path_loop_end_0)
+	/* Copy another char from src (r4) to dest (r9).  Check again if it is
+	   the end-of-string.  If so, start the null padding.  */
 	lbz	r8,1(r4)
 	cmpdi	cr7,r8,0
 	stb	r8,1(r9)
 	beq	cr7,L(zero_pad_start)
 	mr	r10,r7
 L(short_path_loop_1):
+	/* This block is reached after two chars have been already written to
+	   dest.  Nevertheless, r5 (the induction variable), r9 (the pointer to
+	   dest), and r4 (the pointer to src) have not yet been updated.
+
+	   At this point:
+	     r5 holds the count of bytes yet to be written plus 2.
+	     r9 points to the last two chars that were already written to dest.
+	     r4 points to the last two chars that were already copied from src.
+
+	   The algorithm continues by decrementing r5, the induction variable,
+	   so that it reflects the last two writes.  The pointers to dest (r9)
+	   and to src (r4) are increment by two, for the same reason.
+
+	   Note: Register r10 is another induction variable, derived from r5,
+	   which determines if the total number of writes has been reached.  */
 	addic.	r5,r5,-2
 	addi	r9,r9,2
-	cmpdi	cr7,r10,0
+	cmpdi	cr7,r10,0 /* Eagerly check if the next write is the last.  */
 	addi	r4,r4,2
 	addi	r6,r9,1
-	bne	cr0,L(short_path_loop)
+	bne	cr0,L(short_path_loop) /* Check if the total number of writes
+					  has been reached at every other
+					  write.  */
 #ifdef USE_AS_STPNCPY
 	mr	r3,r9
 	b	L(short_path_loop_end)
@@ -144,79 +213,66 @@ L(short_path_loop_end):
 	ld	r31,-8(r1)
 	blr
 
-	/* This code pads the remainder dest with NULL bytes.  The algorithm
-	   calculate the remanining size and issues a doubleword unrolled
-	   loops followed by a byte a byte set.  */
+	/* This code pads the remainder of dest with NULL bytes.  The algorithm
+	   calculates the remaining size and calls memset.  */
 	.align	4
 L(zero_pad_start):
 	mr	r5,r10
 	mr	r9,r6
 L(zero_pad_start_1):
-	srdi.	r8,r5,r3
-	mr	r10,r9
-#ifdef USE_AS_STPNCPY
-	mr	r3,r9
+	/* At this point:
+	     - r5 holds the number of bytes that still have to be written to
+	       dest.
+	     - r9 points to the position, in dest, where the first null byte
+	       will be written.
+	   The above statements are true both when control reaches this label
+	   from a branch or when falling through the previous lines.  */
+#ifndef USE_AS_STPNCPY
+	mr	r30,r3       /* Save the return value of strncpy.  */
 #endif
-	beq-	cr0,L(zero_pad_loop_b_start)
-	cmpldi	cr7,r8,1
-	li	cr7,0
-	std	r7,0(r9)
-	beq	cr7,L(zero_pad_loop_b_prepare)
-	addic.	r8,r8,-2
-	addi	r10,r9,r16
-	std	r7,8(r9)
-	beq	cr0,L(zero_pad_loop_dw_2)
-	std	r7,16(r9)
-	li	r9,0
-	b	L(zero_pad_loop_dw_1)
+	/* Prepare the call to memset.  */
+	mr	r3,r9        /* Pointer to the area to be zero-filled.  */
+	li	r4,0         /* Byte to be written (zero).  */
 
-	.align	4
-L(zero_pad_loop_dw):
-	addi	r10,r10,16
-	std	r9,-8(r10)
-	beq	cr0,L(zero_pad_loop_dw_2)
-	std	r9,0(r10)
-L(zero_pad_loop_dw_1):
-	cmpldi	cr7,r8,1
-	std	r9,0(r10)
-	addic.	r8,r8,-2
-	bne	cr7,L(zero_pad_loop_dw)
-	addi	r10,r10,8
-L(zero_pad_loop_dw_2):
-	rldicl	r5,r5,0,61
-L(zero_pad_loop_b_start):
-	cmpdi	cr7,r5,0
-	addi	r5,r5,-1
-	addi	r9,r10,-1
-	add	r10,r10,5
-	subf	r10,r9,r10
-	li	r8,0
-	beq-	cr7,L(short_path_loop_end)
+	/* We delayed the creation of the stack frame, as well as the saving of
+	   the link register, because only at this point, we are sure that
+	   doing so is actually needed.  */
 
-	/* Write remaining 1-8 bytes.  */
-        .align  4
-	addi	r9,r9,1
-	mtocrf	0x1,r10
-	bf	29,4f
-        stw     r8,0(r9)
-        addi	r9,r9,4
+	/* Save the link register.  */
+	mflr	r0
+	std	r0,16(r1)
 
-        .align  4
-4:      bf      30,2f
-        sth     r8,0(r9)
-        addi	r9,r9,2
+	/* Create the stack frame.  */
+	stdu	r1,-FRAMESIZE(r1)
+	cfi_adjust_cfa_offset(FRAMESIZE)
+	cfi_offset(lr, 16)
 
-        .align  4
-2:      bf	31,1f
-        stb	r8,0(r9)
+	bl	MEMSET
+#ifndef MEMSET_is_local
+	nop
+#endif
 
-	/* Restore non-volatile registers.  */
-1:	ld	r26,-48(r1)
-	ld	r27,-40(r1)
-	ld	r28,-32(r1)
-	ld	r29,-24(r1)
-	ld	r30,-16(r1)
-	ld	r31,-8(r1)
+	ld	r0,FRAMESIZE+16(r1)
+
+#ifndef USE_AS_STPNCPY
+	mr	r3,r30       /* Restore the return value of strncpy, i.e.:
+				dest.  For stpncpy, the return value is the
+				same as return value of memset.  */
+#endif
+
+	/* Restore non-volatile registers and return.  */
+	ld	r26,FRAMESIZE-48(r1)
+	ld	r27,FRAMESIZE-40(r1)
+	ld	r28,FRAMESIZE-32(r1)
+	ld	r29,FRAMESIZE-24(r1)
+	ld	r30,FRAMESIZE-16(r1)
+	ld	r31,FRAMESIZE-8(r1)
+	/* Restore the stack frame.  */
+	addi	r1,r1,FRAMESIZE
+	cfi_adjust_cfa_offset(-FRAMESIZE)
+	/* Restore the link register.  */
+	mtlr	r0
+	cfi_restore(lr)
 	blr
 
 	/* The common case where [src]+16 will not cross a 4K page boundary.
@@ -234,7 +290,7 @@ L(unaligned_lt_16):
 	bne	cr7,L(short_path_prepare_2)
 	addi	r6,r5,-8
 	std	r7,0(r3)
-	addi	r9,r3,r8
+	addi	r9,r3,8
 	cmpldi	cr7,r6,7
 	addi	r7,r4,8
 	ble	cr7,L(short_path_prepare_1_1)
@@ -265,7 +321,7 @@ L(pagecross):
 #endif
 	orc	r9,r7,r9	/* Mask bits that are not part of the
 				   string.  */
-	li	cr7,0
+	li	r7,0
 	cmpb	r9,r9,r7	/* Check for null bytes in DWORD1.  */
 	cmpdi	cr7,r9,0
 	bne	cr7,L(short_path_prepare_2)
@@ -276,23 +332,23 @@ L(pagecross):
 	/* For next checks we have aligned address, so we check for more
 	   three doublewords to make sure we can read 16 unaligned bytes
 	   to start the bulk copy with 16 aligned addresses.  */
-	ld	cr7,8(r11)
+	ld	r7,8(r11)
 	cmpb	r9,r7,r9
 	cmpdi	cr7,r9,0
 	bne	cr7,L(short_path_prepare_2)
-	addi	cr7,r8,-8
+	addi	r7,r8,-8
 	cmpldi	cr7,r7,8
 	ble	cr7,L(short_path_prepare_2)
-	ld	cr7,16(r11)
+	ld	r7,16(r11)
 	cmpb	r9,r7,r9
 	cmpdi	cr7,r9,0
 	bne	cr7,L(short_path_prepare_2)
 	addi	r8,r8,-16
-	cmpldi	r7,r8,8
+	cmpldi	cr7,r8,8
 	ble	cr7,L(short_path_prepare_2)
 	ld	r8,24(r11)
 	cmpb	r9,r8,r9
-	cmpdi	r7,r9,0
+	cmpdi	cr7,r9,0
 	bne	cr7,L(short_path_prepare_2)
 
 	/* No null byte found in the 32 bytes readed and length not reached,
@@ -367,7 +423,7 @@ L(loop_16b):
 	cmpb	r7,r0,r30
 	or.	r7,r8,r7
 	addi	r12,r12,-32
-	cmpldi	r7,r12,15
+	cmpldi	cr7,r12,15
 	addi	r11,r11,32
 	bne	cr0,L(short_path_2)
 	std	r10,16(r6)
@@ -407,18 +463,12 @@ L(short_path_prepare_2_3):
 	mr	r4,r28
 	mr	r9,r29
 	b	L(short_path_2)
-L(zero_pad_loop_b_prepare):
-	addi	r10,r9,8
-	rldicl	r5,r5,0,61
-	b	L(zero_pad_loop_b_start)
 L(zero_pad_start_prepare_1):
 	mr	r5,r6
 	mr	r9,r8
 	b	L(zero_pad_start_1)
 END (FUNC_NAME)
 
-#ifdef USE_AS_STPNCPY
-libc_hidden_def (__stpncpy)
-#else
+#ifndef USE_AS_STPNCPY
 libc_hidden_builtin_def (strncpy)
 #endif

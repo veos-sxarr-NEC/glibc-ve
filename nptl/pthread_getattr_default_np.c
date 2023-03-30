@@ -1,5 +1,5 @@
 /* Get the default attributes used by pthread_create in the process.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,19 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stdlib.h>
 #include <pthreadP.h>
-#include <assert.h>
 
 int
 pthread_getattr_default_np (pthread_attr_t *out)
 {
   struct pthread_attr *real_out;
 
-  assert (sizeof (*out) >= sizeof (struct pthread_attr));
   real_out = (struct pthread_attr *) out;
 
   lll_lock (__default_pthread_attr_lock, LLL_PRIVATE);

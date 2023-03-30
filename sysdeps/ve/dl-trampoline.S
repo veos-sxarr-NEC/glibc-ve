@@ -1,4 +1,4 @@
-/* Copyright (C) 2017-2019 NEC Corporation
+/* Copyright (C) 2020 NEC Corporation
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 */
 
 /* PLT trampolines.  VE version. */
@@ -102,8 +102,7 @@ _dl_runtime_resolve:
 	ld	%s0, 0x10(, %s62)	/* addr of link_map object, got[2]*/
 	or	%s1, 0, %s13		/* Index of PLT in bin/lib, the symbol which we are trying to resolve */
 
-	lea     %s12, _dl_fixup@PC_LO(-24)
-        and     %s12, %s12,(32)0
+        addi %s12,-16,_dl_fixup@PC_LO
         sic     %s62
         lea.sl  %s12, _dl_fixup@PC_HI(%s12,%s62)
         bsic    %lr, (%s12)		/* Fetch the address of dl_fixup() and invoke. */
@@ -193,8 +192,7 @@ _dl_runtime_profile:
 	ld %s4, LR_fp_OFFSET(,%sp)
 	ld      %sp, -176(%sp)
         /* Call resolver */
-	lea     %s12, _dl_profile_fixup@PC_LO(-24)
-        and     %s12, %s12,(32)0
+        addi %s12,-16,_dl_profile_fixup@PC_LO
         sic     %s62
         lea.sl  %s12, _dl_profile_fixup@PC_HI(%s12,%s62)
         bsic    %lr, (%s12)
@@ -229,8 +227,7 @@ _dl_runtime_profile:
         ld %s0, LR_S2_OFFSET(%sp)
 
 	ld      %sp, -176(%sp)
-	lea     %s12, _dl_call_pltexit@PC_LO(-24)
-        and     %s12, %s12,(32)0
+        addi %s12,-16,_dl_call_pltexit@PC_LO
 	sic     %s62
         lea.sl  %s12, _dl_call_pltexit@PC_HI(%s12,%s62)
         bsic    %lr, (%s12)

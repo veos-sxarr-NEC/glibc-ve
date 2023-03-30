@@ -1,5 +1,5 @@
 /* Test exception in current environment.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Denis Joseph Barrow (djbarrow@de.ibm.com).
 
@@ -15,19 +15,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <fenv_libc.h>
-#include <fpu_control.h>
+#include <fenv_private.h>
 
 int
 fetestexcept (int excepts)
 {
-  fexcept_t temp;
-
-  /* Get current exceptions.  */
-  _FPU_GETCW (temp);
-  temp = (temp >> FPC_DXC_SHIFT) | (temp >> FPC_FLAGS_SHIFT);
-  return temp & excepts & FE_ALL_EXCEPT;
+  return libc_fetestexcept_s390 (excepts);
 }
 libm_hidden_def (fetestexcept)

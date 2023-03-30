@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 subdir := mach
 
@@ -21,9 +21,9 @@ include ../Makeconfig
 
 headers = mach_init.h mach.h mach_error.h mach-shortcuts.h mach/mach_traps.h \
 	  $(interface-headers) mach/mach.h mach/mig_support.h mach/error.h \
-	  $(lock-headers) machine-sp.h
+	  $(lock-headers) machine-sp.h bits/mach/param.h
 lock = spin-solid spin-lock mutex-init mutex-solid
-lock-headers = lock-intern.h machine-lock.h spin-lock.h
+lock-headers = lock-intern.h spin-lock.h
 routines = $(mach-syscalls) $(mach-shortcuts) \
 	   mach_init mig_strncpy msg \
 	   mig-alloc mig-dealloc mig-reply \
@@ -53,6 +53,15 @@ server-interfaces := mach/exc
 
 # Clear any environment	value.
 generated =
+
+# Avoid ssp before TLS is initialized.
+CFLAGS-mach_init.o = $(no-stack-protector)
+CFLAGS-RPC_vm_statistics.o = $(no-stack-protector)
+CFLAGS-RPC_vm_map.o = $(no-stack-protector)
+CFLAGS-RPC_vm_protect.o = $(no-stack-protector)
+CFLAGS-RPC_i386_set_gdt.o = $(no-stack-protector)
+CFLAGS-RPC_i386_set_ldt.o = $(no-stack-protector)
+CFLAGS-RPC_task_get_special_port.o = $(no-stack-protector)
 
 # Translate GNU names for CPUs into the names used in Mach header files.
 mach-machine = $(patsubst powerpc,ppc,$(base-machine))
@@ -61,7 +70,7 @@ mach-machine = $(patsubst powerpc,ppc,$(base-machine))
 ifndef inhibit_mach_syscalls
 -include $(objpfx)mach-syscalls.mk
 endif
-$(objpfx)mach-syscalls.mk: syscalls.awk Makefile
+$(objpfx)mach-syscalls.mk: syscalls.awk Makefile libc-modules.h
 # Go kludges!!!
 	$(make-target-directory)
 # We must use $(CFLAGS) to get -O flags that affect #if's in header files.
@@ -88,7 +97,8 @@ else
 $(mach-syscalls:%=$(objpfx)%.S): $(objpfx)%.S: $(objpfx)mach-syscalls.mk
 	(echo '#include <sysdep.h>'; \
 	 echo 'kernel_trap (__$*,$(sysno-$*),$(nargs-$*))'; \
-	 echo 'weak_alias (__$*, $*)') > $@-new
+	 echo 'weak_alias (__$*, $*)'; \
+	 echo 'libc_hidden_def (__$*)') > $@-new
 	 mv -f $@-new $@
 generated += $(mach-syscalls:=.S)
 endif	# mach-syscalls
@@ -107,7 +117,7 @@ ifndef mach-shortcuts
 # $(mach-shortcuts) will be set, and that will change how
 # mach_interface.defs is processed: it will get the -D flags below.
 user-interfaces := $(filter-out $(mach-interface-list:%=mach/%) \
-				mach/mach_port mach/mach_host mach/mach4 \
+				mach/mach_port mach/mach_host mach/mach4 mach/gnumach \
 				device/device_request,\
 				$(user-interfaces))
 endif
@@ -137,9 +147,12 @@ $(objpfx)mach-shortcuts.h: $(mach-interface-list:%=$(objpfx)mach/%.h) \
 # The first line gets us one paragraph per line, with @s separating real lines.
 # The second line selects paragraphs for the shortcutted functions.
 # The third line removes `_rpc' from the names and reconstitutes the lines.
-	cat $^ | tr \\012 @ | sed s/@@/@%/g | tr % \\012 \
-	| grep '^/\* Routine [a-z0-9_]*_rpc \*/' \
-	| sed 's/_rpc//g' | tr @ \\012 > $@-new
+	( echo "#include <mach/mach_types.h>" ; \
+	  echo "#include <mach/message.h>" ; \
+	  echo ; \
+	  cat $^ | tr \\012 @ | sed s/@@/@%/g | tr % \\012 \
+	  | grep '^/\* Routine [a-z0-9_]*_rpc \*/' \
+	  | sed 's/_rpc//g' | tr @ \\012 ) > $@-new
 	mv -f $@-new $@
 generated += mach-shortcuts.h
 

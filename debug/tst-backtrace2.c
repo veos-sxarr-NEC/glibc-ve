@@ -1,5 +1,5 @@
 /* Test backtrace and backtrace_symbols.
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <execinfo.h>
 #include <search.h>
@@ -23,10 +23,6 @@
 #include <string.h>
 
 #include "tst-backtrace.h"
-
-static int do_test (void);
-#define TEST_FUNCTION do_test ()
-#include "../test-skeleton.c"
 
 /* The backtrace should include at least f1, f2, f3, and do_test.  */
 #define NUM_FUNCTIONS 4
@@ -75,7 +71,7 @@ fn1 (void)
      check do_test.  */
 }
 
-NO_INLINE static int
+NO_INLINE int
 fn2 (void)
 {
   fn1 ();
@@ -91,9 +87,17 @@ fn3 (void)
   return x;
 }
 
-NO_INLINE static int
+NO_INLINE int
 do_test (void)
 {
+  /* Test BZ #18084.  */
+  void *buffer[1];
+
+  if (backtrace (buffer, 0) != 0)
+    FAIL ();
+
   fn3 ();
   return ret;
 }
+
+#include <support/test-driver.c>

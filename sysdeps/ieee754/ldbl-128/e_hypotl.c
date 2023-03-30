@@ -47,11 +47,13 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
-long double
-__ieee754_hypotl(long double x, long double y)
+_Float128
+__ieee754_hypotl(_Float128 x, _Float128 y)
 {
-	long double a,b,t1,t2,y1,y2,w;
+	_Float128 a,b,t1,t2,y1,y2,w;
 	int64_t j,k,ha,hb;
 
 	GET_LDOUBLE_MSW64(ha,x);
@@ -65,8 +67,10 @@ __ieee754_hypotl(long double x, long double y)
 	k=0;
 	if(ha > 0x5f3f000000000000LL) {	/* a>2**8000 */
 	   if(ha >= 0x7fff000000000000LL) {	/* Inf or NaN */
-	       u_int64_t low;
+	       uint64_t low;
 	       w = a+b;			/* for sNaN */
+	       if (issignaling (a) || issignaling (b))
+		 return w;
 	       GET_LDOUBLE_LSW64(low,a);
 	       if(((ha&0xffffffffffffLL)|low)==0) w = a;
 	       GET_LDOUBLE_LSW64(low,b);
@@ -81,7 +85,7 @@ __ieee754_hypotl(long double x, long double y)
 	}
 	if(hb < 0x20bf000000000000LL) {	/* b < 2**-8000 */
 	    if(hb <= 0x0000ffffffffffffLL) {	/* subnormal b or 0 */
-		u_int64_t low;
+		uint64_t low;
 		GET_LDOUBLE_LSW64(low,b);
 		if((hb|low)==0) return a;
 		t1=0;
@@ -114,7 +118,7 @@ __ieee754_hypotl(long double x, long double y)
 	    t1 = 0;
 	    SET_LDOUBLE_MSW64(t1,ha);
 	    t2 = a-t1;
-	    w  = __ieee754_sqrtl(t1*t1-(b*(-b)-t2*(a+t1)));
+	    w  = sqrtl(t1*t1-(b*(-b)-t2*(a+t1)));
 	} else {
 	    a  = a+a;
 	    y1 = 0;
@@ -123,14 +127,16 @@ __ieee754_hypotl(long double x, long double y)
 	    t1 = 0;
 	    SET_LDOUBLE_MSW64(t1,ha+0x0001000000000000LL);
 	    t2 = a - t1;
-	    w  = __ieee754_sqrtl(t1*y1-(w*(-w)-(t1*y2+t2*b)));
+	    w  = sqrtl(t1*y1-(w*(-w)-(t1*y2+t2*b)));
 	}
 	if(k!=0) {
-	    u_int64_t high;
-	    t1 = 1.0L;
+	    uint64_t high;
+	    t1 = 1;
 	    GET_LDOUBLE_MSW64(high,t1);
 	    SET_LDOUBLE_MSW64(t1,high+(k<<48));
-	    return t1*w;
+	    w *= t1;
+	    math_check_force_underflow_nonneg (w);
+	    return w;
 	} else return w;
 }
-strong_alias (__ieee754_hypotl, __hypotl_finite)
+libm_alias_finite (__ieee754_hypotl, __hypotl)

@@ -1,5 +1,5 @@
 /* Define and initialize the `__libc_enable_secure' flag.  Hurd version.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,10 +14,17 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* There is no need for this file in the Hurd; it is just a placeholder
    to prevent inclusion of the sysdeps/generic version.
    In the shared library, the `__libc_enable_secure' variable is defined
    by the dynamic linker in dl-sysdep.c and set there.
    In the static library, it is defined in init-first.c and set there.  */
+
+#include <libc-internal.h>
+
+void
+__libc_init_secure (void)
+{
+}

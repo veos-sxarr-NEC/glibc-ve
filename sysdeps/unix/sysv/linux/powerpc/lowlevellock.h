@@ -1,5 +1,5 @@
 /* PowerPC specific lock definitions.
-   Copyright (C) 2015 Free Software Foundation, Inc.
+   Copyright (C) 2015-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _POWERPC_LOWLEVELLOCK_H
 #define _POWERPC_LOWLEVELLOCK_H 1
@@ -22,17 +22,18 @@
 #include <sysdeps/nptl/lowlevellock.h>
 
 /* Transactional lock elision definitions.  */
-extern int __lll_timedlock_elision
-  (int *futex, short *adapt_count, const struct timespec *timeout, int private)
+extern int __lll_clocklock_elision
+  (int *futex, short *adapt_count,
+   clockid_t clockid, const struct timespec *timeout, int private)
   attribute_hidden;
 
-#define lll_timedlock_elision(futex, adapt_count, timeout, private)	      \
-  __lll_timedlock_elision(&(futex), &(adapt_count), timeout, private)
+#define lll_clocklock_elision(futex, adapt_count, clockid, timeout, private) \
+  __lll_clocklock_elision (&(futex), &(adapt_count), clockid, timeout, private)
 
 extern int __lll_lock_elision (int *futex, short *adapt_count, int private)
   attribute_hidden;
 
-extern int __lll_unlock_elision(int *lock, int private)
+extern int __lll_unlock_elision (int *lock, short *adapt_count, int private)
   attribute_hidden;
 
 extern int __lll_trylock_elision(int *lock, short *adapt_count)
@@ -40,8 +41,8 @@ extern int __lll_trylock_elision(int *lock, short *adapt_count)
 
 #define lll_lock_elision(futex, adapt_count, private) \
   __lll_lock_elision (&(futex), &(adapt_count), private)
-#define lll_unlock_elision(futex, private) \
-  __lll_unlock_elision (&(futex), private)
+#define lll_unlock_elision(futex, adapt_count, private) \
+  __lll_unlock_elision (&(futex), &(adapt_count), private)
 #define lll_trylock_elision(futex, adapt_count) \
   __lll_trylock_elision (&(futex), &(adapt_count))
 

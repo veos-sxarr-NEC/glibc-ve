@@ -1,5 +1,5 @@
 /* Internal macros for atomic operations for GNU C Library.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _ATOMIC_H
 #define _ATOMIC_H	1
@@ -47,14 +47,14 @@
 
 #include <stdlib.h>
 
-#include <bits/atomic.h>
+#include <atomic-machine.h>
 
 /* Wrapper macros to call pre_NN_post (mem, ...) where NN is the
    bit width of *MEM.  The calling macro puts parens around MEM
    and following args.  */
 #define __atomic_val_bysize(pre, post, mem, ...)			      \
   ({									      \
-    __typeof (*mem) __atg1_result;					      \
+    __typeof ((__typeof (*(mem))) *(mem)) __atg1_result;		      \
     if (sizeof (*mem) == 1)						      \
       __atg1_result = pre##_8_##post (mem, __VA_ARGS__);		      \
     else if (sizeof (*mem) == 2)					      \
@@ -159,29 +159,12 @@
 #endif
 
 
-#ifndef catomic_compare_and_exchange_bool_rel
-# ifndef atomic_compare_and_exchange_bool_rel
-#  define catomic_compare_and_exchange_bool_rel(mem, newval, oldval)	      \
-  catomic_compare_and_exchange_bool_acq (mem, newval, oldval)
-# else
-#  define catomic_compare_and_exchange_bool_rel(mem, newval, oldval)	      \
-  atomic_compare_and_exchange_bool_rel (mem, newval, oldval)
-# endif
-#endif
-
-
-#ifndef atomic_compare_and_exchange_bool_rel
-# define atomic_compare_and_exchange_bool_rel(mem, newval, oldval) \
-  atomic_compare_and_exchange_bool_acq (mem, newval, oldval)
-#endif
-
-
 /* Store NEWVALUE in *MEM and return the old value.  */
 #ifndef atomic_exchange_acq
 # define atomic_exchange_acq(mem, newvalue) \
-  ({ __typeof (*(mem)) __atg5_oldval;					      \
+  ({ __typeof ((__typeof (*(mem))) *(mem)) __atg5_oldval;		      \
      __typeof (mem) __atg5_memp = (mem);				      \
-     __typeof (*(mem)) __atg5_value = (newvalue);			      \
+     __typeof ((__typeof (*(mem))) *(mem)) __atg5_value = (newvalue);	      \
 									      \
      do									      \
        __atg5_oldval = *__atg5_memp;					      \
@@ -567,6 +550,20 @@ void __atomic_link_error (void);
    if (sizeof (*mem) != 4)						      \
      __atomic_link_error ();
 # endif
+/* We additionally provide 8b and 16b atomic loads and stores; we do not yet
+   need other atomic operations of such sizes, and restricting the support to
+   loads and stores makes this easier for archs that do not have native
+   support for atomic operations to less-than-word-sized data.  */
+# if __HAVE_64B_ATOMICS == 1
+#  define __atomic_check_size_ls(mem) \
+   if ((sizeof (*mem) != 1) && (sizeof (*mem) != 2) && (sizeof (*mem) != 4)   \
+       && (sizeof (*mem) != 8))						      \
+     __atomic_link_error ();
+# else
+#  define __atomic_check_size_ls(mem) \
+   if ((sizeof (*mem) != 1) && (sizeof (*mem) != 2) && sizeof (*mem) != 4)    \
+     __atomic_link_error ();
+# endif
 
 # define atomic_thread_fence_acquire() \
   __atomic_thread_fence (__ATOMIC_ACQUIRE)
@@ -576,18 +573,20 @@ void __atomic_link_error (void);
   __atomic_thread_fence (__ATOMIC_SEQ_CST)
 
 # define atomic_load_relaxed(mem) \
-  ({ __atomic_check_size((mem)); __atomic_load_n ((mem), __ATOMIC_RELAXED); })
+  ({ __atomic_check_size_ls((mem));					      \
+     __atomic_load_n ((mem), __ATOMIC_RELAXED); })
 # define atomic_load_acquire(mem) \
-  ({ __atomic_check_size((mem)); __atomic_load_n ((mem), __ATOMIC_ACQUIRE); })
+  ({ __atomic_check_size_ls((mem));					      \
+     __atomic_load_n ((mem), __ATOMIC_ACQUIRE); })
 
 # define atomic_store_relaxed(mem, val) \
   do {									      \
-    __atomic_check_size((mem));						      \
+    __atomic_check_size_ls((mem));					      \
     __atomic_store_n ((mem), (val), __ATOMIC_RELAXED);			      \
   } while (0)
 # define atomic_store_release(mem, val) \
   do {									      \
-    __atomic_check_size((mem));						      \
+    __atomic_check_size_ls((mem));					      \
     __atomic_store_n ((mem), (val), __ATOMIC_RELEASE);			      \
   } while (0)
 
@@ -605,6 +604,9 @@ void __atomic_link_error (void);
   __atomic_compare_exchange_n ((mem), (expected), (desired), 1,		      \
     __ATOMIC_RELEASE, __ATOMIC_RELAXED); })
 
+# define atomic_exchange_relaxed(mem, desired) \
+  ({ __atomic_check_size((mem));					      \
+  __atomic_exchange_n ((mem), (desired), __ATOMIC_RELAXED); })
 # define atomic_exchange_acquire(mem, desired) \
   ({ __atomic_check_size((mem));					      \
   __atomic_exchange_n ((mem), (desired), __ATOMIC_ACQUIRE); })
@@ -625,9 +627,15 @@ void __atomic_link_error (void);
   ({ __atomic_check_size((mem));					      \
   __atomic_fetch_add ((mem), (operand), __ATOMIC_ACQ_REL); })
 
+# define atomic_fetch_and_relaxed(mem, operand) \
+  ({ __atomic_check_size((mem));					      \
+  __atomic_fetch_and ((mem), (operand), __ATOMIC_RELAXED); })
 # define atomic_fetch_and_acquire(mem, operand) \
   ({ __atomic_check_size((mem));					      \
   __atomic_fetch_and ((mem), (operand), __ATOMIC_ACQUIRE); })
+# define atomic_fetch_and_release(mem, operand) \
+  ({ __atomic_check_size((mem));					      \
+  __atomic_fetch_and ((mem), (operand), __ATOMIC_RELEASE); })
 
 # define atomic_fetch_or_relaxed(mem, operand) \
   ({ __atomic_check_size((mem));					      \
@@ -635,6 +643,13 @@ void __atomic_link_error (void);
 # define atomic_fetch_or_acquire(mem, operand) \
   ({ __atomic_check_size((mem));					      \
   __atomic_fetch_or ((mem), (operand), __ATOMIC_ACQUIRE); })
+# define atomic_fetch_or_release(mem, operand) \
+  ({ __atomic_check_size((mem));					      \
+  __atomic_fetch_or ((mem), (operand), __ATOMIC_RELEASE); })
+
+# define atomic_fetch_xor_release(mem, operand) \
+  ({ __atomic_check_size((mem));					      \
+  __atomic_fetch_xor ((mem), (operand), __ATOMIC_RELEASE); })
 
 #else /* !USE_ATOMIC_COMPILER_BUILTINS  */
 
@@ -653,7 +668,7 @@ void __atomic_link_error (void);
 
 # ifndef atomic_load_relaxed
 #  define atomic_load_relaxed(mem) \
-   ({ __typeof (*(mem)) __atg100_val;					      \
+   ({ __typeof ((__typeof (*(mem))) *(mem)) __atg100_val;		      \
    __asm ("" : "=r" (__atg100_val) : "0" (*(mem)));			      \
    __atg100_val; })
 # endif
@@ -701,6 +716,12 @@ void __atomic_link_error (void);
    *(expected) == __atg103_expected; })
 # endif
 
+/* XXX Fall back to acquire MO because archs do not define a weaker
+   atomic_exchange.  */
+# ifndef atomic_exchange_relaxed
+#  define atomic_exchange_relaxed(mem, val) \
+   atomic_exchange_acq ((mem), (val))
+# endif
 # ifndef atomic_exchange_acquire
 #  define atomic_exchange_acquire(mem, val) \
    atomic_exchange_acq ((mem), (val))
@@ -732,11 +753,23 @@ void __atomic_link_error (void);
    atomic_exchange_and_add_acq ((mem), (operand)); })
 # endif
 
+/* XXX Fall back to acquire MO because archs do not define a weaker
+   atomic_and_val.  */
+# ifndef atomic_fetch_and_relaxed
+#  define atomic_fetch_and_relaxed(mem, operand) \
+   atomic_fetch_and_acquire ((mem), (operand))
+# endif
 /* XXX The default for atomic_and_val has acquire semantics, but this is not
    documented.  */
 # ifndef atomic_fetch_and_acquire
 #  define atomic_fetch_and_acquire(mem, operand) \
    atomic_and_val ((mem), (operand))
+# endif
+# ifndef atomic_fetch_and_release
+/* XXX This unnecessarily has acquire MO.  */
+#  define atomic_fetch_and_release(mem, operand) \
+   ({ atomic_thread_fence_release ();					      \
+   atomic_and_val ((mem), (operand)); })
 # endif
 
 /* XXX The default for atomic_or_val has acquire semantics, but this is not
@@ -751,12 +784,46 @@ void __atomic_link_error (void);
 #  define atomic_fetch_or_relaxed(mem, operand) \
    atomic_fetch_or_acquire ((mem), (operand))
 # endif
+/* XXX Contains an unnecessary acquire MO because archs do not define a weaker
+   atomic_or_val.  */
+# ifndef atomic_fetch_or_release
+#  define atomic_fetch_or_release(mem, operand) \
+   ({ atomic_thread_fence_release ();					      \
+   atomic_fetch_or_acquire ((mem), (operand)); })
+# endif
+
+# ifndef atomic_fetch_xor_release
+/* Failing the atomic_compare_exchange_weak_release reloads the value in
+   __atg104_expected, so we need only do the XOR again and retry.  */
+# define atomic_fetch_xor_release(mem, operand) \
+  ({ __typeof (mem) __atg104_memp = (mem);				      \
+     __typeof (*(mem)) __atg104_expected = (*__atg104_memp);		      \
+     __typeof (*(mem)) __atg104_desired;				      \
+     __typeof (*(mem)) __atg104_op = (operand);				      \
+									      \
+     do									      \
+       __atg104_desired = __atg104_expected ^ __atg104_op;		      \
+     while (__glibc_unlikely						      \
+	    (atomic_compare_exchange_weak_release (			      \
+	       __atg104_memp, &__atg104_expected, __atg104_desired)	      \
+	     == 0));							      \
+     __atg104_expected; })
+#endif
 
 #endif /* !USE_ATOMIC_COMPILER_BUILTINS  */
 
+/* This operation does not affect synchronization semantics but can be used
+   in the body of a spin loop to potentially improve its efficiency.  */
+#ifndef atomic_spin_nop
+# define atomic_spin_nop() do { /* nothing */ } while (0)
+#endif
 
-#ifndef atomic_delay
-# define atomic_delay() do { /* nothing */ } while (0)
+/* ATOMIC_EXCHANGE_USES_CAS is non-zero if atomic_exchange operations
+   are implemented based on a CAS loop; otherwise, this is zero and we assume
+   that the atomic_exchange operations could provide better performance
+   than a CAS loop.  */
+#ifndef ATOMIC_EXCHANGE_USES_CAS
+# error ATOMIC_EXCHANGE_USES_CAS has to be defined.
 #endif
 
 #endif	/* atomic.h */

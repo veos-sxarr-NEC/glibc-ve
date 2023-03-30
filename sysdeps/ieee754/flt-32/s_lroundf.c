@@ -1,5 +1,5 @@
 /* Round float value to long int.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1997.
 
@@ -15,18 +15,22 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
+#include <fenv.h>
+#include <limits.h>
 #include <math.h>
 
 #include <math_private.h>
+#include <libm-alias-float.h>
+#include <fix-fp-int-convert-overflow.h>
 
 
 long int
 __lroundf (float x)
 {
   int32_t j0;
-  u_int32_t i;
+  uint32_t i;
   long int result;
   int sign;
 
@@ -51,12 +55,20 @@ __lroundf (float x)
     }
   else
     {
-      /* The number is too large.  It is left implementation defined
-	 what happens.  */
+#ifdef FE_INVALID
+      /* The number is too large.  Unless it rounds to LONG_MIN,
+	 FE_INVALID must be raised and the return value is
+	 unspecified.  */
+      if (FIX_FLT_LONG_CONVERT_OVERFLOW && x != (float) LONG_MIN)
+	{
+	  feraiseexcept (FE_INVALID);
+	  return sign == 1 ? LONG_MAX : LONG_MIN;
+	}
+#endif
       return (long int) x;
     }
 
   return sign * result;
 }
 
-weak_alias (__lroundf, lroundf)
+libm_alias_float (__lround, lround)

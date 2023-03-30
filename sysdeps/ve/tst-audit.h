@@ -1,6 +1,6 @@
-/* Definitions for testing PLT entry/exit auditing.  ve version.
+/* Definitions for testing PLT entry/exit auditing.  x86_64 version.
 
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -16,8 +16,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+   <https://www.gnu.org/licenses/>.  */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #ifndef __ILP32__
 # define pltenter la_ve_gnu_pltenter

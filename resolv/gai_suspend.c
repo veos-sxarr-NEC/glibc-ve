@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <netdb.h>
@@ -35,7 +35,7 @@ gai_suspend (const struct gaicb *const list[], int ent,
   pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 #endif
   int cnt;
-  int cntr = 1;
+  unsigned int cntr = 1;
   int none = 1;
   int result;
 
@@ -91,11 +91,11 @@ gai_suspend (const struct gaicb *const list[], int ent,
 	{
 	  /* We have to convert the relative timeout value into an
 	     absolute time value with pthread_cond_timedwait expects.  */
-	  struct timeval now;
+	  struct timespec now;
 	  struct timespec abstime;
 
-	  __gettimeofday (&now, NULL);
-	  abstime.tv_nsec = timeout->tv_nsec + now.tv_usec * 1000;
+          __clock_gettime (CLOCK_REALTIME, &now);
+	  abstime.tv_nsec = timeout->tv_nsec + now.tv_nsec;
 	  abstime.tv_sec = timeout->tv_sec + now.tv_sec;
 	  if (abstime.tv_nsec >= 1000000000)
 	    {
@@ -141,7 +141,7 @@ gai_suspend (const struct gaicb *const list[], int ent,
 	  /* An error occurred.  Possibly it's EINTR.  We have to translate
 	     the timeout error report of `pthread_cond_timedwait' to the
 	     form expected from `gai_suspend'.  */
-	  if (__builtin_expect (result, ETIMEDOUT) == ETIMEDOUT)
+	  if (__glibc_likely (result == ETIMEDOUT))
 	    result = EAI_AGAIN;
 	  else if (result == EINTR)
 	    result = EAI_INTR;

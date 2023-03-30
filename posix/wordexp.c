@@ -1,5 +1,5 @@
 /* POSIX.2 wordexp implementation.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Tim Waugh <tim@cyberelk.demon.co.uk>.
 
@@ -15,9 +15,8 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <alloca.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -26,31 +25,17 @@
 #include <libintl.h>
 #include <paths.h>
 #include <pwd.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <wchar.h>
 #include <wordexp.h>
-#include <kernel-features.h>
-
-#include <bits/libc-lock.h>
+#include <spawn.h>
+#include <scratch_buffer.h>
 #include <_itoa.h>
-
-/* Undefine the following line for the production version.  */
-/* #define NDEBUG 1 */
 #include <assert.h>
-
-/* Get some device information.  */
-#include <device-nrs.h>
 
 /*
  * This is a recursive-descent-style word expansion routine.
@@ -64,19 +49,16 @@ extern char **__libc_argv attribute_hidden;
 static int parse_dollars (char **word, size_t *word_length, size_t *max_length,
 			  const char *words, size_t *offset, int flags,
 			  wordexp_t *pwordexp, const char *ifs,
-			  const char *ifs_white, int quoted)
-     internal_function;
+			  const char *ifs_white, int quoted);
 static int parse_backtick (char **word, size_t *word_length,
 			   size_t *max_length, const char *words,
 			   size_t *offset, int flags, wordexp_t *pwordexp,
-			   const char *ifs, const char *ifs_white)
-     internal_function;
+			   const char *ifs, const char *ifs_white);
 static int parse_dquote (char **word, size_t *word_length, size_t *max_length,
 			 const char *words, size_t *offset, int flags,
 			 wordexp_t *pwordexp, const char *ifs,
-			 const char *ifs_white)
-     internal_function;
-static int eval_expr (char *expr, long int *result) internal_function;
+			 const char *ifs_white);
+static int eval_expr (char *expr, long int *result);
 
 /* The w_*() functions manipulate word lists. */
 
@@ -117,7 +99,6 @@ w_addchar (char *buffer, size_t *actlen, size_t *maxlen, char ch)
 }
 
 static char *
-internal_function
 w_addmem (char *buffer, size_t *actlen, size_t *maxlen, const char *str,
 	  size_t len)
 {
@@ -144,7 +125,6 @@ w_addmem (char *buffer, size_t *actlen, size_t *maxlen, const char *str,
 }
 
 static char *
-internal_function
 w_addstr (char *buffer, size_t *actlen, size_t *maxlen, const char *str)
      /* (lengths exclude trailing zero) */
 {
@@ -159,7 +139,6 @@ w_addstr (char *buffer, size_t *actlen, size_t *maxlen, const char *str)
 }
 
 static int
-internal_function
 w_addword (wordexp_t *pwordexp, char *word)
 {
   /* Add a word to the wordlist */
@@ -200,7 +179,6 @@ no_space:
  */
 
 static int
-internal_function
 parse_backslash (char **word, size_t *word_length, size_t *max_length,
 		 const char *words, size_t *offset)
 {
@@ -229,7 +207,6 @@ parse_backslash (char **word, size_t *word_length, size_t *max_length,
 }
 
 static int
-internal_function
 parse_qtd_backslash (char **word, size_t *word_length, size_t *max_length,
 		     const char *words, size_t *offset)
 {
@@ -272,7 +249,6 @@ parse_qtd_backslash (char **word, size_t *word_length, size_t *max_length,
 }
 
 static int
-internal_function
 parse_tilde (char **word, size_t *word_length, size_t *max_length,
 	     const char *words, size_t *offset, size_t wordc)
 {
@@ -294,8 +270,8 @@ parse_tilde (char **word, size_t *word_length, size_t *max_length,
 
   for (i = 1 + *offset; words[i]; i++)
     {
-      if (words[i] == ':' || words[i] == '/' || words[i] == ' ' ||
-	  words[i] == '\t' || words[i] == 0 )
+      if (words[i] == ':' || words[i] == '/' || words[i] == ' '
+	  || words[i] == '\t' || words[i] == 0 )
 	break;
 
       if (words[i] == '\\')
@@ -308,12 +284,7 @@ parse_tilde (char **word, size_t *word_length, size_t *max_length,
   if (i == 1 + *offset)
     {
       /* Tilde appears on its own */
-      uid_t uid;
-      struct passwd pwd, *tpwd;
-      int buflen = 1000;
       char* home;
-      char* buffer;
-      int result;
 
       /* POSIX.2 says ~ expands to $HOME and if HOME is unset the
 	 results are unspecified.  We do a lookup on the uid if
@@ -328,25 +299,38 @@ parse_tilde (char **word, size_t *word_length, size_t *max_length,
 	}
       else
 	{
-	  uid = __getuid ();
-	  buffer = __alloca (buflen);
+	  struct passwd pwd, *tpwd;
+	  uid_t uid = __getuid ();
+	  int result;
+	  struct scratch_buffer tmpbuf;
+	  scratch_buffer_init (&tmpbuf);
 
-	  while ((result = __getpwuid_r (uid, &pwd, buffer, buflen, &tpwd)) != 0
+	  while ((result = __getpwuid_r (uid, &pwd,
+					 tmpbuf.data, tmpbuf.length,
+					 &tpwd)) != 0
 		 && errno == ERANGE)
-	    buffer = extend_alloca (buffer, buflen, buflen + 1000);
+	    if (!scratch_buffer_grow (&tmpbuf))
+	      return WRDE_NOSPACE;
 
 	  if (result == 0 && tpwd != NULL && pwd.pw_dir != NULL)
 	    {
 	      *word = w_addstr (*word, word_length, max_length, pwd.pw_dir);
 	      if (*word == NULL)
-		return WRDE_NOSPACE;
+		{
+		  scratch_buffer_free (&tmpbuf);
+		  return WRDE_NOSPACE;
+		}
 	    }
 	  else
 	    {
 	      *word = w_addchar (*word, word_length, max_length, '~');
 	      if (*word == NULL)
-		return WRDE_NOSPACE;
+		{
+		  scratch_buffer_free (&tmpbuf);
+		  return WRDE_NOSPACE;
+		}
 	    }
+	  scratch_buffer_free (&tmpbuf);
 	}
     }
   else
@@ -354,13 +338,15 @@ parse_tilde (char **word, size_t *word_length, size_t *max_length,
       /* Look up user name in database to get home directory */
       char *user = strndupa (&words[1 + *offset], i - (1 + *offset));
       struct passwd pwd, *tpwd;
-      int buflen = 1000;
-      char* buffer = __alloca (buflen);
       int result;
+      struct scratch_buffer tmpbuf;
+      scratch_buffer_init (&tmpbuf);
 
-      while ((result = __getpwnam_r (user, &pwd, buffer, buflen, &tpwd)) != 0
+      while ((result = __getpwnam_r (user, &pwd, tmpbuf.data, tmpbuf.length,
+				     &tpwd)) != 0
 	     && errno == ERANGE)
-	buffer = extend_alloca (buffer, buflen, buflen + 1000);
+	if (!scratch_buffer_grow (&tmpbuf))
+	  return WRDE_NOSPACE;
 
       if (result == 0 && tpwd != NULL && pwd.pw_dir)
 	*word = w_addstr (*word, word_length, max_length, pwd.pw_dir);
@@ -372,6 +358,8 @@ parse_tilde (char **word, size_t *word_length, size_t *max_length,
 	    *word = w_addstr (*word, word_length, max_length, user);
 	}
 
+      scratch_buffer_free (&tmpbuf);
+
       *offset = i - 1;
     }
   return *word ? 0 : WRDE_NOSPACE;
@@ -379,7 +367,6 @@ parse_tilde (char **word, size_t *word_length, size_t *max_length,
 
 
 static int
-internal_function
 do_parse_glob (const char *glob_word, char **word, size_t *word_length,
 	       size_t *max_length, wordexp_t *pwordexp, const char *ifs,
 	       const char *ifs_white)
@@ -436,7 +423,6 @@ do_parse_glob (const char *glob_word, char **word, size_t *word_length,
 }
 
 static int
-internal_function
 parse_glob (char **word, size_t *word_length, size_t *max_length,
 	    const char *words, size_t *offset, int flags,
 	    wordexp_t *pwordexp, const char *ifs, const char *ifs_white)
@@ -532,7 +518,6 @@ tidy_up:
 }
 
 static int
-internal_function
 parse_squote (char **word, size_t *word_length, size_t *max_length,
 	      const char *words, size_t *offset)
 {
@@ -554,7 +539,6 @@ parse_squote (char **word, size_t *word_length, size_t *max_length,
 
 /* Functions to evaluate an arithmetic expression */
 static int
-internal_function
 eval_expr_val (char **expr, long int *result)
 {
   char *digit;
@@ -589,7 +573,6 @@ eval_expr_val (char **expr, long int *result)
 }
 
 static int
-internal_function
 eval_expr_multdiv (char **expr, long int *result)
 {
   long int arg;
@@ -617,6 +600,10 @@ eval_expr_multdiv (char **expr, long int *result)
 	  if (eval_expr_val (expr, &arg) != 0)
 	    return WRDE_SYNTAX;
 
+	  /* Division by zero or integer overflow.  */
+	  if (arg == 0 || (arg == -1 && *result == LONG_MIN))
+	    return WRDE_SYNTAX;
+
 	  *result /= arg;
 	}
       else break;
@@ -626,7 +613,6 @@ eval_expr_multdiv (char **expr, long int *result)
 }
 
 static int
-internal_function
 eval_expr (char *expr, long int *result)
 {
   long int arg;
@@ -663,7 +649,6 @@ eval_expr (char *expr, long int *result)
 }
 
 static int
-internal_function
 parse_arith (char **word, size_t *word_length, size_t *max_length,
 	     const char *words, size_t *offset, int flags, int bracket)
 {
@@ -799,6 +784,7 @@ parse_arith (char **word, size_t *word_length, size_t *max_length,
 
 	case '(':
 	  ++paren_depth;
+	  /* Fall through.  */
 	default:
 	  expr = w_addchar (expr, &expr_length, &expr_maxlen, words[*offset]);
 	  if (expr == NULL)
@@ -811,74 +797,81 @@ parse_arith (char **word, size_t *word_length, size_t *max_length,
   return WRDE_SYNTAX;
 }
 
+#define DYNARRAY_STRUCT        strlist
+#define DYNARRAY_ELEMENT       char *
+#define DYNARRAY_PREFIX        strlist_
+/* Allocates about 512/1024 (32/64 bit) on stack.  */
+#define DYNARRAY_INITIAL_SIZE  128
+#include <malloc/dynarray-skeleton.c>
+
 /* Function called by child process in exec_comm() */
-static inline void
-internal_function __attribute__ ((always_inline))
-exec_comm_child (char *comm, int *fildes, int showerr, int noexec)
+static pid_t
+exec_comm_child (char *comm, int *fildes, bool showerr, bool noexec)
 {
-  const char *args[4] = { _PATH_BSHELL, "-c", comm, NULL };
+  pid_t pid = -1;
 
-  /* Execute the command, or just check syntax? */
-  if (noexec)
-    args[1] = "-nc";
+  /* Execute the command, or just check syntax?  */
+  const char *args[] = { _PATH_BSHELL, noexec ? "-nc" : "-c", comm, NULL };
 
-  /* Redirect output.  */
-  if (__glibc_likely (fildes[1] != STDOUT_FILENO))
+  posix_spawn_file_actions_t fa;
+  /* posix_spawn_file_actions_init does not fail.  */
+  __posix_spawn_file_actions_init (&fa);
+
+  /* Redirect output.  For check syntax only (noexec being true), exec_comm
+     explicits sets fildes[1] to -1, so check its value to avoid a failure in
+     __posix_spawn_file_actions_adddup2.  */
+  if (fildes[1] != -1)
     {
-      __dup2 (fildes[1], STDOUT_FILENO);
-      __close (fildes[1]);
-    }
-  else
-    {
-#ifdef O_CLOEXEC
-      /* Reset the close-on-exec flag (if necessary).  */
-# ifndef __ASSUME_PIPE2
-      if (__have_pipe2 > 0)
-# endif
-	__fcntl (fildes[1], F_SETFD, 0);
-#endif
+      if (__glibc_likely (fildes[1] != STDOUT_FILENO))
+	{
+	  if (__posix_spawn_file_actions_adddup2 (&fa, fildes[1],
+						  STDOUT_FILENO) != 0
+	      || __posix_spawn_file_actions_addclose (&fa, fildes[1]) != 0)
+	    goto out;
+	}
+      else
+	/* Reset the close-on-exec flag (if necessary).  */
+	if (__posix_spawn_file_actions_adddup2 (&fa, fildes[1], fildes[1])
+	    != 0)
+	  goto out;
     }
 
   /* Redirect stderr to /dev/null if we have to.  */
-  if (showerr == 0)
+  if (!showerr)
+    if (__posix_spawn_file_actions_addopen (&fa, STDERR_FILENO, _PATH_DEVNULL,
+					    O_WRONLY, 0) != 0)
+      goto out;
+
+  struct strlist newenv;
+  strlist_init (&newenv);
+
+  bool recreate_env = getenv ("IFS") != NULL;
+  if (recreate_env)
     {
-      struct stat64 st;
-      int fd;
-      __close (STDERR_FILENO);
-      fd = __open (_PATH_DEVNULL, O_WRONLY);
-      if (fd >= 0 && fd != STDERR_FILENO)
-	{
-	  __dup2 (fd, STDERR_FILENO);
-	  __close (fd);
-	}
-      /* Be paranoid.  Check that we actually opened the /dev/null
-	 device.  */
-      if (__builtin_expect (__fxstat64 (_STAT_VER, STDERR_FILENO, &st), 0) != 0
-	  || __builtin_expect (S_ISCHR (st.st_mode), 1) == 0
-#if defined DEV_NULL_MAJOR && defined DEV_NULL_MINOR
-	  || st.st_rdev != makedev (DEV_NULL_MAJOR, DEV_NULL_MINOR)
-#endif
-	  )
-	/* It's not the /dev/null device.  Stop right here.  The
-	   problem is: how do we stop?  We use _exit() with an
-	   hopefully unusual exit code.  */
-	_exit (90);
+      for (char **ep = __environ; *ep != NULL; ep++)
+	if (strncmp (*ep, "IFS=", strlen ("IFS=")) != 0)
+	  strlist_add (&newenv, *ep);
+      strlist_add (&newenv, NULL);
+      if (strlist_has_failed (&newenv))
+	goto out;
     }
 
-  /* Make sure the subshell doesn't field-split on our behalf. */
-  __unsetenv ("IFS");
+  /* pid is not set if posix_spawn fails, so it keep the original value
+     of -1.  */
+  __posix_spawn (&pid, _PATH_BSHELL, &fa, NULL, (char *const *) args,
+		 recreate_env ? strlist_begin (&newenv) : __environ);
 
-  __close (fildes[0]);
-  __execve (_PATH_BSHELL, (char *const *) args, __environ);
+  strlist_free (&newenv);
 
-  /* Bad.  What now?  */
-  abort ();
+out:
+  __posix_spawn_file_actions_destroy (&fa);
+
+  return pid;
 }
 
 /* Function to execute a command and retrieve the results */
 /* pwordexp contains NULL if field-splitting is forbidden */
 static int
-internal_function
 exec_comm (char *comm, char **word, size_t *word_length, size_t *max_length,
 	   int flags, wordexp_t *pwordexp, const char *ifs,
 	   const char *ifs_white)
@@ -891,55 +884,28 @@ exec_comm (char *comm, char **word, size_t *word_length, size_t *max_length,
   size_t maxnewlines = 0;
   char buffer[bufsize];
   pid_t pid;
-  int noexec = 0;
+  bool noexec = false;
 
   /* Do nothing if command substitution should not succeed.  */
   if (flags & WRDE_NOCMD)
     return WRDE_CMDSUB;
 
-  /* Don't fork() unless necessary */
+  /* Don't posix_spawn unless necessary */
   if (!comm || !*comm)
     return 0;
 
-#ifdef O_CLOEXEC
-# ifndef __ASSUME_PIPE2
-  if (__have_pipe2 >= 0)
-# endif
-    {
-      int r = __pipe2 (fildes, O_CLOEXEC);
-# ifndef __ASSUME_PIPE2
-      if (__have_pipe2 == 0)
-	__have_pipe2 = r != -1 || errno != ENOSYS ? 1 : -1;
-
-      if (__have_pipe2 > 0)
-# endif
-	if (r < 0)
-	  /* Bad */
-	  return WRDE_NOSPACE;
-    }
-#endif
-#ifndef __ASSUME_PIPE2
-# ifdef O_CLOEXEC
-  if (__have_pipe2 < 0)
-# endif
-    if (__pipe (fildes) < 0)
-      /* Bad */
-      return WRDE_NOSPACE;
-#endif
+  if (__pipe2 (fildes, O_CLOEXEC) < 0)
+    return WRDE_NOSPACE;
 
  again:
-  if ((pid = __fork ()) < 0)
+  pid = exec_comm_child (comm, fildes, noexec ? false : flags & WRDE_SHOWERR,
+			 noexec);
+  if (pid < 0)
     {
-      /* Bad */
       __close (fildes[0]);
       __close (fildes[1]);
       return WRDE_NOSPACE;
     }
-
-  if (pid == 0)
-    exec_comm_child (comm, fildes, noexec ? 0 : flags & WRDE_SHOWERR, noexec);
-
-  /* Parent */
 
   /* If we are just testing the syntax, only wait.  */
   if (noexec)
@@ -1100,8 +1066,8 @@ exec_comm (char *comm, char **word, size_t *word_length, size_t *max_length,
   /* Chop off trailing newlines (required by POSIX.2)  */
   /* Ensure we don't go back further than the beginning of the
      substitution (i.e. remove maxnewlines bytes at most) */
-  while (maxnewlines-- != 0 &&
-	 *word_length > 0 && (*word)[*word_length - 1] == '\n')
+  while (maxnewlines-- != 0
+	 && *word_length > 0 && (*word)[*word_length - 1] == '\n')
     {
       (*word)[--*word_length] = '\0';
 
@@ -1121,7 +1087,7 @@ exec_comm (char *comm, char **word, size_t *word_length, size_t *max_length,
   /* Check for syntax error (re-execute but with "-n" flag) */
   if (buflen < 1 && status != 0)
     {
-      noexec = 1;
+      noexec = true;
       goto again;
     }
 
@@ -1135,7 +1101,6 @@ no_space:
 }
 
 static int
-internal_function
 parse_comm (char **word, size_t *word_length, size_t *max_length,
 	    const char *words, size_t *offset, int flags, wordexp_t *pwordexp,
 	    const char *ifs, const char *ifs_white)
@@ -1174,25 +1139,9 @@ parse_comm (char **word, size_t *word_length, size_t *max_length,
 	      /* Go -- give script to the shell */
 	      if (comm)
 		{
-#ifdef __libc_ptf_call
-		  /* We do not want the exec_comm call to be cut short
-		     by a thread cancellation since cleanup is very
-		     ugly.  Therefore disable cancellation for
-		     now.  */
-		  // XXX Ideally we do want the thread being cancelable.
-		  // XXX If demand is there we'll change it.
-		  int state = PTHREAD_CANCEL_ENABLE;
-		  __libc_ptf_call (pthread_setcancelstate,
-				   (PTHREAD_CANCEL_DISABLE, &state), 0);
-#endif
-
+		  /* posix_spawn already handles thread cancellation.  */
 		  error = exec_comm (comm, word, word_length, max_length,
 				     flags, pwordexp, ifs, ifs_white);
-
-#ifdef __libc_ptf_call
-		  __libc_ptf_call (pthread_setcancelstate, (state, NULL), 0);
-#endif
-
 		  free (comm);
 		}
 
@@ -1218,8 +1167,10 @@ parse_comm (char **word, size_t *word_length, size_t *max_length,
   return WRDE_SYNTAX;
 }
 
+#define CHAR_IN_SET(ch, char_set) \
+  (memchr (char_set "", ch, sizeof (char_set) - 1) != NULL)
+
 static int
-internal_function
 parse_param (char **word, size_t *word_length, size_t *max_length,
 	     const char *words, size_t *offset, int flags, wordexp_t *pwordexp,
 	     const char *ifs, const char *ifs_white, int quoted)
@@ -1299,7 +1250,7 @@ parse_param (char **word, size_t *word_length, size_t *max_length,
 	}
       while (isdigit(words[++*offset]));
     }
-  else if (strchr ("*@$", words[*offset]) != NULL)
+  else if (CHAR_IN_SET (words[*offset], "*@$"))
     {
       /* Special parameter. */
       special = 1;
@@ -1343,7 +1294,7 @@ parse_param (char **word, size_t *word_length, size_t *max_length,
 	  break;
 
 	case ':':
-	  if (strchr ("-=?+", words[1 + *offset]) == NULL)
+	  if (!CHAR_IN_SET (words[1 + *offset], "-=?+"))
 	    goto syntax;
 
 	  colon_seen = 1;
@@ -1912,7 +1863,7 @@ envsubst:
 	  if (pattern && !value)
 	    goto no_space;
 
-	  __setenv (env, value, 1);
+	  __setenv (env, value ?: "", 1);
 	  break;
 
 	default:
@@ -2045,8 +1996,9 @@ do_error:
   return error;
 }
 
+#undef CHAR_IN_SET
+
 static int
-internal_function
 parse_dollars (char **word, size_t *word_length, size_t *max_length,
 	       const char *words, size_t *offset, int flags,
 	       wordexp_t *pwordexp, const char *ifs, const char *ifs_white,
@@ -2105,7 +2057,6 @@ parse_dollars (char **word, size_t *word_length, size_t *max_length,
 }
 
 static int
-internal_function
 parse_backtick (char **word, size_t *word_length, size_t *max_length,
 		const char *words, size_t *offset, int flags,
 		wordexp_t *pwordexp, const char *ifs, const char *ifs_white)
@@ -2143,7 +2094,6 @@ parse_backtick (char **word, size_t *word_length, size_t *max_length,
 	      break;
 	    }
 
-	  ++(*offset);
 	  error = parse_backslash (&comm, &comm_length, &comm_maxlen, words,
 				   offset);
 
@@ -2157,6 +2107,7 @@ parse_backtick (char **word, size_t *word_length, size_t *max_length,
 
 	case '\'':
 	  squoting = 1 - squoting;
+	  /* Fall through.  */
 	default:
 	  comm = w_addchar (comm, &comm_length, &comm_maxlen, words[*offset]);
 	  if (comm == NULL)
@@ -2170,7 +2121,6 @@ parse_backtick (char **word, size_t *word_length, size_t *max_length,
 }
 
 static int
-internal_function
 parse_dquote (char **word, size_t *word_length, size_t *max_length,
 	      const char *words, size_t *offset, int flags,
 	      wordexp_t *pwordexp, const char * ifs, const char * ifs_white)

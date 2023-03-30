@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,13 +14,15 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdeps/generic/ldconfig.h>
 
 #define SYSDEP_KNOWN_INTERPRETER_NAMES \
   { "/lib/ld-linux-aarch64.so.1", FLAG_ELF_LIBC6 }, \
   { "/lib/ld-linux-aarch64_be.so.1", FLAG_ELF_LIBC6 }, \
+  { "/lib/ld-linux-aarch64_ilp32.so.1", FLAG_ELF_LIBC6 }, \
+  { "/lib/ld-linux-aarch64_be_ilp32.so.1", FLAG_ELF_LIBC6 }, \
   { "/lib/ld-linux.so.3", FLAG_ELF_LIBC6 }, \
   { "/lib/ld-linux-armhf.so.3", FLAG_ELF_LIBC6 },
 #define SYSDEP_KNOWN_LIBRARY_NAMES \

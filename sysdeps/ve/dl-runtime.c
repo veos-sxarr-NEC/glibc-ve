@@ -1,4 +1,4 @@
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 /* The ABI calls for the PLT stubs to pass the index of the relocation
    and not its offset.  In _dl_profile_fixup and _dl_call_pltexit we

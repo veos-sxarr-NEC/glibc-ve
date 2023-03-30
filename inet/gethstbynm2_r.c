@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <errno.h>
@@ -22,7 +22,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-
+#include <resolv/res_hconf.h>
 
 #define LOOKUP_TYPE	struct hostent
 #define FUNCTION_NAME	gethostbyname2
@@ -30,7 +30,7 @@
 #define ADD_PARAMS	const char *name, int af
 #define ADD_VARIABLES	name, af
 #define NEED_H_ERRNO	1
-#define NEED__RES_HCONF	1
+#define NEED__RES	1
 #define POSTPROCESS \
   if (status == NSS_STATUS_SUCCESS)					      \
     _res_hconf_reorder_addrs (resbuf);

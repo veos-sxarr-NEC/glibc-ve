@@ -1,4 +1,4 @@
-/* Copyright (C) 2010-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2010-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,14 +13,13 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 
 
-#ifdef __NR_prlimit64
 int
 prlimit (__pid_t pid, enum __rlimit_resource resource,
 	 const struct rlimit *new_rlimit, struct rlimit *old_rlimit)
@@ -51,41 +50,28 @@ prlimit (__pid_t pid, enum __rlimit_resource resource,
     {
       /* The prlimit64 syscall is ill-designed for 32-bit machines.
 	 We have to provide a 32-bit variant since otherwise the LFS
-	 system would not work.  But what shall we do if the syscall
-	 succeeds but the old values do not fit into a rlimit
-	 structure?  We cannot return an error because the operation
-	 itself worked.  Best is perhaps to return RLIM_INFINITY.  */
+	 system would not work.  The infinity value can be translated,
+	 but otherwise what shall we do if the syscall succeeds but the
+	 old values do not fit into a rlimit structure?  We cannot return
+	 an error because the operation itself worked.  Best is perhaps
+	 to return RLIM_INFINITY.  */
       old_rlimit->rlim_cur = old_rlimit64_mem.rlim_cur;
       if (old_rlimit->rlim_cur != old_rlimit64_mem.rlim_cur)
 	{
-	  if (new_rlimit == NULL)
-	    {
-	      __set_errno (EOVERFLOW);
-	      return -1;
-	    }
+	  if ((new_rlimit == NULL)
+	      && (old_rlimit64_mem.rlim_cur != RLIM64_INFINITY))
+	    return INLINE_SYSCALL_ERROR_RETURN_VALUE (EOVERFLOW);
 	  old_rlimit->rlim_cur = RLIM_INFINITY;
 	}
       old_rlimit->rlim_max = old_rlimit64_mem.rlim_max;
       if (old_rlimit->rlim_max != old_rlimit64_mem.rlim_max)
 	{
-	  if (new_rlimit == NULL)
-	    {
-	      __set_errno (EOVERFLOW);
-	      return -1;
-	    }
+	  if ((new_rlimit == NULL)
+	      && (old_rlimit64_mem.rlim_max != RLIM64_INFINITY))
+	    return INLINE_SYSCALL_ERROR_RETURN_VALUE (EOVERFLOW);
 	  old_rlimit->rlim_max = RLIM_INFINITY;
 	}
     }
 
   return res;
 }
-#else
-int
-prlimit (__pid_t pid, enum __rlimit_resource resource,
-	 const struct rlimit *new_rlimit, struct rlimit *old_rlimit)
-{
-  __set_errno (ENOSYS);
-  return -1;
-}
-stub_warning (prlimit)
-#endif

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,19 +13,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <hurd.h>
 #include <hurd/port.h>
 #include <hurd/id.h>
+#include <hurdlock.h>
 #include "set-hooks.h"
 
 /* Things in the library which want to be run when the auth port changes.  */
 DEFINE_HOOK (_hurd_reauth_hook, (auth_t new_auth));
 
-#include <cthreads.h>
-static struct mutex reauth_lock = MUTEX_INITIALIZER;
-
+static unsigned int reauth_lock = LLL_INITIALIZER;
 
 /* Set the auth port to NEW, and reauthenticate
    everything used by the library.  */
@@ -68,12 +67,12 @@ _hurd_setauth (auth_t new)
 	  mach_port_t new;
 	  ref = __mach_reply_port ();
 	  if (! __io_reauthenticate (_hurd_init_dtable[d],
-				     ref, MACH_MSG_TYPE_MAKE_SEND) &&
-	      ! HURD_PORT_USE (&_hurd_ports[INIT_PORT_AUTH],
-			       __auth_user_authenticate
-			       (port,
-				ref, MACH_MSG_TYPE_MAKE_SEND,
-				&new)))
+				     ref, MACH_MSG_TYPE_MAKE_SEND)
+	      && ! HURD_PORT_USE (&_hurd_ports[INIT_PORT_AUTH],
+				  __auth_user_authenticate
+				  (port,
+				   ref, MACH_MSG_TYPE_MAKE_SEND,
+				   &new)))
 	    {
 	      __mach_port_deallocate (__mach_task_self (),
 				      _hurd_init_dtable[d]);
@@ -85,20 +84,20 @@ _hurd_setauth (auth_t new)
   ref = __mach_reply_port ();
   if (__USEPORT (CRDIR,
 		 ! __io_reauthenticate (port,
-					ref, MACH_MSG_TYPE_MAKE_SEND) &&
-		 ! __auth_user_authenticate (new,
-					     ref, MACH_MSG_TYPE_MAKE_SEND,
-					     &newport)))
+					ref, MACH_MSG_TYPE_MAKE_SEND)
+		 && ! __auth_user_authenticate (new,
+						ref, MACH_MSG_TYPE_MAKE_SEND,
+						&newport)))
     _hurd_port_set (&_hurd_ports[INIT_PORT_CRDIR], newport);
   __mach_port_destroy (__mach_task_self (), ref);
 
   ref = __mach_reply_port ();
   if (__USEPORT (CWDIR,
 		 ! __io_reauthenticate (port,
-					ref, MACH_MSG_TYPE_MAKE_SEND) &&
-		 ! __auth_user_authenticate (new,
-					     ref, MACH_MSG_TYPE_MAKE_SEND,
-					     &newport)))
+					ref, MACH_MSG_TYPE_MAKE_SEND)
+		 && ! __auth_user_authenticate (new,
+						ref, MACH_MSG_TYPE_MAKE_SEND,
+						&newport)))
     _hurd_port_set (&_hurd_ports[INIT_PORT_CWDIR], newport);
   __mach_port_destroy (__mach_task_self (), ref);
 

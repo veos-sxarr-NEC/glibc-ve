@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static const struct option opts[] =
   {
@@ -27,20 +28,20 @@ one_test (const char *fmt, int argc, char *argv[], int n, int expected[n])
       int c = getopt_long (argc, argv, fmt, opts, NULL);
       if (c != expected[i])
 	{
-	  printf ("format '%s' test %d failed: expected '%c', got '%c'\n",
-		  fmt, i, expected[i], c);
+	  printf ("%s: format '%s' test %d failed: expected '%c', got '%c'\n",
+		  argv[0], fmt, i, expected[i], c);
 	  res = 1;
 	}
       else if (optarg != NULL)
 	{
-	  printf ("format '%s' test %d failed: optarg is \"%s\", not NULL\n",
-		  fmt, i, optarg);
+	  printf ("%s: format '%s' test %d failed: optarg is \"%s\", not NULL\n",
+		  argv[0], fmt, i, optarg);
 	  res = 1;
 	}
       if (ftell (stderr) != 0)
 	{
-	  printf ("format '%s' test %d failed: printed to stderr\n",
-		  fmt, i);
+	  printf ("%s: format '%s' test %d failed: printed to stderr\n",
+		  argv[0], fmt, i);
 	  res = 1;
 	}
     }
@@ -52,12 +53,14 @@ one_test (const char *fmt, int argc, char *argv[], int n, int expected[n])
 static int
 do_test (void)
 {
-  char *fname = tmpnam (NULL);
-  if (fname == NULL)
+  char fname[] = "/tmp/bug-getopt4.XXXXXX";
+  int fd = mkstemp (fname);
+  if (fd == -1)
     {
-      puts ("cannot generate name for temporary file");
+      printf ("mkstemp failed: %m\n");
       return 1;
     }
+  close (fd);
 
   if (freopen (fname, "w+", stderr) == NULL)
     {
@@ -68,11 +71,11 @@ do_test (void)
   remove (fname);
 
   int ret = one_test ("W;", 2,
-		      (char *[2]) { (char *) "bug-getopt4", (char *) "--a" },
+		      (char *[2]) { (char *) "bug-getopt4a", (char *) "--a" },
 		      1, (int [1]) { 'a' });
 
   ret |= one_test ("W;", 3,
-		   (char *[3]) { (char *) "bug-getopt4", (char *) "-W",
+		   (char *[3]) { (char *) "bug-getopt4b", (char *) "-W",
 				 (char *) "a" },
 		   1, (int [1]) { 'a' });
 

@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2001.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <netdb.h>
 #include <pthread.h>
@@ -42,7 +42,6 @@ notify_func_wrapper (void *arg)
 
 
 int
-internal_function
 __gai_notify_only (struct sigevent *sigev, pid_t caller_pid)
 {
   int result = 0;
@@ -94,7 +93,6 @@ __gai_notify_only (struct sigevent *sigev, pid_t caller_pid)
 
 
 void
-internal_function
 __gai_notify (struct requestlist *req)
 {
   struct waitlist *waitlist;

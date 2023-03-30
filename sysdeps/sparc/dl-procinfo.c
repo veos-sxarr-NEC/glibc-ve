@@ -1,5 +1,5 @@
 /* Data for Linux/sparc version of processor capability information.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Jakub Jelinek <jakub@redhat.com>, 2002.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This information must be kept in sync with the _DL_HWCAP_COUNT
    definition in procinfo.h.
@@ -46,13 +46,13 @@
 #if !defined PROCINFO_DECL && defined SHARED
   ._dl_sparc_cap_flags
 #else
-PROCINFO_CLASS const char _dl_sparc_cap_flags[27][11]
+PROCINFO_CLASS const char _dl_sparc_cap_flags[28][11]
 #endif
 #ifndef PROCINFO_DECL
   = { "flush", "stbar", "swap", "muldiv", "v9", "ultra3", "v9v", "v9v2",
       "mul32", "div32", "fsmuld", "v8plus", "popc", "vis", "vis2",
       "ASIBlkInit", "fmaf", "vis3", "hpc", "random", "trans", "fjfmau",
-      "ima", "cspare", "pause", "cbcond", "crypto" }
+      "ima", "cspare", "pause", "cbcond", "crypto", "adp" }
 #endif
 #if !defined SHARED || defined PROCINFO_DECL
 ;

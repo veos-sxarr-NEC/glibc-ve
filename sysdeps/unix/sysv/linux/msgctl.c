@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
@@ -14,19 +14,82 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <errno.h>
 #include <sys/msg.h>
 #include <ipc_priv.h>
-
 #include <sysdep.h>
-#include <string.h>
-#include <sys/syscall.h>
 #include <shlib-compat.h>
+#include <errno.h>
 
-#include <kernel-features.h>
+#ifndef DEFAULT_VERSION
+# ifndef __ASSUME_SYSVIPC_BROKEN_MODE_T
+#  define DEFAULT_VERSION GLIBC_2_2
+# else
+#  define DEFAULT_VERSION GLIBC_2_31
+# endif
+#endif
 
+static int
+msgctl_syscall (int msqid, int cmd, struct msqid_ds *buf)
+{
+#ifdef __ASSUME_DIRECT_SYSVIPC_SYSCALLS
+  return INLINE_SYSCALL_CALL (msgctl, msqid, cmd | __IPC_64, buf);
+#else
+  return INLINE_SYSCALL_CALL (ipc, IPCOP_msgctl, msqid, cmd | __IPC_64, 0,
+			      buf);
+#endif
+}
+
+int
+__new_msgctl (int msqid, int cmd, struct msqid_ds *buf)
+{
+  /* POSIX states ipc_perm mode should have type of mode_t.  */
+  _Static_assert (sizeof ((struct msqid_ds){0}.msg_perm.mode)
+		  == sizeof (mode_t),
+		  "sizeof (msqid_ds.msg_perm.mode) != sizeof (mode_t)");
+
+#ifdef __ASSUME_SYSVIPC_BROKEN_MODE_T
+  struct msqid_ds tmpds;
+  if (cmd == IPC_SET)
+    {
+      tmpds = *buf;
+      tmpds.msg_perm.mode *= 0x10000U;
+      buf = &tmpds;
+    }
+#endif
+
+  int ret = msgctl_syscall (msqid, cmd, buf);
+
+#ifdef __ASSUME_SYSVIPC_BROKEN_MODE_T
+  if (ret >= 0)
+    {
+      switch (cmd)
+	{
+	case IPC_STAT:
+	case MSG_STAT:
+	case MSG_STAT_ANY:
+	  buf->msg_perm.mode >>= 16;
+	}
+    }
+#endif
+
+  return ret;
+}
+versioned_symbol (libc, __new_msgctl, msgctl, DEFAULT_VERSION);
+
+#if defined __ASSUME_SYSVIPC_BROKEN_MODE_T \
+    && SHLIB_COMPAT (libc, GLIBC_2_2, GLIBC_2_31)
+int
+attribute_compat_text_section
+__msgctl_mode16 (int msqid, int cmd, struct msqid_ds *buf)
+{
+  return msgctl_syscall (msqid, cmd, buf);
+}
+compat_symbol (libc, __msgctl_mode16, msgctl, GLIBC_2_2);
+#endif
+
+#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_2)
 struct __old_msqid_ds
 {
   struct __old_ipc_perm msg_perm;	/* structure describing operation permission */
@@ -44,88 +107,19 @@ struct __old_msqid_ds
   __ipc_pid_t msg_lrpid;		/* pid of last msgrcv() */
 };
 
-/* Allows to control internal state and destruction of message queue
-   objects.  */
-#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_2)
-int __old_msgctl (int, int, struct __old_msqid_ds *);
-#endif
-int __new_msgctl (int, int, struct msqid_ds *);
-
-#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_2)
 int
 attribute_compat_text_section
 __old_msgctl (int msqid, int cmd, struct __old_msqid_ds *buf)
 {
-  return INLINE_SYSCALL (ipc, 5, IPCOP_msgctl, msqid, cmd, 0, buf);
+#if defined __ASSUME_DIRECT_SYSVIPC_SYSCALLS \
+    && !defined __ASSUME_SYSVIPC_DEFAULT_IPC_64
+  /* For architecture that have wire-up msgctl but also have __IPC_64 to a
+     value different than default (0x0) it means the compat symbol used the
+     __NR_ipc syscall.  */
+  return INLINE_SYSCALL_CALL (msgctl, msqid, cmd, buf);
+#else
+  return INLINE_SYSCALL_CALL (ipc, IPCOP_msgctl, msqid, cmd, 0, buf);
+#endif
 }
 compat_symbol (libc, __old_msgctl, msgctl, GLIBC_2_0);
 #endif
-
-int
-__new_msgctl (int msqid, int cmd, struct msqid_ds *buf)
-{
-#if __ASSUME_IPC64 > 0
-  return INLINE_SYSCALL (ipc, 5, IPCOP_msgctl,
-			 msqid, cmd | __IPC_64, 0, buf);
-#else
-  switch (cmd) {
-    case MSG_STAT:
-    case IPC_STAT:
-    case IPC_SET:
-      break;
-    default:
-      return INLINE_SYSCALL (ipc, 5, IPCOP_msgctl,
-			     msqid, cmd, 0, buf);
-  }
-
-  {
-    int result;
-    struct __old_msqid_ds old;
-
-    /* Unfortunately there is no way how to find out for sure whether
-       we should use old or new msgctl.  */
-    result = INLINE_SYSCALL (ipc, 5, IPCOP_msgctl,
-			     msqid, cmd | __IPC_64, 0, buf);
-    if (result != -1 || errno != EINVAL)
-      return result;
-
-    if (cmd == IPC_SET)
-      {
-	old.msg_perm.uid = buf->msg_perm.uid;
-	old.msg_perm.gid = buf->msg_perm.gid;
-	old.msg_perm.mode = buf->msg_perm.mode;
-	old.msg_qbytes = buf->msg_qbytes;
-	if (old.msg_perm.uid != buf->msg_perm.uid ||
-	    old.msg_perm.gid != buf->msg_perm.gid ||
-	    old.msg_qbytes != buf->msg_qbytes)
-	  {
-	    __set_errno (EINVAL);
-	    return -1;
-	  }
-      }
-    result = INLINE_SYSCALL (ipc, 5, IPCOP_msgctl, msqid, cmd, 0, &old);
-    if (result != -1 && cmd != IPC_SET)
-      {
-	memset(buf, 0, sizeof(*buf));
-	buf->msg_perm.__key = old.msg_perm.__key;
-	buf->msg_perm.uid = old.msg_perm.uid;
-	buf->msg_perm.gid = old.msg_perm.gid;
-	buf->msg_perm.cuid = old.msg_perm.cuid;
-	buf->msg_perm.cgid = old.msg_perm.cgid;
-	buf->msg_perm.mode = old.msg_perm.mode;
-	buf->msg_perm.__seq = old.msg_perm.__seq;
-	buf->msg_stime = old.msg_stime;
-	buf->msg_rtime = old.msg_rtime;
-	buf->msg_ctime = old.msg_ctime;
-	buf->__msg_cbytes = old.__msg_cbytes;
-	buf->msg_qnum = old.msg_qnum;
-	buf->msg_qbytes = old.msg_qbytes;
-	buf->msg_lspid = old.msg_lspid;
-	buf->msg_lrpid = old.msg_lrpid;
-      }
-    return result;
-  }
-#endif
-}
-
-versioned_symbol (libc, __new_msgctl, msgctl, GLIBC_2_2);

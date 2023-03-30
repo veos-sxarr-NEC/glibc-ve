@@ -138,55 +138,47 @@ argument to @code{setlocale}) has to be a valid locale name.
 @xref{Locale Names}.
 
 @vtable @code
-@comment locale.h
-@comment ISO
 @item LC_COLLATE
+@standards{ISO, locale.h}
 This category applies to collation of strings (functions @code{strcoll}
 and @code{strxfrm}); see @ref{Collation Functions}.
 
-@comment locale.h
-@comment ISO
 @item LC_CTYPE
+@standards{ISO, locale.h}
 This category applies to classification and conversion of characters,
 and to multibyte and wide characters;
 see @ref{Character Handling}, and @ref{Character Set Handling}.
 
-@comment locale.h
-@comment ISO
 @item LC_MONETARY
+@standards{ISO, locale.h}
 This category applies to formatting monetary values; see @ref{General Numeric}.
 
-@comment locale.h
-@comment ISO
 @item LC_NUMERIC
+@standards{ISO, locale.h}
 This category applies to formatting numeric values that are not
 monetary; see @ref{General Numeric}.
 
-@comment locale.h
-@comment ISO
 @item LC_TIME
+@standards{ISO, locale.h}
 This category applies to formatting date and time values; see
 @ref{Formatting Calendar Time}.
 
-@comment locale.h
-@comment XOPEN
 @item LC_MESSAGES
+@standards{XOPEN, locale.h}
 This category applies to selecting the language used in the user
 interface for message translation (@pxref{The Uniforum approach};
 @pxref{Message catalogs a la X/Open})  and contains regular expressions
 for affirmative and negative responses.
 
-@comment locale.h
-@comment ISO
 @item LC_ALL
+@standards{ISO, locale.h}
 This is not a category; it is only a macro that you can use
 with @code{setlocale} to set a single locale for all purposes.  Setting
 this environment variable overwrites all selections by the other
 @code{LC_*} variables or @code{LANG}.
 
-@comment locale.h
-@comment ISO
 @item LANG
+@standards{ISO, locale.h}
 If this environment variable is defined, its value specifies the locale
 to use for all purposes except as overridden by the variables above.
 @end vtable
@@ -228,9 +220,8 @@ general use or for a specific category.
 @pindex locale.h
 The symbols in this section are defined in the header file @file{locale.h}.
 
-@comment locale.h
-@comment ISO
 @deftypefun {char *} setlocale (int @var{category}, const char *@var{locale})
+@standards{ISO, locale.h}
 @safety{@prelim{}@mtunsafe{@mtasuconst{:@mtslocale{}} @mtsenv{}}@asunsafe{@asuinit{} @asulock{} @ascuheap{} @asucorrupt{}}@acunsafe{@acuinit{} @acucorrupt{} @aculock{} @acsmem{} @acsfd{}}}
 @c Uses of the global locale object are unguarded in functions that
 @c ought to be MT-Safe, so we're ruling out the use of this function
@@ -365,7 +356,7 @@ The function @code{setlocale} sets the current locale for category
 @var{category} to @var{locale}.
 
 If @var{category} is @code{LC_ALL}, this specifies the locale for all
-purposes.  The other possible values of @var{category} specify an
+purposes.  The other possible values of @var{category} specify a
 single purpose (@pxref{Locale Categories}).
 
 You can also use this function to find out the current locale by passing
@@ -374,8 +365,8 @@ a null pointer as the @var{locale} argument.  In this case,
 currently selected for category @var{category}.
 
 The string returned by @code{setlocale} can be overwritten by subsequent
-calls, so you should make a copy of the string (@pxref{Copying and
-Concatenation}) if you want to save it past any further calls to
+calls, so you should make a copy of the string (@pxref{Copying Strings
+and Arrays}) if you want to save it past any further calls to
 @code{setlocale}.  (The standard library is guaranteed never to call
 @code{setlocale} itself.)
 
@@ -407,7 +398,7 @@ name is used if possible.
 
 The effective locale name (either the second argument to
 @code{setlocale}, or if the argument is an empty string, the name
-obtained from the process environment) must be valid locale name.
+obtained from the process environment) must be a valid locale name.
 @xref{Locale Names}.
 
 If you specify an invalid locale name, @code{setlocale} returns a null
@@ -613,7 +604,7 @@ as far as the system follows the Unix standards.
 
 Together with the @code{setlocale} function the @w{ISO C} people
 invented the @code{localeconv} function.  It is a masterpiece of poor
-design.  It is expensive to use, not extendable, and not generally
+design.  It is expensive to use, not extensible, and not generally
 usable as it provides access to only @code{LC_MONETARY} and
 @code{LC_NUMERIC} related information.  Nevertheless, if it is
 applicable to a given situation it should be used since it is very
@@ -623,9 +614,8 @@ according to the selected locale using this information.
 @cindex monetary value formatting
 @cindex numeric value formatting
 
-@comment locale.h
-@comment ISO
 @deftypefun {struct lconv *} localeconv (void)
+@standards{ISO, locale.h}
 @safety{@prelim{}@mtunsafe{@mtasurace{:localeconv} @mtslocale{}}@asunsafe{}@acsafe{}}
 @c This function reads from multiple components of the locale object,
 @c without synchronization, while writing to the static buffer it uses
@@ -640,9 +630,8 @@ be overwritten by subsequent calls to @code{localeconv}, or by calls to
 value.
 @end deftypefun
 
-@comment locale.h
-@comment ISO
 @deftp {Data Type} {struct lconv}
+@standards{ISO, locale.h}
 @code{localeconv}'s return value is of this data type.  Its elements are
 described in the following subsections.
 @end deftp
@@ -815,7 +804,7 @@ The members with the @code{int_} prefix apply to the
 @code{int_curr_symbol} while the other two apply to
 @code{currency_symbol}.  There is one specialty with the
 @code{int_curr_symbol}, though.  Since all legal values contain a space
-at the end the string one either printf this space (if the currency
+at the end of the string one either prints this space (if the currency
 symbol must appear in front and must be separated) or one has to avoid
 printing this character at all (especially when at the end of the
 string).
@@ -849,7 +838,7 @@ unreasonable.)
 @itemx char int_n_sign_posn
 These members are small integers that indicate how to
 position the sign for nonnegative and negative monetary quantities,
-respectively.  (The string used by the sign is what was specified with
+respectively.  (The string used for the sign is what was specified with
 @code{positive_sign} or @code{negative_sign}.)  The possible values are
 as follows:
 
@@ -893,9 +882,8 @@ in the locale (as later specified in the POSIX.1 standard) requires more
 ways to access it.  Therefore the @code{nl_langinfo} function
 was introduced.
 
-@comment langinfo.h
-@comment XOPEN
 @deftypefun {char *} nl_langinfo (nl_item @var{item})
+@standards{XOPEN, langinfo.h}
 @safety{@prelim{}@mtsafe{@mtslocale{}}@assafe{}@acsafe{}}
 @c It calls _nl_langinfo_l with the current locale, which returns a
 @c pointer into constant strings defined in locale data structures.
@@ -910,7 +898,7 @@ formatting information, information from the
 @code{LC_TIME} and @code{LC_MESSAGES} categories is available.
 
 @pindex langinfo.h
-The type @code{nl_type} is defined in @file{nl_types.h}.  The argument
+The type @code{nl_item} is defined in @file{nl_types.h}.  The argument
 @var{item} is a numeric value defined in the header @file{langinfo.h}.
 The X/Open standard defines the following values:
 
@@ -935,7 +923,7 @@ corresponds to Sunday.
 @itemx DAY_5
 @itemx DAY_6
 @itemx DAY_7
-Similar to @code{ABDAY_1} etc., but here the return value is the
+Similar to @code{ABDAY_1}, etc.,@: but here the return value is the
 unabbreviated weekday name.
 @item ABMON_1
 @itemx ABMON_2
@@ -949,8 +937,9 @@ unabbreviated weekday name.
 @itemx ABMON_10
 @itemx ABMON_11
 @itemx ABMON_12
-The return value is abbreviated name of the month.  @code{ABMON_1}
-corresponds to January.
+The return value is the abbreviated name of the month, in the
+grammatical form used when the month forms part of a complete date.
+@code{ABMON_1} corresponds to January.
 @item MON_1
 @itemx MON_2
 @itemx MON_3
@@ -963,8 +952,34 @@ corresponds to January.
 @itemx MON_10
 @itemx MON_11
 @itemx MON_12
-Similar to @code{ABMON_1} etc., but here the month names are not abbreviated.
-Here the first value @code{MON_1} also corresponds to January.
+Similar to @code{ABMON_1}, etc.,@: but here the month names are not
+abbreviated.  Here the first value @code{MON_1} also corresponds to
+January.
+@item ALTMON_1
+@itemx ALTMON_2
+@itemx ALTMON_3
+@itemx ALTMON_4
+@itemx ALTMON_5
+@itemx ALTMON_6
+@itemx ALTMON_7
+@itemx ALTMON_8
+@itemx ALTMON_9
+@itemx ALTMON_10
+@itemx ALTMON_11
+@itemx ALTMON_12
+Similar to @code{MON_1}, etc.,@: but here the month names are in the
+grammatical form used when the month is named by itself.  The
+@code{strftime} functions use these month names for the conversion
+specifier @code{%OB} (@pxref{Formatting Calendar Time}).
+
+Note that not all languages need two different forms of the month names,
+so the strings returned for @code{MON_@dots{}} and @code{ALTMON_@dots{}}
+may or may not be the same, depending on the locale.
+
+@strong{NB:} @code{ABALTMON_@dots{}} constants corresponding to the
+@code{%Ob} conversion specifier are not currently provided, but are
+expected to be in a future release.  In the meantime, it is possible
+to use @code{_NL_ABALTMON_@dots{}}.
 @item AM_STR
 @itemx PM_STR
 The return values are strings which can be used in the representation of time
@@ -1133,11 +1148,11 @@ should be used.
 @end vtable
 
 The file @file{langinfo.h} defines a lot more symbols but none of them
-is official.  Using them is not portable, and the format of the
+are official.  Using them is not portable, and the format of the
 return values might change.  Therefore we recommended you not use
 them.
 
-Note that the return value for any valid argument can be used for
+Note that the return value for any valid argument can be used
 in all situations (with the possible exception of the am/pm time formatting
 codes).  If the user has not selected any locale for the
 appropriate category, @code{nl_langinfo} returns the information from the
@@ -1194,10 +1209,11 @@ numbers according to these rules.
 
 @deftypefun ssize_t strfmon (char *@var{s}, size_t @var{maxsize}, const char *@var{format}, @dots{})
 @safety{@prelim{}@mtsafe{@mtslocale{}}@asunsafe{@ascuheap{}}@acunsafe{@acsmem{}}}
-@c It (and strfmon_l) both call vstrfmon_l, which, besides accessing the
-@c locale object passed to it, accesses the active locale through
-@c isdigit (but to_digit assumes ASCII digits only).  It may call
-@c __printf_fp (@mtslocale @ascuheap @acsmem) and guess_grouping (safe).
+@c It (and strfmon_l) both call __vstrfmon_l_internal, which, besides
+@c accessing the locale object passed to it, accesses the active
+@c locale through isdigit (but to_digit assumes ASCII digits only).
+@c It may call __printf_fp (@mtslocale @ascuheap @acsmem) and
+@c guess_grouping (safe).
 The @code{strfmon} function is similar to the @code{strftime} function
 in that it takes a buffer, its size, a format string,
 and values to write into the buffer as text in a form specified
@@ -1240,7 +1256,7 @@ it does not fill the entire field width.
 @end table
 @end itemize
 
-The next part of a specification is an optional field width.  If no
+The next part of the specification is an optional field width.  If no
 width is specified @math{0} is taken.  During output, the function first
 determines how much space is required.  If it requires at least as many
 characters as given by the field width, it is output using as much space
@@ -1406,14 +1422,13 @@ English.
 @Theglibc{} contains @code{rpmatch} to give applications easy
 access to the corresponding locale definitions.
 
-@comment GNU
-@comment stdlib.h
 @deftypefun int rpmatch (const char *@var{response})
+@standards{GNU, stdlib.h}
 @safety{@prelim{}@mtsafe{@mtslocale{}}@asunsafe{@asucorrupt{} @ascuheap{} @asulock{} @ascudlopen{}}@acunsafe{@acucorrupt{} @aculock{} @acsmem{} @acsfd{}}}
 @c Calls nl_langinfo with YESEXPR and NOEXPR, triggering @mtslocale but
 @c it's regcomp and regexec that bring in all of the safety issues.
 @c regfree is also called, but it doesn't introduce any further issues.
-The function @code{rpmatch} checks the string in @var{response} whether
+The function @code{rpmatch} checks the string in @var{response} for whether
 or not it is a correct yes-or-no answer and if yes, which one.  The
 check uses the @code{YESEXPR} and @code{NOEXPR} data in the
 @code{LC_MESSAGES} category of the currently selected locale.  The

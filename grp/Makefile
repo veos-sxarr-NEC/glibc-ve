@@ -1,4 +1,4 @@
-# Copyright (C) 1991-2015 Free Software Foundation, Inc.
+# Copyright (C) 1991-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for grp portion of the library.
@@ -26,9 +26,10 @@ headers := grp.h
 
 routines := fgetgrent initgroups setgroups \
 	    getgrent getgrgid getgrnam putgrent \
-	    getgrent_r getgrgid_r getgrnam_r fgetgrent_r
+	    getgrent_r getgrgid_r getgrnam_r fgetgrent_r \
+	    grp-merge
 
-tests := testgrp
+tests := testgrp tst-putgrent
 
 ifeq (yes,$(build-shared))
 test-srcs :=  tst_fgetgrent
@@ -42,15 +43,15 @@ include ../Rules
 
 ifeq ($(have-thread-library),yes)
 
-CFLAGS-getgrgid_r.c = -fexceptions
-CFLAGS-getgrnam_r.c = -fexceptions
-CFLAGS-getgrent_r.c = -fexceptions
-CFLAGS-getgrent.c =  -fexceptions
-CFLAGS-fgetgrent.c = -O0 -fexceptions
-CFLAGS-fgetgrent_r.c = -O0 -fexceptions $(libio-mtsafe)
-CFLAGS-putgrent.c = -fexceptions $(libio-mtsafe)
-CFLAGS-initgroups.c = -fexceptions
-CFLAGS-getgrgid.c = -fexceptions
+CFLAGS-getgrgid_r.c += -fexceptions
+CFLAGS-getgrnam_r.c += -fexceptions
+CFLAGS-getgrent_r.c += -fexceptions
+CFLAGS-getgrent.c += -fexceptions
+CFLAGS-fgetgrent.c += -O0 -fexceptions
+CFLAGS-fgetgrent_r.c += -O0 -fexceptions $(libio-mtsafe)
+CFLAGS-putgrent.c += -fexceptions $(libio-mtsafe)
+CFLAGS-initgroups.c += -fexceptions
+CFLAGS-getgrgid.c += -fexceptions
 
 endif
 
@@ -59,7 +60,7 @@ ifeq ($(run-built-tests),yes)
 ifeq (yes,$(build-shared))
 $(objpfx)tst_fgetgrent.out: tst_fgetgrent.sh $(objpfx)tst_fgetgrent
 	$(SHELL) $< $(common-objpfx) '$(test-program-prefix-before-env)' \
-       '$(run-program-env)'; \
+	'$(run-program-env)' > $@; \
 	$(evaluate-test)
 
 endif

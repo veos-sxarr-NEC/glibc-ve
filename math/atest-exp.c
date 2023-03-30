@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Geoffrey Keating <Geoff.Keating@anu.edu.au>, 1997.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdio.h>
 #include <math.h>
@@ -61,7 +61,7 @@ exp_mpn (mp1 ex, mp1 x)
    unsigned n;
    mp1 xp;
    mp2 tmp;
-   mp_limb_t chk;
+   mp_limb_t chk __attribute__ ((unused));
    mp1 tol;
 
    memset (xp, 0, sizeof (mp1));
@@ -191,6 +191,6 @@ do_test (void)
    return failures == 0 ? 0 : 1;
 }
 
-#define TIMEOUT 10
+#define TIMEOUT 200
 #define TEST_FUNCTION do_test ()
 #include "../test-skeleton.c"

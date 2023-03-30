@@ -1,4 +1,4 @@
-/* Copyright (C) 2004-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_LINK_H
 # error "Never include <bits/link.h> directly; use <link.h> instead."
@@ -38,6 +38,8 @@ typedef struct La_i86_retval
   uint32_t lrv_edx;
   long double lrv_st0;
   long double lrv_st1;
+  uint64_t lrv_bnd0;
+  uint64_t lrv_bnd1;
 } La_i86_retval;
 
 

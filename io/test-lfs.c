@@ -1,5 +1,5 @@
 /* Some basic tests for LFS.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 2000.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -25,6 +25,7 @@
 #include <error.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <support/check.h>
 
 /* Prototype for our test function.  */
 extern void do_prepare (int argc, char *argv[]);
@@ -32,9 +33,6 @@ extern int do_test (int argc, char *argv[]);
 
 /* We have a preparation function.  */
 #define PREPARE do_prepare
-
-/* We might need a bit longer timeout.  */
-#define TIMEOUT 20 /* sec */
 
 /* This defines the `main' function and some more.  */
 #include <test-skeleton.c>
@@ -53,10 +51,9 @@ do_prepare (int argc, char *argv[])
   struct rlimit64 rlim;
 
   name_len = strlen (test_dir);
-  name = malloc (name_len + sizeof ("/lfsXXXXXX"));
+  name = xmalloc (name_len + sizeof ("/lfsXXXXXX"));
   mempcpy (mempcpy (name, test_dir, name_len),
            "/lfsXXXXXX", sizeof ("/lfsXXXXXX"));
-  add_temp_file (name);
 
   /* Open our test file.   */
   fd = mkstemp64 (name);
@@ -71,6 +68,9 @@ do_prepare (int argc, char *argv[])
       else
 	error (EXIT_FAILURE, errno, "cannot create temporary file");
     }
+  if (!support_descriptor_supports_holes (fd))
+    FAIL_UNSUPPORTED ("File %s does not support holes", name);
+  add_temp_file (name);
 
   if (getrlimit64 (RLIMIT_FSIZE, &rlim) != 0)
     {
@@ -144,7 +144,7 @@ test_ftello (void)
 int
 do_test (int argc, char *argv[])
 {
-  int ret;
+  int ret, fd2;
   struct stat64 statbuf;
 
   ret = lseek64 (fd, TWO_GB+100, SEEK_SET);
@@ -163,6 +163,27 @@ do_test (int argc, char *argv[])
       error (0, errno, "lseek64 failed with error");
       exit (EXIT_FAILURE);
     }
+  off64_t offset64 = lseek64 (fd, 0, SEEK_CUR);
+  if (offset64 != TWO_GB + 100)
+    {
+      error (0, 0, "lseek64 did not return expected offset");
+      exit (EXIT_FAILURE);
+    }
+  off_t offset = lseek (fd, 0, SEEK_CUR);
+  if (sizeof (off_t) < sizeof (off64_t))
+    {
+      if (offset != -1 || errno != EOVERFLOW)
+	{
+	  error (0, 0, "lseek did not fail with EOVERFLOW");
+	  exit (EXIT_FAILURE);
+	}
+    }
+  else
+    if (offset != TWO_GB + 100)
+      {
+	error (0, 0, "lseek did not return expected offset");
+	exit (EXIT_FAILURE);
+      }
 
   ret = write (fd, "Hello", 5);
   if (ret == -1 && errno == EFBIG)
@@ -194,6 +215,25 @@ do_test (int argc, char *argv[])
   else if (statbuf.st_size != (TWO_GB + 100 + 5))
     error (EXIT_FAILURE, 0, "stat reported size %lld instead of %lld.",
 	   (long long int) statbuf.st_size, (TWO_GB + 100 + 5));
+
+  fd2 = openat64 (AT_FDCWD, name, O_RDWR);
+  if (fd2 == -1)
+    {
+      if (errno == ENOSYS)
+	{
+	  /* Silently ignore this test.  */
+	  error (0, 0, "openat64 is not supported");
+	}
+      else
+	error (EXIT_FAILURE, errno, "openat64 failed to open big file");
+    }
+  else
+    {
+      ret = close (fd2);
+
+      if (ret == -1)
+	error (EXIT_FAILURE, errno, "error closing file");
+    }
 
   test_ftello ();
 

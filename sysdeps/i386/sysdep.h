@@ -1,5 +1,5 @@
 /* Assembler macros for i386.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,9 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sysdeps/generic/sysdep.h>
+#include <sysdeps/x86/sysdep.h>
 
 #include <features.h> /* For __GNUC_PREREQ.  */
 
@@ -30,48 +30,14 @@
 #endif
 
 #ifdef	__ASSEMBLER__
-# if __GNUC_PREREQ (4, 7)
-#  define GET_PC_THUNK(reg) __x86.get_pc_thunk.reg
-# else
-#  define GET_PC_THUNK(reg) __i686.get_pc_thunk.reg
-# endif
+# define GET_PC_THUNK(reg) __x86.get_pc_thunk.reg
 #else
-# if __GNUC_PREREQ (4, 7)
-#  define GET_PC_THUNK_STR(reg) "__x86.get_pc_thunk." #reg
-# else
-#  define GET_PC_THUNK_STR(reg) "__i686.get_pc_thunk." #reg
-# endif
+# define GET_PC_THUNK_STR(reg) "__x86.get_pc_thunk." #reg
 #endif
 
 #ifdef	__ASSEMBLER__
 
 /* Syntactic details of assembler.  */
-
-/* ELF uses byte-counts for .align, most others use log2 of count of bytes.  */
-#define ALIGNARG(log2) 1<<log2
-#define ASM_SIZE_DIRECTIVE(name) .size name,.-name;
-
-
-/* Define an entry point visible from C.
-
-   There is currently a bug in gdb which prevents us from specifying
-   incomplete stabs information.  Fake some entries here which specify
-   the current source file.  */
-#define	ENTRY(name)							      \
-  .globl C_SYMBOL_NAME(name);						      \
-  .type C_SYMBOL_NAME(name),@function;					      \
-  .align ALIGNARG(4);							      \
-  C_LABEL(name)								      \
-  cfi_startproc;							      \
-  CALL_MCOUNT
-
-#undef	END
-#define END(name)							      \
-  cfi_endproc;								      \
-  ASM_SIZE_DIRECTIVE(name)
-
-#define ENTRY_CHK(name) ENTRY (name)
-#define END_CHK(name) END (name)
 
 /* If compiled for profiling, call `mcount' at the start of each function.  */
 #ifdef	PROF
@@ -85,12 +51,6 @@
 #define CALL_MCOUNT		/* Do nothing.  */
 #endif
 
-/* Since C identifiers are not normally prefixed with an underscore
-   on this system, the asm identifier `syscall_error' intrudes on the
-   C name space.  Make sure we use an innocuous name.  */
-#define	syscall_error	__syscall_error
-#define mcount		_mcount
-
 #define	PSEUDO(name, syscall_name, args)				      \
   .globl syscall_error;							      \
 lose: SYSCALL_PIC_SETUP							      \
@@ -98,10 +58,6 @@ lose: SYSCALL_PIC_SETUP							      \
   ENTRY (name)								      \
   DO_CALL (syscall_name, args);						      \
   jb lose
-
-#undef	PSEUDO_END
-#define	PSEUDO_END(name)						      \
-  END (name)
 
 # define SETUP_PIC_REG(reg) \
   .ifndef GET_PC_THUNK(reg);						      \
@@ -136,13 +92,6 @@ GET_PC_THUNK(reg):							      \
 #define JUMPTARGET(name)	name
 #define SYSCALL_PIC_SETUP	/* Nothing.  */
 #endif
-
-/* Local label name for asm code. */
-#ifndef L
-#define L(name)		.L##name
-#endif
-
-#define atom_text_section .section ".text.atom", "ax"
 
 #else /* __ASSEMBLER__ */
 

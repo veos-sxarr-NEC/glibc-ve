@@ -1,5 +1,5 @@
 /* sigstack, sigaltstack definitions.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,31 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#ifndef _SIGNAL_H
+#ifndef _BITS_SIGSTACK_H
+#define _BITS_SIGSTACK_H 1
+
+#if !defined _SIGNAL_H && !defined _SYS_UCONTEXT_H
 # error "Never include this file directly.  Use <signal.h> instead"
 #endif
-
-#ifndef _SIGSTACK_H
-#define _SIGSTACK_H	1
-
-/* Structure describing a signal stack (obsolete).  */
-struct sigstack
-  {
-    __ptr_t ss_sp;		/* Signal stack pointer.  */
-    int ss_onstack;		/* Nonzero if executing on this stack.  */
-  };
-
-
-/* Possible values for `ss_flags.'.  */
-enum
-{
-  SS_ONSTACK = 1,
-#define SS_ONSTACK	SS_ONSTACK
-  SS_DISABLE
-#define SS_DISABLE	SS_DISABLE
-};
 
 /* Minimum stack size for a signal handler.
 
@@ -50,13 +33,4 @@ enum
 /* System default stack size.  */
 #define SIGSTKSZ	262144
 
-
-/* Alternate, preferred interface.  */
-typedef struct sigaltstack
-  {
-    __ptr_t ss_sp;
-    int ss_flags;
-    size_t ss_size;
-  } stack_t;
-
-#endif	/* bits/sigstack.h */
+#endif /* bits/sigstack.h */

@@ -1,5 +1,5 @@
 /* Conversion loop frame work.
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This file provides a frame for the reader loop in all conversion modules.
    The actual code must (of course) be provided in the actual module source
@@ -49,14 +49,14 @@
 
 #include <assert.h>
 #include <endian.h>
-#include <gconv.h>
+#include <iconv/gconv_int.h>
 #include <stdint.h>
 #include <string.h>
 #include <wchar.h>
 #include <sys/param.h>		/* For MIN.  */
 #define __need_size_t
 #include <stddef.h>
-#include <libc-internal.h>
+#include <libc-diag.h>
 
 /* We have to provide support for machines which are not able to handled
    unaligned memory accesses.  Some of the character encodings have
@@ -254,6 +254,16 @@
   }
 
 
+/* With GCC 7 when compiling with -Os for 32-bit s390 the compiler
+   warns that the variable 'ch', in the definition of BODY in
+   sysdeps/s390/multiarch/8bit-generic.c, may be used uninitialized in
+   the call to UNICODE_TAG_HANDLER in that macro.  This variable is
+   actually always initialized before use, in the prior loop if INDEX
+   is nonzero and in the following 'if' if INDEX is zero.  That code
+   has a comment referencing this diagnostic disabling; updates in one
+   place may require updates in the other.  */
+DIAG_PUSH_NEEDS_COMMENT;
+DIAG_IGNORE_Os_NEEDS_COMMENT (7, "-Wmaybe-uninitialized");
 /* Handling of Unicode 3.1 TAG characters.  Unicode recommends
    "If language codes are not relevant to the particular processing
     operation, then they should be ignored."  This macro is usually
@@ -267,6 +277,7 @@
 	continue;							      \
       }									      \
   }
+DIAG_POP_NEEDS_COMMENT;
 
 
 /* The function returns the status, as defined in gconv.h.  */

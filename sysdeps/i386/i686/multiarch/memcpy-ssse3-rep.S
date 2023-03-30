@@ -1,5 +1,5 @@
 /* memcpy with SSSE3 and REP string.
-   Copyright (C) 2010-2015 Free Software Foundation, Inc.
+   Copyright (C) 2010-2020 Free Software Foundation, Inc.
    Contributed by Intel Corporation.
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -52,7 +52,7 @@
 #define PUSH(REG)	pushl REG; CFI_PUSH (REG)
 #define POP(REG)	popl REG; CFI_POP (REG)
 
-#ifdef SHARED
+#ifdef PIC
 # define PARMS		8		/* Preserve EBX.  */
 # define ENTRANCE	PUSH (%ebx);
 # define RETURN_END	POP (%ebx); ret
@@ -71,7 +71,7 @@
        absolute address.  */					\
     addl	(%ebx,INDEX,SCALE), %ebx;			\
     /* We loaded the jump table.  Go.  */			\
-    jmp		*%ebx
+    _CET_NOTRACK jmp *%ebx
 
 # define BRANCH_TO_JMPTBL_ENTRY_VALUE(TABLE)			\
     addl	$(TABLE - .), %ebx
@@ -79,7 +79,7 @@
 # define BRANCH_TO_JMPTBL_ENTRY_TAIL(TABLE, INDEX, SCALE)	\
     addl	(%ebx,INDEX,SCALE), %ebx;			\
     /* We loaded the jump table.  Go.  */			\
-    jmp		*%ebx
+    _CET_NOTRACK jmp *%ebx
 #else
 # define PARMS		4
 # define ENTRANCE
@@ -91,16 +91,16 @@
    absolute offsets.  INDEX is a register contains the index into the
    jump table.  SCALE is the scale of INDEX. */
 # define BRANCH_TO_JMPTBL_ENTRY(TABLE, INDEX, SCALE)		\
-    jmp		*TABLE(,INDEX,SCALE)
+    _CET_NOTRACK jmp *TABLE(,INDEX,SCALE)
 
 # define BRANCH_TO_JMPTBL_ENTRY_VALUE(TABLE)
 
 # define BRANCH_TO_JMPTBL_ENTRY_TAIL(TABLE, INDEX, SCALE)		\
-    jmp		*TABLE(,INDEX,SCALE)
+    _CET_NOTRACK jmp *TABLE(,INDEX,SCALE)
 #endif
 
 	.section .text.ssse3,"ax",@progbits
-#if !defined USE_AS_BCOPY
+#if !defined USE_AS_BCOPY && defined SHARED
 ENTRY (MEMCPY_CHK)
 	movl	12(%esp), %eax
 	cmpl	%eax, 16(%esp)
@@ -160,7 +160,7 @@ L(48bytesormore):
 #ifdef SHARED_CACHE_SIZE_HALF
 	cmp	$SHARED_CACHE_SIZE_HALF, %ecx
 #else
-# ifdef SHARED
+# ifdef PIC
 	SETUP_PIC_REG(bx)
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
 	cmp	__x86_shared_cache_size_half@GOTOFF(%ebx), %ecx
@@ -230,7 +230,7 @@ L(shl_0_gobble):
 #ifdef DATA_CACHE_SIZE_HALF
 	cmp	$DATA_CACHE_SIZE_HALF, %ecx
 #else
-# ifdef SHARED
+# ifdef PIC
 	SETUP_PIC_REG(bx)
 	add	$_GLOBAL_OFFSET_TABLE_, %ebx
 	mov	__x86_data_cache_size_half@GOTOFF(%ebx), %edi

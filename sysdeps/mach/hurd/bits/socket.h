@@ -1,5 +1,5 @@
 /* System-specific socket constants and types.  Hurd version.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef __BITS_SOCKET_H
 #define __BITS_SOCKET_H	1
@@ -25,11 +25,10 @@
 #endif
 
 #define	__need_size_t
-#define __need_NULL
 #include <stddef.h>
 
-#include <limits.h>		/* XXX Is this allowed?  */
-#include <bits/types.h>
+#include <bits/wordsize.h>
+#include <sys/types.h>
 
 /* Type for length arguments in socket calls.  */
 #ifndef __socklen_t_defined
@@ -131,13 +130,19 @@ enum __socket_type
 #define	AF_APPLETALK	PF_APPLETALK
 #define	AF_ROUTE	PF_ROUTE
 #define	AF_LINK		PF_LINK
-#define	pseudo_AF_XTP	PF_XTP
+#ifdef __USE_MISC
+# define	pseudo_AF_XTP	PF_XTP
+#endif
 #define	AF_COIP		PF_COIP
 #define	AF_CNT		PF_CNT
-#define pseudo_AF_RTIP	PF_RTIP
+#ifdef __USE_MISC
+# define pseudo_AF_RTIP	PF_RTIP
+#endif
 #define	AF_IPX		PF_IPX
 #define	AF_SIP		PF_SIP
-#define pseudo_AF_PIP	PF_PIP
+#ifdef __USE_MISC
+# define pseudo_AF_PIP	PF_PIP
+#endif
 #define AF_INET6	PF_INET6
 #define	AF_MAX		PF_MAX
 
@@ -156,20 +161,20 @@ struct sockaddr
 
 
 /* Structure large enough to hold any socket address (with the historical
-   exception of AF_UNIX).  We reserve 128 bytes.  */
-#if ULONG_MAX > 0xffffffff
+   exception of AF_UNIX).  */
+#if __WORDSIZE == 64
 # define __ss_aligntype	__uint64_t
 #else
 # define __ss_aligntype	__uint32_t
 #endif
-#define _SS_SIZE	128
-#define _SS_PADSIZE	(_SS_SIZE - (2 * sizeof (__ss_aligntype)))
+#define _SS_PADSIZE \
+  (_SS_SIZE - __SOCKADDR_COMMON_SIZE - sizeof (__ss_aligntype))
 
 struct sockaddr_storage
   {
     __SOCKADDR_COMMON (ss_);	/* Address family, etc.  */
-    __ss_aligntype __ss_align;	/* Force desired alignment.  */
     char __ss_padding[_SS_PADSIZE];
+    __ss_aligntype __ss_align;	/* Force desired alignment.  */
   };
 
 
@@ -220,13 +225,13 @@ struct cmsghdr
 				   of cmsghdr structure.  */
     int cmsg_level;		/* Originating protocol.  */
     int cmsg_type;		/* Protocol specific type.  */
-#if (!defined __STRICT_ANSI__ && __GNUC__ >= 2) || __STDC_VERSION__ >= 199901L
+#if __glibc_c99_flexarr_available
     __extension__ unsigned char __cmsg_data __flexarr; /* Ancillary data.  */
 #endif
   };
 
 /* Ancillary data object manipulation macros.  */
-#if (!defined __STRICT_ANSI__ && __GNUC__ >= 2) || __STDC_VERSION__ >= 199901L
+#if __glibc_c99_flexarr_available
 # define CMSG_DATA(cmsg) ((cmsg)->__cmsg_data)
 #else
 # define CMSG_DATA(cmsg) ((unsigned char *) ((struct cmsghdr *) (cmsg) + 1))
@@ -236,7 +241,7 @@ struct cmsghdr
 
 #define CMSG_FIRSTHDR(mhdr) \
   ((size_t) (mhdr)->msg_controllen >= sizeof (struct cmsghdr)		      \
-   ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) NULL)
+   ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) 0)
 
 #define CMSG_ALIGN(len) (((len) + sizeof (size_t) - 1) \
 			   & (size_t) ~(sizeof (size_t) - 1))
@@ -255,7 +260,7 @@ __NTH (__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg))
 {
   if ((size_t) __cmsg->cmsg_len < sizeof (struct cmsghdr))
     /* The kernel header does this so there may be a reason.  */
-    return NULL;
+    return (struct cmsghdr *) 0;
 
   __cmsg = (struct cmsghdr *) ((unsigned char *) __cmsg
 			       + CMSG_ALIGN (__cmsg->cmsg_len));
@@ -264,7 +269,7 @@ __NTH (__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg))
       || ((unsigned char *) __cmsg + CMSG_ALIGN (__cmsg->cmsg_len)
 	  > ((unsigned char *) __mhdr->msg_control + __mhdr->msg_controllen)))
     /* No more entries.  */
-    return NULL;
+    return (struct cmsghdr *) 0;
   return __cmsg;
 }
 #endif	/* Use `extern inline'.  */
@@ -280,6 +285,7 @@ enum
 #define SCM_CREDS SCM_CREDS
   };
 
+#ifdef __USE_MISC
 /* Unfortunately, BSD practice dictates this structure be of fixed size.
    If there are more than CMGROUP_MAX groups, the list is truncated.
    (On GNU systems, the `cmcred_euid' field is just the first in the
@@ -300,6 +306,7 @@ struct cmsgcred
     int cmcred_ngroups;
     __gid_t cmcred_groups[CMGROUP_MAX];
   };
+#endif
 
 /* Protocol number used to manipulate socket-level options
    with `getsockopt' and `setsockopt'.  */

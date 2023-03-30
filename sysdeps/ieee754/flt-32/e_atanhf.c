@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gmail.com>, 2011.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 
 /* __ieee754_atanh(x)
@@ -35,9 +35,13 @@
 
  */
 
+#include <float.h>
 #include <inttypes.h>
 #include <math.h>
+#include <math-barriers.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const float huge = 1e30;
 
@@ -51,6 +55,7 @@ __ieee754_atanhf (float x)
       if (__glibc_unlikely (xa < 0x1.0p-28f))
 	{
 	  math_force_eval (huge + x);
+	  math_check_force_underflow (x);
 	  return x;
 	}
 
@@ -67,6 +72,6 @@ __ieee754_atanhf (float x)
       return x / 0.0f;
     }
 
-  return __copysignf (t, x);
+  return copysignf (t, x);
 }
-strong_alias (__ieee754_atanhf, __atanhf_finite)
+libm_alias_finite (__ieee754_atanhf, __atanhf)

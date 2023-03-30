@@ -1,5 +1,5 @@
 /* Initialization code run first thing by the ELF startup code.  Common version
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <ctype.h>
 #include <stdio.h>
@@ -51,9 +51,6 @@ attribute_hidden
 _init (int argc, char **argv, char **envp)
 {
 #endif
-#ifdef USE_NONOPTION_FLAGS
-  extern void __getopt_clean_environment (char **);
-#endif
 
   __libc_multiple_libcs = &_dl_starting_up && !_dl_starting_up;
 
@@ -72,23 +69,12 @@ _init (int argc, char **argv, char **envp)
   __environ = envp;
 
 #ifndef SHARED
-  __libc_init_secure ();
-
   /* First the initialization which normally would be done by the
      dynamic linker.  */
   _dl_non_dynamic_init ();
 #endif
 
-#ifdef VDSO_SETUP
-  VDSO_SETUP ();
-#endif
-
   __init_misc (argc, argv, envp);
-
-#ifdef USE_NONOPTION_FLAGS
-  /* This is a hack to make the special getopt in GNU libc working.  */
-  __getopt_clean_environment (envp);
-#endif
 
   /* Initialize ctype data.  */
   __ctype_init ();

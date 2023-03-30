@@ -1,6 +1,5 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
-   Contributed by Ralf Baechle <ralf@gnu.org>.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -14,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _SGIDEFS_H
 #define _SGIDEFS_H	1
@@ -68,5 +67,9 @@
 # define _ABI64			3
 #endif
 #define _MIPS_SIM_ABI64		_ABI64
+
+#ifndef _ABIO64
+# define _ABIO64		4
+#endif
 
 #endif /* sgidefs.h */

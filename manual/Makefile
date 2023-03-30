@@ -1,4 +1,4 @@
-# Copyright (C) 1992-2015 Free Software Foundation, Inc.
+# Copyright (C) 1992-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Makefile for the GNU C Library manual.
 
@@ -38,21 +38,20 @@ chapters = $(addsuffix .texi, \
 		       message search pattern io stdio llio filesys	\
 		       pipe socket terminal syslog math arith time	\
 		       resource setjmp signal startup process ipc job	\
-		       nss users sysinfo conf crypt debug threads probes)
-add-chapters = $(wildcard $(foreach d, $(add-ons), ../$d/$d.texi))
+		       nss users sysinfo conf crypt debug threads	\
+		       probes tunables)
 appendices = lang.texi header.texi install.texi maint.texi platform.texi \
 	     contrib.texi
 licenses = freemanuals.texi lgpl-2.1.texi fdl-1.3.texi
 
 -include $(objpfx)texis
-$(objpfx)texis: texis.awk $(chapters) $(add-chapters) $(appendices) $(licenses)
+$(objpfx)texis: texis.awk $(chapters) $(appendices) $(licenses)
 	$(make-target-directory)
 	$(AWK) -f $^ > $@.T
 	mv -f $@.T $@
 
-nonexamples = $(filter-out $(add-chapters) %.c.texi, $(texis))
-examples = $(filter-out $(foreach d, $(add-ons), ../$d/%.c.texi), \
-			$(filter %.c.texi, $(texis)))
+nonexamples = $(filter-out %.c.texi, $(texis))
+examples = $(filter %.c.texi, $(texis))
 
 # Generated files directly included from libc.texinfo.
 libc-texi-generated = chapters.texi top-menu.texi dir-add.texi \
@@ -68,7 +67,6 @@ texis-path := $(filter-out $(libc-texi-generated) summary.texi $(examples), \
 chapters.% top-menu.%: libc-texinfo.sh $(texis-path) Makefile
 	AWK=$(AWK) $(SHELL) $< $(objpfx) \
 				'$(chapters)' \
-			       '$(add-chapters)' \
 			       '$(appendices) $(licenses)'
 
 
@@ -82,11 +80,10 @@ $(objpfx)libc/index.html: $(addprefix $(objpfx),$(libc-texi-generated))
 
 # Generate the summary from the Texinfo source files for each chapter.
 $(objpfx)summary.texi: $(objpfx)stamp-summary ;
-$(objpfx)stamp-summary: summary.awk $(filter-out $(objpfx)summary.texi, \
+$(objpfx)stamp-summary: summary.pl $(filter-out $(objpfx)summary.texi, \
 					$(texis-path))
 	$(SHELL) ./check-safety.sh $(filter-out $(objpfx)%, $(texis-path))
-	$(AWK) -f $^ | sort -t'' -df -k 1,1 | tr '\014' '\012' \
-		> $(objpfx)summary-tmp
+	LC_ALL=C $(PERL) $^ > $(objpfx)summary-tmp
 	$(move-if-change) $(objpfx)summary-tmp $(objpfx)summary.texi
 	touch $@
 
@@ -102,10 +99,11 @@ $(objpfx)dir-add.texi: xtract-typefun.awk $(texis-path)
 
 # The table with the math errors is generated.
 $(objpfx)libm-err.texi: $(objpfx)stamp-libm-err
-$(objpfx)stamp-libm-err: libm-err-tab.pl $(wildcard $(foreach dir,$(sysdirs),\
-						     $(dir)/libm-test-ulps))
+$(objpfx)stamp-libm-err: $(..)math/gen-libm-test.py \
+			 $(wildcard $(foreach dir,$(sysdirs),\
+						  $(dir)/libm-test-ulps))
 	pwd=`pwd`; \
-	$(PERL) $< $$pwd/.. > $(objpfx)libm-err-tmp
+	$(PYTHON) $< -s $$pwd/.. -m $(objpfx)libm-err-tmp
 	$(move-if-change) $(objpfx)libm-err-tmp $(objpfx)libm-err.texi
 	touch $@
 
@@ -153,7 +151,7 @@ $(objpfx)%.pdf: %.texinfo
 
 
 # Distribution.
-minimal-dist = summary.awk texis.awk tsort.awk libc-texinfo.sh libc.texinfo \
+minimal-dist = summary.pl texis.awk tsort.awk libc-texinfo.sh libc.texinfo \
 	       libm-err.texi stamp-libm-err check-safety.sh		    \
 	       $(filter-out summary.texi, $(nonexamples))		    \
 	       $(patsubst %.c.texi,examples/%.c, $(examples))
@@ -172,12 +170,16 @@ include ../Rules
 
 .PHONY: install subdir_install install-data
 install-data subdir_install: install
+# Generated files requiring python: libm-err.texi
+# Generated files requiring perl: summary.texi
+ifneq ($(PERL),no)
 ifneq ($(strip $(MAKEINFO)),:)
 install: $(inst_infodir)/libc.info
 	@if $(SHELL) -c '$(INSTALL_INFO) --version' >/dev/null 2>&1; then \
 	 test -f $(inst_infodir)/dir || $(INSTALL_DATA) dir $(inst_infodir);\
 	 $(INSTALL_INFO) --info-dir=$(inst_infodir) $(inst_infodir)/libc.info;\
 	else : ; fi
+endif
 endif
 # Catchall implicit rule for other installation targets from the parent.
 install-%: ;

@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,12 +13,18 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#define SIGCONTEXT int _code, struct sigcontext *
-#define SIGCONTEXT_EXTRA_ARGS _code,
-#define GET_PC(ctx)	((void *) (ctx)->sc_pc)
-#define GET_FRAME(ctx)	((void *) (ctx)->sc_regs[15])
-#define GET_STACK(ctx)	((void *) (ctx)->sc_regs[30])
-#define CALL_SIGHANDLER(handler, signo, ctx) \
-  (handler)((signo), SIGCONTEXT_EXTRA_ARGS (ctx))
+#ifndef _SIGCONTEXTINFO_H
+#define _SIGCONTEXTINFO_H
+
+#include <stdint.h>
+#include <sys/ucontext.h>
+
+static inline uintptr_t
+sigcontext_get_pc (const ucontext_t *ctx)
+{
+  return ctx->uc_mcontext.sc_pc;
+}
+
+#endif

@@ -1,5 +1,5 @@
 /* clock_gettime -- Get the current time from a POSIX clockid_t.  Unix version.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,7 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
-/* Changes by NEC Corporation for the VE port, 2017-2019 */
+/* Changes by NEC Corporation for the VE port, 2020 */
 
 #include <errno.h>
 #include <stdint.h>
@@ -23,14 +23,15 @@
 #include <sys/time.h>
 #include <libc-internal.h>
 #include <ldsodefs.h>
+#include <shlib-compat.h>
 #include "posix-timer.h"
 
 /* For all clock ids */
 #define  MAX_CLOCKS  16
 
 /* Declare locks for all clockids */
-static volatile int lock[MAX_CLOCKS] = {LLL_LOCK_INITIALIZER};
-static volatile int lock_freq = LLL_LOCK_INITIALIZER;
+static int lock[MAX_CLOCKS] = {LLL_LOCK_INITIALIZER};
+static int lock_freq = LLL_LOCK_INITIALIZER;
 
 static struct timespec base_tspec[MAX_CLOCKS] = {0};
 static struct timespec prev_tspec[MAX_CLOCKS] = {0};
@@ -193,7 +194,7 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 	timespec_add(&tvm, &base_tspec[clock_id], &tvm);
 	/*Storing current time data from micro to nano*/
 	tp->tv_sec = tvm.tv_sec;
-        tp->tv_nsec = tvm.tv_nsec;
+	tp->tv_nsec = tvm.tv_nsec;
 
 	lll_lock (lock[clock_id], LLL_PRIVATE);
 
@@ -211,13 +212,13 @@ __clock_gettime (clockid_t clock_id, struct timespec *tp)
 	  base_tspec[clock_id].tv_nsec = tp->tv_nsec;
 	  /* Get fresh STM at this point */
 	  GET_STM(base_stm[clock_id], vehva);
-          tvm.tv_sec = tp->tv_sec;
-          tvm.tv_nsec = tp->tv_nsec;
+	  tvm.tv_sec = tp->tv_sec;
+	  tvm.tv_nsec = tp->tv_nsec;
 	}
 
 	if (timespec_compare(&tvm, &prev_tspec[clock_id]) < 0)
 	{
-          timespec_sub(&diff, &prev_tspec[clock_id], &tvm);
+	  timespec_sub(&diff, &prev_tspec[clock_id], &tvm);
 	  if (diff.tv_sec < 60)
 	  {
 	    tp->tv_sec = prev_tspec[clock_id].tv_sec;
@@ -262,5 +263,12 @@ set_return_status:
 
   return retval;
 }
-weak_alias (__clock_gettime, clock_gettime)
 libc_hidden_def (__clock_gettime)
+
+versioned_symbol (libc, __clock_gettime, clock_gettime, GLIBC_2_17);
+/* clock_gettime moved to libc in version 2.17;
+   old binaries may expect the symbol version it had in librt.  */
+#if SHLIB_COMPAT (libc, GLIBC_2_2, GLIBC_2_17)
+strong_alias (__clock_gettime, __clock_gettime_2);
+compat_symbol (libc, __clock_gettime_2, clock_gettime, GLIBC_2_2);
+#endif

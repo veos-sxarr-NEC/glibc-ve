@@ -1,5 +1,5 @@
 /* O_*, F_*, FD_* bit values for Linux.
-   Copyright (C) 1995-2015 Free Software Foundation, Inc.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef	_FCNTL_H
 # error "Never use <bits/fcntl.h> directly; include <fcntl.h> instead."
@@ -27,7 +27,7 @@
 #define O_NONBLOCK	00200004 /* HPUX has separate NDELAY & NONBLOCK */
 #define __O_DSYNC	01000000
 #define __O_RSYNC	02000000 /* HPUX only */
-#define __O_SYNC	01000000
+#define __O_SYNC	00100000
 #define O_SYNC		(__O_SYNC|__O_DSYNC)
 
 #define O_BLKSEEK	00000100 /* HPUX only */

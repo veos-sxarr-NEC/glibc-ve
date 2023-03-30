@@ -1,6 +1,6 @@
 /* Round to int long double floating-point values.
    IBM extended format long double version.
-   Copyright (C) 2006-2015 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -15,15 +15,19 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* This has been coded in assembler because GCC makes such a mess of it
    when it's coded in C.  */
 
+#define NO_MATH_REDIRECT
 #include <math.h>
+#include <math_private.h>
 #include <math_ldbl_opt.h>
 #include <float.h>
 #include <ieee754.h>
+
+double round (double) asm ("__round");
 
 
 long double
@@ -38,47 +42,48 @@ __roundl (long double x)
 			&& __builtin_isless (__builtin_fabs (xh),
 					     __builtin_inf ()), 1))
     {
-      double orig_xh;
-
-      /* Long double arithmetic, including the canonicalisation below,
-	 only works in round-to-nearest mode.  */
-
-      /* Convert the high double to integer.  */
-      orig_xh = xh;
-      hi = ldbl_nearbyint (xh);
-
-      /* Subtract integral high part from the value.  */
-      xh -= hi;
-      ldbl_canonicalize (&xh, &xl);
-
-      /* Now convert the low double, adjusted for any remainder from the
-	 high double.  */
-      lo = ldbl_nearbyint (xh);
-
-      /* Adjust the result when the remainder is exactly 0.5.  nearbyint
-	 rounds values halfway between integers to the nearest even
-	 integer.  roundl must round away from zero.
-	 Also correct cases where nearbyint returns an incorrect value
-	 for LO.  */
-      xh -= lo;
-      ldbl_canonicalize (&xh, &xl);
-      if (xh == 0.5)
+      hi = round (xh);
+      if (hi != xh)
 	{
-	  if (xl > 0.0 || (xl == 0.0 && orig_xh > 0.0))
-	    lo += 1.0;
+	  /* The high part is not an integer; the low part only
+	     affects the result if the high part is exactly half way
+	     between two integers and the low part is nonzero with the
+	     opposite sign.  */
+	  if (fabs (hi - xh) == 0.5)
+	    {
+	      if (xh > 0 && xl < 0)
+		xh = hi - 1;
+	      else if (xh < 0 && xl > 0)
+		xh = hi + 1;
+	      else
+		xh = hi;
+	    }
+	  else
+	    xh = hi;
+	  xl = 0;
 	}
-      else if (-xh == 0.5)
+      else
 	{
-	  if (xl < 0.0 || (xl == 0.0 && orig_xh < 0.0))
-	    lo -= 1.0;
+	  /* The high part is a nonzero integer.  */
+	  lo = round (xl);
+	  if (fabs (lo - xl) == 0.5)
+	    {
+	      if (xh > 0 && xl < 0)
+		xl = lo + 1;
+	      else if (xh < 0 && lo > 0)
+		xl = lo - 1;
+	      else
+		xl = lo;
+	    }
+	  else
+	    xl = lo;
+	  xh = hi;
+	  ldbl_canonicalize_int (&xh, &xl);
 	}
-
-      /* Ensure the final value is canonical.  In certain cases,
-	 rounding causes hi,lo calculated so far to be non-canonical.  */
-      xh = hi;
-      xl = lo;
-      ldbl_canonicalize (&xh, &xl);
     }
+  else
+    /* Quiet signaling NaN arguments.  */
+    xh += xh;
 
   return ldbl_pack (xh, xl);
 }

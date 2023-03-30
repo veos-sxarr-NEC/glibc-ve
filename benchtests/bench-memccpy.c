@@ -1,5 +1,5 @@
 /* Measure memccpy functions.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,34 +14,14 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
 #define TEST_NAME "memccpy"
 #include "bench-string.h"
 
-void *simple_memccpy (void *, const void *, int, size_t);
-void *stupid_memccpy (void *, const void *, int, size_t);
-
-IMPL (stupid_memccpy, 0)
-IMPL (simple_memccpy, 0)
-IMPL (memccpy, 1)
-
 void *
-simple_memccpy (void *dst, const void *src, int c, size_t n)
-{
-  const char *s = src;
-  char *d = dst;
-
-  while (n-- > 0)
-    if ((*d++ = *s++) == (char) c)
-      return d;
-
-  return NULL;
-}
-
-void *
-stupid_memccpy (void *dst, const void *src, int c, size_t n)
+generic_memccpy (void *dst, const void *src, int c, size_t n)
 {
   void *p = memchr (src, c, n);
 
@@ -52,30 +32,17 @@ stupid_memccpy (void *dst, const void *src, int c, size_t n)
   return NULL;
 }
 
+IMPL (memccpy, 1)
+IMPL (generic_memccpy, 0)
+
 typedef void *(*proto_t) (void *, const void *, int c, size_t);
 
 static void
 do_one_test (impl_t *impl, void *dst, const void *src, int c, size_t len,
 	     size_t n)
 {
-  void *expect = len > n ? NULL : (char *) dst + len;
-  size_t i, iters = INNER_LOOP_ITERS;
+  size_t i, iters = INNER_LOOP_ITERS_LARGE;
   timing_t start, stop, cur;
-
-  if (CALL (impl, dst, src, c, n) != expect)
-    {
-      error (0, 0, "Wrong result in function %s %p %p", impl->name,
-	     CALL (impl, dst, src, c, n), expect);
-      ret = 1;
-      return;
-    }
-
-  if (memcmp (dst, src, len > n ? n : len) != 0)
-    {
-      error (0, 0, "Wrong result in function %s", impl->name);
-      ret = 1;
-      return;
-    }
 
   TIMING_NOW (start);
   for (i = 0; i < iters; ++i)
@@ -160,4 +127,4 @@ test_main (void)
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

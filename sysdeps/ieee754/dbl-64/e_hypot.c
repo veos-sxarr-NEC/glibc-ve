@@ -44,6 +44,8 @@
 
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 double
 __ieee754_hypot (double x, double y)
@@ -74,8 +76,10 @@ __ieee754_hypot (double x, double y)
     {
       if (ha >= 0x7ff00000)             /* Inf or NaN */
 	{
-	  u_int32_t low;
+	  uint32_t low;
 	  w = a + b;                    /* for sNaN */
+	  if (issignaling (a) || issignaling (b))
+	    return w;
 	  GET_LOW_WORD (low, a);
 	  if (((ha & 0xfffff) | low) == 0)
 	    w = a;
@@ -93,7 +97,7 @@ __ieee754_hypot (double x, double y)
     {
       if (hb <= 0x000fffff)             /* subnormal b or 0 */
 	{
-	  u_int32_t low;
+	  uint32_t low;
 	  GET_LOW_WORD (low, b);
 	  if ((hb | low) == 0)
 	    return a;
@@ -130,7 +134,7 @@ __ieee754_hypot (double x, double y)
       t1 = 0;
       SET_HIGH_WORD (t1, ha);
       t2 = a - t1;
-      w = __ieee754_sqrt (t1 * t1 - (b * (-b) - t2 * (a + t1)));
+      w = sqrt (t1 * t1 - (b * (-b) - t2 * (a + t1)));
     }
   else
     {
@@ -141,17 +145,21 @@ __ieee754_hypot (double x, double y)
       t1 = 0;
       SET_HIGH_WORD (t1, ha + 0x00100000);
       t2 = a - t1;
-      w = __ieee754_sqrt (t1 * y1 - (w * (-w) - (t1 * y2 + t2 * b)));
+      w = sqrt (t1 * y1 - (w * (-w) - (t1 * y2 + t2 * b)));
     }
   if (k != 0)
     {
-      u_int32_t high;
+      uint32_t high;
       t1 = 1.0;
       GET_HIGH_WORD (high, t1);
       SET_HIGH_WORD (t1, high + (k << 20));
-      return t1 * w;
+      w *= t1;
+      math_check_force_underflow_nonneg (w);
+      return w;
     }
   else
     return w;
 }
-strong_alias (__ieee754_hypot, __hypot_finite)
+#ifndef __ieee754_hypot
+libm_alias_finite (__ieee754_hypot, __hypot)
+#endif

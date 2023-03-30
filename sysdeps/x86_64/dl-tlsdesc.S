@@ -1,5 +1,5 @@
 /* Thread-local storage handling in the ELF dynamic linker.  x86_64 version.
-   Copyright (C) 2004-2015 Free Software Foundation, Inc.
+   Copyright (C) 2004-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <tls.h>
@@ -37,6 +37,7 @@
 	cfi_startproc
 	.align 16
 _dl_tlsdesc_return:
+	_CET_ENDBR
 	movq	8(%rax), %rax
 	ret
 	cfi_endproc
@@ -58,6 +59,7 @@ _dl_tlsdesc_return:
 	cfi_startproc
 	.align 16
 _dl_tlsdesc_undefweak:
+	_CET_ENDBR
 	movq	8(%rax), %rax
 	subq	%fs:0, %rax
 	ret
@@ -96,6 +98,7 @@ _dl_tlsdesc_dynamic (register struct tlsdesc *tdp asm ("%rax"))
 	cfi_startproc
 	.align 16
 _dl_tlsdesc_dynamic:
+	_CET_ENDBR
 	/* Preserve call-clobbered registers that we modify.
 	   We need two scratch regs anyway.  */
 	movq	%rsi, -16(%rsp)
@@ -128,7 +131,11 @@ _dl_tlsdesc_dynamic:
 	movq	%r10, 40(%rsp)
 	movq	%r11, 48(%rsp)
 	/* %rdi already points to the tlsinfo data structure.  */
+#ifdef NO_RTLD_HIDDEN
+	call	JUMPTARGET (__tls_get_addr)
+#else
 	call	HIDDEN_JUMPTARGET (__tls_get_addr)
+#endif
 	movq	8(%rsp), %rdx
 	movq	16(%rsp), %rcx
 	movq	24(%rsp), %r8
@@ -162,15 +169,17 @@ _dl_tlsdesc_dynamic:
 	.align 16
 	/* The PLT entry will have pushed the link_map pointer.  */
 _dl_tlsdesc_resolve_rela:
+	_CET_ENDBR
 	cfi_adjust_cfa_offset (8)
-	/* Save all call-clobbered registers.  */
-	subq	$72, %rsp
-	cfi_adjust_cfa_offset (72)
+	/* Save all call-clobbered registers.  Add 8 bytes for push in
+	   the PLT entry to align the stack.  */
+	subq	$80, %rsp
+	cfi_adjust_cfa_offset (80)
 	movq	%rax, (%rsp)
 	movq	%rdi, 8(%rsp)
 	movq	%rax, %rdi	/* Pass tlsdesc* in %rdi.  */
 	movq	%rsi, 16(%rsp)
-	movq	72(%rsp), %rsi	/* Pass link_map* in %rsi.  */
+	movq	80(%rsp), %rsi	/* Pass link_map* in %rsi.  */
 	movq	%r8, 24(%rsp)
 	movq	%r9, 32(%rsp)
 	movq	%r10, 40(%rsp)
@@ -187,8 +196,8 @@ _dl_tlsdesc_resolve_rela:
 	movq	48(%rsp), %r11
 	movq	56(%rsp), %rdx
 	movq	64(%rsp), %rcx
-	addq	$80, %rsp
-	cfi_adjust_cfa_offset (-80)
+	addq	$88, %rsp
+	cfi_adjust_cfa_offset (-88)
 	jmp	*(%rax)
 	cfi_endproc
 	.size	_dl_tlsdesc_resolve_rela, .-_dl_tlsdesc_resolve_rela
@@ -211,6 +220,7 @@ _dl_tlsdesc_resolve_rela:
 	.align 16
 _dl_tlsdesc_resolve_hold:
 0:
+	_CET_ENDBR
 	/* Save all call-clobbered registers.  */
 	subq	$72, %rsp
 	cfi_adjust_cfa_offset (72)

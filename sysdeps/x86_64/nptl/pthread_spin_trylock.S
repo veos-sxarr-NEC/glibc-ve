@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,9 +14,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <pthread-errnos.h>
+#include <sysdep.h>
 
 
 #ifdef UP
@@ -25,10 +26,7 @@
 # define LOCK lock
 #endif
 
-	.globl	pthread_spin_trylock
-	.type	pthread_spin_trylock,@function
-	.align	16
-pthread_spin_trylock:
+ENTRY(pthread_spin_trylock)
 	movl	$1, %eax
 	xorl	%ecx, %ecx
 	LOCK
@@ -36,4 +34,4 @@ pthread_spin_trylock:
 	movl	$EBUSY, %eax
 	cmovel	%ecx, %eax
 	retq
-	.size	pthread_spin_trylock,.-pthread_spin_trylock
+END(pthread_spin_trylock)

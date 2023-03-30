@@ -1,5 +1,5 @@
 /* Look up a symbol in a shared object loaded by `dlopen'.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <stddef.h>
@@ -41,7 +41,6 @@
 /* Return the symbol address given the map of the module it is in and
    the symbol record.  This is used in dl-sym.c.  */
 static void *
-internal_function
 _dl_tls_symaddr (struct link_map *map, const ElfW(Sym) *ref)
 {
 # ifndef DONT_USE_TLS_INDEX
@@ -81,9 +80,20 @@ call_dl_lookup (void *ptr)
 					args->flags, NULL);
 }
 
+/* Return the link map containing the caller address.  */
+static inline struct link_map *
+find_caller_link_map (ElfW(Addr) caller)
+{
+  struct link_map *l = _dl_find_dso_for_object (caller);
+  if (l != NULL)
+    return l;
+  else
+    /* If the address is not recognized the call comes from the main
+       program (we hope).  */
+    return GL(dl_ns)[LM_ID_BASE]._ns_loaded;
+}
 
 static void *
-internal_function
 do_sym (void *handle, const char *name, void *who,
 	struct r_found_version *vers, int flags)
 {
@@ -91,13 +101,13 @@ do_sym (void *handle, const char *name, void *who,
   lookup_t result;
   ElfW(Addr) caller = (ElfW(Addr)) who;
 
-  struct link_map *l = _dl_find_dso_for_object (caller);
-  /* If the address is not recognized the call comes from the main
-     program (we hope).  */
-  struct link_map *match = l ? l : GL(dl_ns)[LM_ID_BASE]._ns_loaded;
+  /* Link map of the caller if needed.  */
+  struct link_map *match = NULL;
 
   if (handle == RTLD_DEFAULT)
     {
+      match = find_caller_link_map (caller);
+
       /* Search the global scope.  We have the simple case where
 	 we look up in the scope of an object which was part of
 	 the initial binary.  And then the more complex part
@@ -119,38 +129,25 @@ do_sym (void *handle, const char *name, void *who,
 	  args.refp = &ref;
 
 	  THREAD_GSCOPE_SET_FLAG ();
-
-	  const char *objname;
-	  const char *errstring = NULL;
-	  bool malloced;
-	  int err = GLRO(dl_catch_error) (&objname, &errstring, &malloced,
-					  call_dl_lookup, &args);
-
+	  struct dl_exception exception;
+	  int err = _dl_catch_exception (&exception, call_dl_lookup, &args);
 	  THREAD_GSCOPE_RESET_FLAG ();
-
-	  if (__glibc_unlikely (errstring != NULL))
-	    {
-	      /* The lookup was unsuccessful.  Rethrow the error.  */
-	      char *errstring_dup = strdupa (errstring);
-	      char *objname_dup = strdupa (objname);
-	      if (malloced)
-		free ((char *) errstring);
-
-	      GLRO(dl_signal_error) (err, objname_dup, NULL, errstring_dup);
-	      /* NOTREACHED */
-	    }
+	  if (__glibc_unlikely (exception.errstring != NULL))
+	    _dl_signal_exception (err, &exception, NULL);
 
 	  result = args.map;
 	}
     }
   else if (handle == RTLD_NEXT)
     {
+      match = find_caller_link_map (caller);
+
       if (__glibc_unlikely (match == GL(dl_ns)[LM_ID_BASE]._ns_loaded))
 	{
 	  if (match == NULL
 	      || caller < match->l_map_start
 	      || caller >= match->l_map_end)
-	    GLRO(dl_signal_error) (0, NULL, NULL, N_("\
+	    _dl_signal_error (0, NULL, NULL, N_("\
 RTLD_NEXT used in code not dynamically loaded"));
 	}
 
@@ -204,6 +201,9 @@ RTLD_NEXT used in code not dynamically loaded"));
 	  unsigned int ndx = (ref - (ElfW(Sym) *) D_PTR (result,
 							 l_info[DT_SYMTAB]));
 
+	  if (match == NULL)
+	    match = find_caller_link_map (caller);
+
 	  if ((match->l_audit_any_plt | result->l_audit_any_plt) != 0)
 	    {
 	      unsigned int altvalue = 0;
@@ -215,17 +215,20 @@ RTLD_NEXT used in code not dynamically loaded"));
 
 	      for (unsigned int cnt = 0; cnt < GLRO(dl_naudit); ++cnt)
 		{
+		  struct auditstate *match_audit
+		    = link_map_audit_state (match, cnt);
+		  struct auditstate *result_audit
+		    = link_map_audit_state (result, cnt);
 		  if (afct->symbind != NULL
-		      && ((match->l_audit[cnt].bindflags & LA_FLG_BINDFROM)
-			  != 0
-			  || ((result->l_audit[cnt].bindflags & LA_FLG_BINDTO)
+		      && ((match_audit->bindflags & LA_FLG_BINDFROM) != 0
+			  || ((result_audit->bindflags & LA_FLG_BINDTO)
 			      != 0)))
 		    {
 		      unsigned int flags = altvalue | LA_SYMB_DLSYM;
 		      uintptr_t new_value
 			= afct->symbind (&sym, ndx,
-					 &match->l_audit[cnt].cookie,
-					 &result->l_audit[cnt].cookie,
+					 &match_audit->cookie,
+					 &result_audit->cookie,
 					 &flags, strtab + ref->st_name);
 		      if (new_value != (uintptr_t) sym.st_value)
 			{
@@ -250,7 +253,6 @@ RTLD_NEXT used in code not dynamically loaded"));
 
 
 void *
-internal_function
 _dl_vsym (void *handle, const char *name, const char *version, void *who)
 {
   struct r_found_version vers;
@@ -267,7 +269,6 @@ _dl_vsym (void *handle, const char *name, const char *version, void *who)
 
 
 void *
-internal_function
 _dl_sym (void *handle, const char *name, void *who)
 {
   return do_sym (handle, name, who, NULL, DL_LOOKUP_RETURN_NEWEST);

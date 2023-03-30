@@ -1,5 +1,5 @@
 /* signbit().  sparc64 version.
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 
@@ -24,11 +24,9 @@ ENTRY (__signbit)
 	retl
 	 srl	%o0, 31, %o0
 END (__signbit)
-weak_alias (__signbit, signbit)
 
 /* On 64-bit the double version will also always work for
    long-double-precision since in both cases the word with the
    sign bit in it is passed always in register %f0.  */
 strong_alias (__signbit, __signbitl)
 hidden_def (__signbitl)
-weak_alias (__signbitl, signbitl)

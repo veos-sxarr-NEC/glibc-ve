@@ -1,4 +1,4 @@
-# Copyright (C) 1998-2015 Free Software Foundation, Inc.
+# Copyright (C) 1998-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for debug portion of the library.
@@ -45,82 +45,93 @@ routines  = backtrace backtracesyms backtracesymsfd noophooks \
 	    gethostname_chk getdomainname_chk wcrtomb_chk mbsnrtowcs_chk \
 	    wcsnrtombs_chk mbsrtowcs_chk wcsrtombs_chk mbstowcs_chk \
 	    wcstombs_chk asprintf_chk vasprintf_chk dprintf_chk \
-	    vdprintf_chk obprintf_chk \
+	    vdprintf_chk obprintf_chk vobprintf_chk \
 	    longjmp_chk ____longjmp_chk \
 	    fdelt_chk poll_chk ppoll_chk \
+	    explicit_bzero_chk \
 	    stack_chk_fail fortify_fail \
 	    $(static-only-routines)
 static-only-routines := warning-nop stack_chk_fail_local
 
-CFLAGS-backtrace.c = -fno-omit-frame-pointer
-CFLAGS-sprintf_chk.c = $(libio-mtsafe)
-CFLAGS-snprintf_chk.c = $(libio-mtsafe)
-CFLAGS-vsprintf_chk.c = $(libio-mtsafe)
-CFLAGS-vsnprintf_chk.c = $(libio-mtsafe)
-CFLAGS-asprintf_chk.c = $(libio-mtsafe)
-CFLAGS-vasprintf_chk.c = $(libio-mtsafe)
-CFLAGS-obprintf_chk.c = $(libio-mtsafe)
-CFLAGS-dprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-vdprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-printf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-vprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-vfprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-gets_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fgets_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fgets_u_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fread_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fread_u_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-swprintf_chk.c = $(libio-mtsafe)
-CFLAGS-vswprintf_chk.c = $(libio-mtsafe)
-CFLAGS-wprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fwprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-vwprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-vfwprintf_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fgetws_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-fgetws_u_chk.c = $(libio-mtsafe) $(exceptions)
-CFLAGS-read_chk.c = -fexceptions -fasynchronous-unwind-tables
-CFLAGS-pread_chk.c = -fexceptions -fasynchronous-unwind-tables
-CFLAGS-pread64_chk.c = -fexceptions -fasynchronous-unwind-tables
-CFLAGS-recv_chk.c = -fexceptions -fasynchronous-unwind-tables
-CFLAGS-recvfrom_chk.c = -fexceptions -fasynchronous-unwind-tables
+# Don't add stack_chk_fail_local.o to libc.a since __stack_chk_fail_local
+# is an alias of __stack_chk_fail in stack_chk_fail.o.
+elide-routines.o := stack_chk_fail_local
+
+# Building the stack-protector failure routines with stack protection
+# is not required since we have already failed a stack check and are
+# exiting the process.  However, the local aliases which jump to the
+# real routines should still be compiled with stack protection
+# (stack_chk_fail_local.c), so that the statically linked parts of the
+# library have the expected flags.
+
+CFLAGS-stack_chk_fail.c += $(no-stack-protector)
+
+CFLAGS-backtrace.c += -fno-omit-frame-pointer -funwind-tables
+CFLAGS-sprintf_chk.c += $(libio-mtsafe)
+CFLAGS-snprintf_chk.c += $(libio-mtsafe)
+CFLAGS-vsprintf_chk.c += $(libio-mtsafe)
+CFLAGS-vsnprintf_chk.c += $(libio-mtsafe)
+CFLAGS-asprintf_chk.c += $(libio-mtsafe)
+CFLAGS-vasprintf_chk.c += $(libio-mtsafe)
+CFLAGS-obprintf_chk.c += $(libio-mtsafe)
+CFLAGS-dprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-vdprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-printf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-vprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-vfprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-gets_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fgets_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fgets_u_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fread_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fread_u_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-swprintf_chk.c += $(libio-mtsafe)
+CFLAGS-vswprintf_chk.c += $(libio-mtsafe)
+CFLAGS-wprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fwprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-vwprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-vfwprintf_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fgetws_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-fgetws_u_chk.c += $(libio-mtsafe) -fexceptions
+CFLAGS-read_chk.c += -fexceptions -fasynchronous-unwind-tables
+CFLAGS-pread_chk.c += -fexceptions -fasynchronous-unwind-tables
+CFLAGS-pread64_chk.c += -fexceptions -fasynchronous-unwind-tables
+CFLAGS-recv_chk.c += -fexceptions -fasynchronous-unwind-tables
+CFLAGS-recvfrom_chk.c += -fexceptions -fasynchronous-unwind-tables
 
 # Need to make sure the settings here override what configure might have
 # set up for us, so keep the CFLAGS/CPPFLAGS split logical as the order is:
 # <user CFLAGS> <test CFLAGS> <user CPPFLAGS> <test CPPFLAGS>
-CFLAGS-tst-longjmp_chk.c = -fexceptions -fasynchronous-unwind-tables -O0
-CPPFLAGS-tst-longjmp_chk.c = -D_FORTIFY_SOURCE=1
-CFLAGS-tst-longjmp_chk2.c = -fexceptions -fasynchronous-unwind-tables -O0
-CPPFLAGS-tst-longjmp_chk2.c = -D_FORTIFY_SOURCE=1
-CFLAGS-tst-longjmp_chk3.c = -fexceptions -fasynchronous-unwind-tables
-CPPFLAGS-tst-longjmp_chk3.c = -D_FORTIFY_SOURCE=1
+CFLAGS-tst-longjmp_chk.c += -fexceptions -fasynchronous-unwind-tables -O0
+CPPFLAGS-tst-longjmp_chk.c += -D_FORTIFY_SOURCE=1
+CFLAGS-tst-longjmp_chk2.c += -fexceptions -fasynchronous-unwind-tables -O0
+CPPFLAGS-tst-longjmp_chk2.c += -D_FORTIFY_SOURCE=1
+CFLAGS-tst-longjmp_chk3.c += -fexceptions -fasynchronous-unwind-tables
+CPPFLAGS-tst-longjmp_chk3.c += -D_FORTIFY_SOURCE=1
 
 # We know these tests have problems with format strings, this is what
-# we are testing.  Disable that warning.  They also generate warnings
-# from warning attributes, which cannot be disabled via pragmas, so
-# require -Wno-error to be used.
-
-#We have commented below files with .cc extension as they are cpp
-#files
-CFLAGS-tst-chk1.c = -Wno-format -Wno-error -O0
-#CFLAGS-tst-chk4.cc = -Wno-format -Wno-error
-CFLAGS-tst-chk2.c = -Wno-format -Wno-error -O0
-CFLAGS-tst-chk3.c = -Wno-format -Wno-error -O0
-#CFLAGS-tst-chk4.cc = -Wno-format -Wno-error
-#CFLAGS-tst-chk5.cc = -Wno-format -Wno-error
-#CFLAGS-tst-chk6.cc = -Wno-format -Wno-error
-CFLAGS-tst-lfschk1.c = -Wno-format -Wno-error -O0
-CFLAGS-tst-lfschk2.c = -Wno-format -Wno-error -O0
-CFLAGS-tst-lfschk3.c = -Wno-format -Wno-error -O0
-#CFLAGS-tst-lfschk4.cc = -Wno-format -Wno-error
-#CFLAGS-tst-lfschk5.cc = -Wno-format -Wno-error
-#CFLAGS-tst-lfschk6.cc = -Wno-format -Wno-error
-#LDLIBS-tst-chk4 = -lstdc++
-#LDLIBS-tst-chk5 = -lstdc++
-#LDLIBS-tst-chk6 = -lstdc++
-#LDLIBS-tst-lfschk4 = -lstdc++
-#LDLIBS-tst-lfschk5 = -lstdc++
-#LDLIBS-tst-lfschk6 = -lstdc++
+# we are testing.  Disable that warning.  They are also testing
+# deprecated functions (notably gets) so disable that warning as well.
+# And they also generate warnings from warning attributes, which
+# cannot be disabled via pragmas, so require -Wno-error to be used.
+CFLAGS-tst-chk1.c += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-chk2.c += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-chk3.c += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-chk4.cc += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-chk5.cc += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-chk6.cc += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-lfschk1.c += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-lfschk2.c += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-lfschk3.c += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-lfschk4.cc += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-lfschk5.cc += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+CFLAGS-tst-lfschk6.cc += -Wno-format -Wno-deprecated-declarations -Wno-error -O0
+LDLIBS-tst-chk4 = -lstdc++ -O0
+LDLIBS-tst-chk5 = -lstdc++ -O0
+LDLIBS-tst-chk6 = -lstdc++ -O0
+LDLIBS-tst-lfschk4 = -lstdc++ -O0
+LDLIBS-tst-lfschk5 = -lstdc++ -O0
+LDLIBS-tst-lfschk6 = -lstdc++ -O0
 
 # backtrace_symbols only works if we link with -rdynamic.  backtrace
 # requires unwind tables on most architectures.
@@ -135,10 +146,21 @@ LDFLAGS-tst-backtrace4 = -rdynamic
 LDFLAGS-tst-backtrace5 = -rdynamic
 LDFLAGS-tst-backtrace6 = -rdynamic
 
+CFLAGS-tst-ssp-1.c += -fstack-protector-all
+
 tests = backtrace-tst tst-longjmp_chk tst-chk1 tst-chk2 tst-chk3 \
 	tst-lfschk1 tst-lfschk2 tst-lfschk3 test-strcpy_chk test-stpcpy_chk \
 	tst-longjmp_chk2 tst-backtrace2 tst-backtrace3 tst-backtrace4 \
 	tst-backtrace5 tst-backtrace6
+
+ifeq ($(have-ssp),yes)
+tests += tst-ssp-1
+endif
+
+ifeq (,$(CXX))
+tests-unsupported = tst-chk4 tst-chk5 tst-chk6 \
+		    tst-lfschk4 tst-lfschk5 tst-lfschk6
+endif
 
 extra-libs = libSegFault libpcprofile
 extra-libs-others = $(extra-libs)
@@ -159,6 +181,13 @@ endif
 generated += catchsegv xtrace
 
 include ../Rules
+
+ifeq ($(run-built-tests),yes)
+LOCALES := de_DE.UTF-8
+include ../gen-locales.mk
+
+$(objpfx)tst-chk1.out: $(gen-locales)
+endif
 
 sLIBdir := $(shell echo $(slibdir) | sed 's,lib\(\|64\)$$,\\\\$$LIB,')
 

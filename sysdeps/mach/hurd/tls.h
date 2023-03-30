@@ -1,5 +1,5 @@
 /* Definitions for thread-local data handling.  Hurd version.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef _TLS_H
 #define _TLS_H
@@ -22,9 +22,12 @@
 #ifndef __ASSEMBLER__
 
 # include <stddef.h>
+# include <stdint.h>
 # include <stdbool.h>
+# include <sysdep.h>
 # include <mach/mig_errors.h>
 # include <mach.h>
+# include <atomic.h>
 
 
 /* This is the size of the initial TCB.  */
@@ -48,6 +51,26 @@
 /* Return dtv of given thread descriptor.  */
 # define GET_DTV(descr) \
   (((tcbhead_t *) (descr))->dtv)
+
+/* Global scope switch support.  */
+#define THREAD_GSCOPE_IN_TCB      0
+#define THREAD_GSCOPE_GLOBAL
+#define THREAD_GSCOPE_SET_FLAG() \
+  atomic_exchange_and_add_acq (&GL(dl_thread_gscope_count), 1)
+#define THREAD_GSCOPE_RESET_FLAG() \
+  do 									      \
+    if (atomic_exchange_and_add_rel (&GL(dl_thread_gscope_count), -1) == 1)   \
+      lll_wake (&GL(dl_thread_gscope_count), 0);			      \
+  while (0)
+#define THREAD_GSCOPE_WAIT() \
+  do 									      \
+    {									      \
+      int count;							      \
+      atomic_write_barrier ();						      \
+      while ((count = GL(dl_thread_gscope_count)))			      \
+        lll_wait (&GL(dl_thread_gscope_count), count, 0);		      \
+    }									      \
+  while (0)
 
 #endif /* !ASSEMBLER */
 

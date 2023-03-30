@@ -1,5 +1,5 @@
 /* Compute cubic root of double value.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Dirk Alboth <dirka@uni-paderborn.de> and
    Ulrich Drepper <drepper@cygnus.com>, 1997.
@@ -16,10 +16,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <math.h>
-#include <math_private.h>
+#include <libm-alias-ldouble.h>
 
 
 #define CBRT2 1.2599210498948731648		/* 2^(1/3) */
@@ -67,4 +67,4 @@ __cbrtl (long double x)
   u -= (u - (x / (u * u))) * third;
   return u;
 }
-weak_alias (__cbrtl, cbrtl)
+libm_alias_ldouble (__cbrt, cbrt)

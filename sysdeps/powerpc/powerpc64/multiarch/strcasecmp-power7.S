@@ -1,5 +1,5 @@
-/* Optimized strcasecmp implementation foOWER7.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+/* Optimized strcasecmp implementation for POWER7.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,25 +14,9 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
-#include <sysdep.h>
-
-#undef ENTRY
-#define ENTRY(name)						\
-  .section ".text";						\
-  ENTRY_2(__strcasecmp_power7)					\
-  .align ALIGNARG(2);						\
-  BODY_LABEL(__strcasecmp_power7):				\
-  cfi_startproc;						\
-  LOCALENTRY(__strcasecmp_power7)
-
-#undef END
-#define END(name)						\
-  cfi_endproc;							\
-  TRACEBACK(__strcasecmp_power7)				\
-  END_2(__strcasecmp_power7)
-
+#define __strcasecmp __strcasecmp_power7
 #undef weak_alias
 #define weak_alias(name, alias)
 

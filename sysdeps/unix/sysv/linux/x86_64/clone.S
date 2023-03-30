@@ -1,4 +1,4 @@
-/* Copyright (C) 2001-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 /* clone() is even more special than fork() as it mucks with stacks
    and invokes a function in the right context after its all over.  */
@@ -22,9 +22,6 @@
 #define _ERRNO_H	1
 #include <bits/errno.h>
 #include <asm-syntax.h>
-
-#define CLONE_VM	0x00000100
-#define CLONE_THREAD	0x00010000
 
 /* The userland implementation is:
    int clone (int (*fn)(void *arg), void *child_stack, int flags, void *arg),
@@ -92,27 +89,18 @@ L(thread_start):
 	   the outermost frame obviously.  */
 	xorl	%ebp, %ebp
 
-	testq	$CLONE_THREAD, %rdi
-	jne	1f
-	testq	$CLONE_VM, %rdi
-	movl	$-1, %eax
-	jne	2f
-	movl	$SYS_ify(getpid), %eax
-	syscall
-2:	movl	%eax, %fs:PID
-	movl	%eax, %fs:TID
-1:
-
 	/* Set up arguments for the function call.  */
 	popq	%rax		/* Function to call.  */
 	popq	%rdi		/* Argument.  */
 	call	*%rax
 	/* Call exit with return value from function call. */
 	movq	%rax, %rdi
-	call	HIDDEN_JUMPTARGET (_exit)
+	movl	$SYS_ify(exit), %eax
+	syscall
 	cfi_endproc;
 
 	cfi_startproc;
 PSEUDO_END (__clone)
 
+libc_hidden_def (__clone)
 weak_alias (__clone, clone)

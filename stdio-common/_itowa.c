@@ -1,5 +1,5 @@
 /* Internal function for converting integers to ASCII.
-   Copyright (C) 1994-2015 Free Software Foundation, Inc.
+   Copyright (C) 1994-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Torbjorn Granlund <tege@matematik.su.se>
    and Ulrich Drepper <drepper@gnu.org>.
@@ -16,7 +16,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <gmp-mparam.h>
 #include <gmp.h>
@@ -87,11 +87,8 @@ extern const wchar_t _itowa_upper_digits[] attribute_hidden;
 
 #if _ITOA_NEEDED
 wchar_t *
-_itowa (value, buflim, base, upper_case)
-     unsigned long long int value;
-     wchar_t *buflim;
-     unsigned int base;
-     int upper_case;
+_itowa (unsigned long long int value, wchar_t *buflim, unsigned int base,
+	int upper_case)
 {
   const wchar_t *digits = (upper_case
 			   ? _itowa_upper_digits : _itowa_lower_digits);

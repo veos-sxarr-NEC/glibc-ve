@@ -1,4 +1,4 @@
-/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, 1996.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 
 #include <wchar.h>
@@ -23,8 +23,7 @@
 #define STRING_TYPE wchar_t
 #define USTRING_TYPE wint_t
 #define STRCOLL __wcscoll_l
-#define STRCMP wcscmp
-#define STRLEN __wcslen
+#define STRCMP __wcscmp
 #define WEIGHT_H "../locale/weightwc.h"
 #define SUFFIX	WC
 #define L(arg) L##arg

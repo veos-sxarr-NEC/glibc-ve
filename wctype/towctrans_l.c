@@ -1,5 +1,5 @@
 /* Map wide character using given mapping and locale.
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <wctype.h>
 
@@ -23,7 +23,7 @@
 #include "wchar-lookup.h"
 
 wint_t
-__towctrans_l (wint_t wc, wctrans_t desc, __locale_t locale)
+__towctrans_l (wint_t wc, wctrans_t desc, locale_t locale)
 {
   /* If the user passes in an invalid DESC valid (the one returned from
      `__wctrans_l' in case of an error) simply return the value.  */

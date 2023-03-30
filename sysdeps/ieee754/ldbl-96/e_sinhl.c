@@ -36,8 +36,11 @@ static char rcsid[] = "$NetBSD: $";
  *	only sinhl(0)=0 is exact for finite x.
  */
 
+#include <float.h>
 #include <math.h>
 #include <math_private.h>
+#include <math-underflow.h>
+#include <libm-alias-finite.h>
 
 static const long double one = 1.0, shuge = 1.0e4931L;
 
@@ -45,7 +48,7 @@ long double
 __ieee754_sinhl(long double x)
 {
 	long double t,w,h;
-	u_int32_t jx,ix,i0,i1;
+	uint32_t jx,ix,i0,i1;
 
     /* Words of |x|. */
 	GET_LDOUBLE_WORDS(jx,i0,i1,x);
@@ -58,8 +61,10 @@ __ieee754_sinhl(long double x)
 	if (jx & 0x8000) h = -h;
     /* |x| in [0,25], return sign(x)*0.5*(E+E/(E+1))) */
 	if (ix < 0x4003 || (ix == 0x4003 && i0 <= 0xc8000000)) { /* |x|<25 */
-	    if (ix<0x3fdf)		/* |x|<2**-32 */
+	    if (ix<0x3fdf) {		/* |x|<2**-32 */
+		math_check_force_underflow (x);
 		if(shuge+x>one) return x;/* sinh(tiny) = tiny with inexact */
+	    }
 	    t = __expm1l(fabsl(x));
 	    if(ix<0x3fff) return h*(2.0*t-t*t/(t+one));
 	    return h*(t+t/(t+one));
@@ -81,4 +86,4 @@ __ieee754_sinhl(long double x)
     /* |x| > overflowthreshold, sinhl(x) overflow */
 	return x*shuge;
 }
-strong_alias (__ieee754_sinhl, __sinhl_finite)
+libm_alias_finite (__ieee754_sinhl, __sinhl)

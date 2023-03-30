@@ -1,4 +1,4 @@
-/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Kaz Kylheku <kaz@ashi.footprints.net>.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; see the file COPYING.LIB.  If
-   not, see <http://www.gnu.org/licenses/>.  */
+   not, see <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <pthread.h>
@@ -25,11 +25,8 @@
 
 /* Set timer TIMERID to VALUE, returning old value in OVLAUE.  */
 int
-timer_settime (timerid, flags, value, ovalue)
-     timer_t timerid;
-     int flags;
-     const struct itimerspec *value;
-     struct itimerspec *ovalue;
+timer_settime (timer_t timerid, int flags, const struct itimerspec *value,
+	       struct itimerspec *ovalue)
 {
   struct timer_node *timer;
   struct thread_node *thread = NULL;
@@ -44,10 +41,8 @@ timer_settime (timerid, flags, value, ovalue)
       goto bail;
     }
 
-  if (value->it_interval.tv_nsec < 0
-      || value->it_interval.tv_nsec >= 1000000000
-      || value->it_value.tv_nsec < 0
-      || value->it_value.tv_nsec >= 1000000000)
+  if (! valid_nanoseconds (value->it_interval.tv_nsec)
+      || ! valid_nanoseconds (value->it_value.tv_nsec))
     {
       __set_errno (EINVAL);
       goto bail;
@@ -58,7 +53,7 @@ timer_settime (timerid, flags, value, ovalue)
 
   if ((flags & TIMER_ABSTIME) == 0)
     {
-      clock_gettime (timer->clock, &now);
+      __clock_gettime (timer->clock, &now);
       have_now = 1;
     }
 
@@ -83,7 +78,7 @@ timer_settime (timerid, flags, value, ovalue)
 	  if (! have_now)
 	    {
 	      pthread_mutex_unlock (&__timer_mutex);
-	      clock_gettime (timer->clock, &now);
+	      __clock_gettime (timer->clock, &now);
 	      have_now = 1;
 	      pthread_mutex_lock (&__timer_mutex);
 	      timer_addref (timer);

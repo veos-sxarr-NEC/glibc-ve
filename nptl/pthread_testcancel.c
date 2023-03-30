@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@redhat.com>, 2002.
 
@@ -14,14 +14,16 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 #include "pthreadP.h"
 
 
 void
-pthread_testcancel (void)
+__pthread_testcancel (void)
 {
   CANCELLATION_P (THREAD_SELF);
 }
+strong_alias (__pthread_testcancel, pthread_testcancel)
+hidden_def (__pthread_testcancel)

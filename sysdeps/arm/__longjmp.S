@@ -1,5 +1,5 @@
 /* longjmp for ARM.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library.  If not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <sysdep.h>
 #include <stap-probe.h>
@@ -28,8 +28,7 @@ ENTRY (__longjmp)
 	mov	ip, r0
 
 #ifdef CHECK_SP
-	sfi_breg ip, \
-	ldr	r4, [\B]	/* jmpbuf's sp */
+	ldr	r4, [ip]	/* jmpbuf's sp */
 	cfi_undefined (r4)
 #ifdef PTR_DEMANGLE
 	PTR_DEMANGLE (r4, r4, a3, a4)
@@ -38,28 +37,22 @@ ENTRY (__longjmp)
 #endif
 
 #ifdef PTR_DEMANGLE
-	sfi_breg ip, \
-	ldr	a4, [\B], #4
+	ldr	a4, [ip], #4
 	PTR_DEMANGLE (a4, a4, a3, r4)
 	cfi_undefined (r4)
-	sfi_breg ip, \
-	ldr	r4, [\B], #4
+	ldr	r4, [ip], #4
 	PTR_DEMANGLE2 (r4, r4, a3)
 #else
-	sfi_breg ip, \
-	ldr	a4, [\B], #4
-	sfi_breg ip, \
-	ldr	r4, [\B], #4
+	ldr	a4, [ip], #4
+	ldr	r4, [ip], #4
 	cfi_undefined (r4)
 #endif
 	/* longjmp probe expects longjmp first argument (4@r0), second
 	   argument (-4@r1), and target address (4@r4), respectively.  */
 	LIBC_PROBE (longjmp, 3, 4@r0, -4@r1, 4@r4)
-	sfi_sp \
 	mov	sp, a4
 	mov	lr, r4
-	sfi_breg ip, \
-	ldmia	\B!, JMP_BUF_REGLIST
+	ldmia	ip!, JMP_BUF_REGLIST
 	cfi_restore (v1)
 	cfi_restore (v2)
 	cfi_restore (v3)
@@ -81,7 +74,7 @@ ENTRY (__longjmp)
 		    C_SYMBOL_NAME(_rtld_local_ro) \
 		    + RTLD_GLOBAL_RO_DL_HWCAP_OFFSET)
 # else
-#  ifdef PIC
+#  ifdef SHARED
 	LDR_GLOBAL (a4, a3, C_SYMBOL_NAME(_rtld_global_ro), \
 		    RTLD_GLOBAL_RO_DL_HWCAP_OFFSET)
 #  else
@@ -97,8 +90,7 @@ ENTRY (__longjmp)
 
 	/* Restore the VFP registers.  */
 	/* Following instruction is vldmia ip!, {d8-d15}.  */
-	sfi_breg r12, \
-	ldc	p11, cr8, [\B], #64
+	ldc	p11, cr8, [r12], #64
 .Lno_vfp:
 
 #ifndef ARM_ASSUME_NO_IWMMXT
@@ -107,18 +99,12 @@ ENTRY (__longjmp)
 
 	/* Restore the call-preserved iWMMXt registers.  */
 	/* Following instructions are wldrd wr10, [ip], #8 (etc.)  */
-	sfi_breg r12, \
-	ldcl	p1, cr10, [\B], #8
-	sfi_breg r12, \
-	ldcl	p1, cr11, [\B], #8
-	sfi_breg r12, \
-	ldcl	p1, cr12, [\B], #8
-	sfi_breg r12, \
-	ldcl	p1, cr13, [\B], #8
-	sfi_breg r12, \
-	ldcl	p1, cr14, [\B], #8
-	sfi_breg r12, \
-	ldcl	p1, cr15, [\B], #8
+	ldcl	p1, cr10, [r12], #8
+	ldcl	p1, cr11, [r12], #8
+	ldcl	p1, cr12, [r12], #8
+	ldcl	p1, cr13, [r12], #8
+	ldcl	p1, cr14, [r12], #8
+	ldcl	p1, cr15, [r12], #8
 .Lno_iwmmxt:
 #endif
 

@@ -1,10 +1,15 @@
 gnulib-arch = $(elf-objpfx)libgcc-stubs.a
 static-gnulib-arch = $(elf-objpfx)libgcc-stubs.a
 
+# All supported build tools support TLS descriptors, but the OS may not.
+ifndef have-arm-tls-desc
+have-arm-tls-desc = yes
+endif
+
 ifeq ($(subdir),elf)
 sysdep-dl-routines += tlsdesc dl-tlsdesc
-sysdep_routines += aeabi_unwind_cpp_pr1 find_exidx tlsdesc dl-tlsdesc
-sysdep-rtld-routines += aeabi_unwind_cpp_pr1 tlsdesc dl-tlsdesc
+sysdep_routines += aeabi_unwind_cpp_pr1 find_exidx
+sysdep-rtld-routines += aeabi_unwind_cpp_pr1
 shared-only-routines += aeabi_unwind_cpp_pr1
 
 $(objpfx)libgcc-stubs.a: $(objpfx)aeabi_unwind_cpp_pr1.os
@@ -46,21 +51,12 @@ sysdep_routines += $(aeabi_constants) $(aeabi_routines)
 static-only-routines += $(aeabi_constants) aeabi_read_tp
 shared-only-routines += libc-aeabi_read_tp
 
-# In order for unwinding to fail when it falls out of main, we need a
-# cantunwind marker.  There's one in start.S.  To make sure we reach it, add
-# unwind tables for __libc_start_main.
-CFLAGS-libc-start.c += -fexceptions
-
 sysdep_routines += arm-unwind-resume
 shared-only-routines += arm-unwind-resume
 endif
 
 ifeq ($(subdir),gmon)
 sysdep_routines += arm-mcount
-endif
-
-ifeq ($(subdir),debug)
-CFLAGS-backtrace.c += -funwind-tables
 endif
 
 ifeq ($(subdir),rt)

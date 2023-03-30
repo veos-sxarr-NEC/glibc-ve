@@ -1,5 +1,5 @@
 /* copy sign, double version.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 2002.
 
@@ -15,9 +15,10 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <machine/asm.h>
+#include <libm-alias-double.h>
 
 	.section .rodata.cst16,"aM",@progbits,16
 
@@ -47,4 +48,4 @@ ENTRY(__copysign)
 	ret
 END (__copysign)
 
-weak_alias (__copysign, copysign)
+libm_alias_double (__copysign, copysign)

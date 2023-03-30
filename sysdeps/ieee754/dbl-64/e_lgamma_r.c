@@ -78,7 +78,10 @@
  */
 
 #include <math.h>
+#include <math-narrow-eval.h>
 #include <math_private.h>
+#include <libc-diag.h>
+#include <libm-alias-finite.h>
 
 static const double
 two52=  4.50359962737049600000e+15, /* 0x43300000, 0x00000000 */
@@ -166,10 +169,10 @@ sin_pi(double x)
      * argument reduction, make sure inexact flag not raised if input
      * is an integer
      */
-	z = __floor(y);
+	z = floor(y);
 	if(z!=y) {				/* inexact anyway */
 	    y  *= 0.5;
-	    y   = 2.0*(y - __floor(y));		/* y = |x| mod 2.0 */
+	    y   = 2.0*(y - floor(y));		/* y = |x| mod 2.0 */
 	    n   = (int) (y*4.0);
 	} else {
 	    if(ix>=0x43400000) {
@@ -224,7 +227,9 @@ __ieee754_lgamma_r(double x, int *signgamp)
 	if(hx<0) {
 	    if(__builtin_expect(ix>=0x43300000, 0))
 		/* |x|>=2**52, must be -integer */
-		return x/zero;
+		return fabs (x)/zero;
+	    if (x < -2.0 && x > -28.0)
+		return __lgamma_neg (x, signgamp);
 	    t = sin_pi(x);
 	    if(t==zero) return one/fabsf(t); /* -integer */
 	    nadj = __ieee754_log(pi/fabs(t*x));
@@ -293,8 +298,15 @@ __ieee754_lgamma_r(double x, int *signgamp)
 	    r = (x-half)*(t-one)+w;
 	} else
     /* 2**58 <= x <= inf */
-	    r =  x*(__ieee754_log(x)-one);
+	    r =  math_narrow_eval (x*(__ieee754_log(x)-one));
+	/* NADJ is set for negative arguments but not otherwise,
+	   resulting in warnings that it may be used uninitialized
+	   although in the cases where it is used it has always been
+	   set.  */
+	DIAG_PUSH_NEEDS_COMMENT;
+	DIAG_IGNORE_NEEDS_COMMENT (4.9, "-Wmaybe-uninitialized");
 	if(hx<0) r = nadj - r;
+	DIAG_POP_NEEDS_COMMENT;
 	return r;
 }
-strong_alias (__ieee754_lgamma_r, __lgamma_r_finite)
+libm_alias_finite (__ieee754_lgamma_r, __lgamma_r)

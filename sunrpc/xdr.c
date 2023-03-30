@@ -44,6 +44,7 @@
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
+#include <shlib-compat.h>
 
 
 /*
@@ -112,6 +113,7 @@ xdr_int (XDR *xdrs, int *ip)
 	  return FALSE;
 	}
       *ip = (int) l;
+      /* Fall through.  */
     case XDR_FREE:
       return TRUE;
     }
@@ -151,6 +153,7 @@ xdr_u_int (XDR *xdrs, u_int *up)
 	  return FALSE;
 	}
       *up = (u_int) (u_long) l;
+      /* Fall through.  */
     case XDR_FREE:
       return TRUE;
     }
@@ -505,6 +508,7 @@ xdr_enum (XDR *xdrs, enum_t *ep)
 	      return FALSE;
 	    }
 	  *ep = l;
+	  /* Fall through.  */
 	case XDR_FREE:
 	  return TRUE;
 
@@ -590,11 +594,7 @@ libc_hidden_nolink_sunrpc (xdr_opaque, GLIBC_2_0)
  * If *cpp is NULL maxsize bytes are allocated
  */
 bool_t
-xdr_bytes (xdrs, cpp, sizep, maxsize)
-     XDR *xdrs;
-     char **cpp;
-     u_int *sizep;
-     u_int maxsize;
+xdr_bytes (XDR *xdrs, char **cpp, u_int *sizep, u_int maxsize)
 {
   char *sp = *cpp;	/* sp is the actual string pointer */
   u_int nodesize;
@@ -631,7 +631,7 @@ xdr_bytes (xdrs, cpp, sizep, maxsize)
 	  (void) __fxprintf (NULL, "%s: %s", __func__, _("out of memory\n"));
 	  return FALSE;
 	}
-      /* fall into ... */
+      /* Fall through.  */
 
     case XDR_ENCODE:
       return xdr_opaque (xdrs, sp, nodesize);
@@ -656,9 +656,7 @@ libc_hidden_nolink_sunrpc (xdr_bytes, GLIBC_2_0)
  * Implemented here due to commonality of the object.
  */
 bool_t
-xdr_netobj (xdrs, np)
-     XDR *xdrs;
-     struct netobj *np;
+xdr_netobj (XDR *xdrs, struct netobj *np)
 {
 
   return xdr_bytes (xdrs, &np->n_bytes, &np->n_len, MAX_NETOBJ_SZ);
@@ -681,12 +679,15 @@ libc_hidden_nolink_sunrpc (xdr_netobj, GLIBC_2_0)
  * If there is no specific or default routine an error is returned.
  */
 bool_t
-xdr_union (xdrs, dscmp, unp, choices, dfault)
-     XDR *xdrs;
-     enum_t *dscmp;		/* enum to decide which arm to work on */
-     char *unp;			/* the union itself */
-     const struct xdr_discrim *choices;	/* [value, xdr proc] for each arm */
-     xdrproc_t dfault;		/* default xdr routine */
+xdr_union (XDR *xdrs,
+	   /* enum to decide which arm to work on */
+	   enum_t *dscmp,
+	   /* the union itself */
+	   char *unp,
+	   /* [value, xdr proc] for each arm */
+	   const struct xdr_discrim *choices,
+	   /* default xdr routine */
+	   xdrproc_t dfault)
 {
   enum_t dscm;
 
@@ -733,10 +734,7 @@ libc_hidden_nolink_sunrpc (xdr_union, GLIBC_2_0)
  * of the string as specified by a protocol.
  */
 bool_t
-xdr_string (xdrs, cpp, maxsize)
-     XDR *xdrs;
-     char **cpp;
-     u_int maxsize;
+xdr_string (XDR *xdrs, char **cpp, u_int maxsize)
 {
   char *sp = *cpp;	/* sp is the actual string pointer */
   /* Initialize to silence the compiler.  It is not really needed because SIZE
@@ -794,7 +792,7 @@ xdr_string (xdrs, cpp, maxsize)
 	  return FALSE;
 	}
       sp[size] = 0;
-      /* fall into ... */
+      /* Fall through.  */
 
     case XDR_ENCODE:
       return xdr_opaque (xdrs, sp, size);
@@ -817,9 +815,7 @@ libc_hidden_nolink_sunrpc (xdr_string, GLIBC_2_0)
  * routines like clnt_call
  */
 bool_t
-xdr_wrapstring (xdrs, cpp)
-     XDR *xdrs;
-     char **cpp;
+xdr_wrapstring (XDR *xdrs, char **cpp)
 {
   if (xdr_string (xdrs, cpp, LASTUNSIGNED))
     {

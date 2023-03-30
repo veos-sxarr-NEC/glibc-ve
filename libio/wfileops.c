@@ -1,4 +1,4 @@
-/* Copyright (C) 1993-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Ulrich Drepper <drepper@cygnus.com>.
    Based on the single byte version by Per Bothner <bothner@cygnus.com>.
@@ -15,7 +15,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
    As a special exception, if you link the code in this file with
    files compiled with a GNU compiler to produce an executable,
@@ -33,28 +33,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-#ifndef _LIBC
-# define _IO_new_do_write _IO_do_write
-# define _IO_new_file_attach _IO_file_attach
-# define _IO_new_file_close_it _IO_file_close_it
-# define _IO_new_file_finish _IO_file_finish
-# define _IO_new_file_fopen _IO_file_fopen
-# define _IO_new_file_init _IO_file_init
-# define _IO_new_file_setbuf _IO_file_setbuf
-# define _IO_new_file_sync _IO_file_sync
-# define _IO_new_file_overflow _IO_file_overflow
-# define _IO_new_file_seekoff _IO_file_seekoff
-# define _IO_new_file_underflow _IO_file_underflow
-# define _IO_new_file_write _IO_file_write
-# define _IO_new_file_xsputn _IO_file_xsputn
-#endif
-
-
 /* Convert TO_DO wide character from DATA to FP.
    Then mark FP as having empty buffers. */
 int
-_IO_wdo_write (_IO_FILE *fp, const wchar_t *data, _IO_size_t to_do)
+_IO_wdo_write (FILE *fp, const wchar_t *data, size_t to_do)
 {
   struct _IO_codecvt *cc = fp->_codecvt;
 
@@ -90,11 +72,11 @@ _IO_wdo_write (_IO_FILE *fp, const wchar_t *data, _IO_size_t to_do)
 	    }
 
 	  /* Now convert from the internal format into the external buffer.  */
-	  result = (*cc->__codecvt_do_out) (cc, &fp->_wide_data->_IO_state,
-					    data, data + to_do, &new_data,
-					    write_ptr,
-					    buf_end,
-					    &write_ptr);
+	  result = __libio_codecvt_out (cc, &fp->_wide_data->_IO_state,
+					data, data + to_do, &new_data,
+					write_ptr,
+					buf_end,
+					&write_ptr);
 
 	  /* Write out what we produced so far.  */
 	  if (_IO_new_do_write (fp, write_base, write_ptr - write_base) == EOF)
@@ -118,7 +100,7 @@ _IO_wdo_write (_IO_FILE *fp, const wchar_t *data, _IO_size_t to_do)
 	     fp->_wide_data->_IO_buf_base);
   fp->_wide_data->_IO_write_base = fp->_wide_data->_IO_write_ptr
     = fp->_wide_data->_IO_buf_base;
-  fp->_wide_data->_IO_write_end = ((fp->_flags & (_IO_LINE_BUF+_IO_UNBUFFERED))
+  fp->_wide_data->_IO_write_end = ((fp->_flags & (_IO_LINE_BUF | _IO_UNBUFFERED))
 				   ? fp->_wide_data->_IO_buf_base
 				   : fp->_wide_data->_IO_buf_end);
 
@@ -128,11 +110,15 @@ libc_hidden_def (_IO_wdo_write)
 
 
 wint_t
-_IO_wfile_underflow (_IO_FILE *fp)
+_IO_wfile_underflow (FILE *fp)
 {
   struct _IO_codecvt *cd;
   enum __codecvt_result status;
-  _IO_ssize_t count;
+  ssize_t count;
+
+  /* C99 requires EOF to be "sticky".  */
+  if (fp->_flags & _IO_EOF_SEEN)
+    return WEOF;
 
   if (__glibc_unlikely (fp->_flags & _IO_NO_READS))
     {
@@ -154,12 +140,12 @@ _IO_wfile_underflow (_IO_FILE *fp)
       fp->_wide_data->_IO_last_state = fp->_wide_data->_IO_state;
       fp->_wide_data->_IO_read_base = fp->_wide_data->_IO_read_ptr =
 	fp->_wide_data->_IO_buf_base;
-      status = (*cd->__codecvt_do_in) (cd, &fp->_wide_data->_IO_state,
-				       fp->_IO_read_ptr, fp->_IO_read_end,
-				       &read_stop,
-				       fp->_wide_data->_IO_read_ptr,
-				       fp->_wide_data->_IO_buf_end,
-				       &fp->_wide_data->_IO_read_end);
+      status = __libio_codecvt_in (cd, &fp->_wide_data->_IO_state,
+				   fp->_IO_read_ptr, fp->_IO_read_end,
+				   &read_stop,
+				   fp->_wide_data->_IO_read_ptr,
+				   fp->_wide_data->_IO_buf_end,
+				   &fp->_wide_data->_IO_read_end);
 
       fp->_IO_read_base = fp->_IO_read_ptr;
       fp->_IO_read_ptr = (char *) read_stop;
@@ -214,26 +200,21 @@ _IO_wfile_underflow (_IO_FILE *fp)
       _IO_wdoallocbuf (fp);
     }
 
-  /* Flush all line buffered files before reading. */
   /* FIXME This can/should be moved to genops ?? */
-  if (fp->_flags & (_IO_LINE_BUF|_IO_UNBUFFERED))
+  if (fp->_flags & (_IO_LINE_BUF | _IO_UNBUFFERED))
     {
-#if 0
-      _IO_flush_all_linebuffered ();
-#else
       /* We used to flush all line-buffered stream.  This really isn't
 	 required by any standard.  My recollection is that
 	 traditional Unix systems did this for stdout.  stderr better
 	 not be line buffered.  So we do just that here
 	 explicitly.  --drepper */
-      _IO_acquire_lock (_IO_stdout);
+      _IO_acquire_lock (stdout);
 
-      if ((_IO_stdout->_flags & (_IO_LINKED | _IO_NO_WRITES | _IO_LINE_BUF))
+      if ((stdout->_flags & (_IO_LINKED | _IO_NO_WRITES | _IO_LINE_BUF))
 	  == (_IO_LINKED | _IO_LINE_BUF))
-	_IO_OVERFLOW (_IO_stdout, EOF);
+	_IO_OVERFLOW (stdout, EOF);
 
-      _IO_release_lock (_IO_stdout);
-#endif
+      _IO_release_lock (stdout);
     }
 
   _IO_switch_to_get_mode (fp);
@@ -285,11 +266,11 @@ _IO_wfile_underflow (_IO_FILE *fp)
       naccbuf += to_copy;
       from = accbuf;
     }
-  status = (*cd->__codecvt_do_in) (cd, &fp->_wide_data->_IO_state,
-				   from, to, &read_ptr_copy,
-				   fp->_wide_data->_IO_read_end,
-				   fp->_wide_data->_IO_buf_end,
-				   &fp->_wide_data->_IO_read_end);
+  status = __libio_codecvt_in (cd, &fp->_wide_data->_IO_state,
+			       from, to, &read_ptr_copy,
+			       fp->_wide_data->_IO_read_end,
+			       fp->_wide_data->_IO_buf_end,
+			       &fp->_wide_data->_IO_read_end);
 
   if (__glibc_unlikely (naccbuf != 0))
     fp->_IO_read_ptr += MAX (0, read_ptr_copy - &accbuf[naccbuf - to_copy]);
@@ -350,7 +331,7 @@ libc_hidden_def (_IO_wfile_underflow)
 
 
 static wint_t
-_IO_wfile_underflow_mmap (_IO_FILE *fp)
+_IO_wfile_underflow_mmap (FILE *fp)
 {
   struct _IO_codecvt *cd;
   const char *read_stop;
@@ -391,12 +372,12 @@ _IO_wfile_underflow_mmap (_IO_FILE *fp)
   fp->_wide_data->_IO_last_state = fp->_wide_data->_IO_state;
   fp->_wide_data->_IO_read_base = fp->_wide_data->_IO_read_ptr =
     fp->_wide_data->_IO_buf_base;
-  (*cd->__codecvt_do_in) (cd, &fp->_wide_data->_IO_state,
-			  fp->_IO_read_ptr, fp->_IO_read_end,
-			  &read_stop,
-			  fp->_wide_data->_IO_read_ptr,
-			  fp->_wide_data->_IO_buf_end,
-			  &fp->_wide_data->_IO_read_end);
+  __libio_codecvt_in (cd, &fp->_wide_data->_IO_state,
+		      fp->_IO_read_ptr, fp->_IO_read_end,
+		      &read_stop,
+		      fp->_wide_data->_IO_read_ptr,
+		      fp->_wide_data->_IO_buf_end,
+		      &fp->_wide_data->_IO_read_end);
 
   fp->_IO_read_ptr = (char *) read_stop;
 
@@ -411,7 +392,7 @@ _IO_wfile_underflow_mmap (_IO_FILE *fp)
 }
 
 static wint_t
-_IO_wfile_underflow_maybe_mmap (_IO_FILE *fp)
+_IO_wfile_underflow_maybe_mmap (FILE *fp)
 {
   /* This is the first read attempt.  Doing the underflow will choose mmap
      or vanilla operations and then punt to the chosen underflow routine.
@@ -424,7 +405,7 @@ _IO_wfile_underflow_maybe_mmap (_IO_FILE *fp)
 
 
 wint_t
-_IO_wfile_overflow (_IO_FILE *f, wint_t wch)
+_IO_wfile_overflow (FILE *f, wint_t wch)
 {
   if (f->_flags & _IO_NO_WRITES) /* SET ERROR */
     {
@@ -439,6 +420,7 @@ _IO_wfile_overflow (_IO_FILE *f, wint_t wch)
       if (f->_wide_data->_IO_write_base == 0)
 	{
 	  _IO_wdoallocbuf (f);
+	  _IO_free_wbackup_area (f);
 	  _IO_wsetg (f, f->_wide_data->_IO_buf_base,
 		     f->_wide_data->_IO_buf_base, f->_wide_data->_IO_buf_base);
 
@@ -477,7 +459,7 @@ _IO_wfile_overflow (_IO_FILE *f, wint_t wch)
       f->_IO_read_base = f->_IO_read_ptr = f->_IO_read_end;
 
       f->_flags |= _IO_CURRENTLY_PUTTING;
-      if (f->_flags & (_IO_LINE_BUF+_IO_UNBUFFERED))
+      if (f->_flags & (_IO_LINE_BUF | _IO_UNBUFFERED))
 	f->_wide_data->_IO_write_end = f->_wide_data->_IO_write_ptr;
     }
   if (wch == WEOF)
@@ -496,9 +478,9 @@ _IO_wfile_overflow (_IO_FILE *f, wint_t wch)
 libc_hidden_def (_IO_wfile_overflow)
 
 wint_t
-_IO_wfile_sync (_IO_FILE *fp)
+_IO_wfile_sync (FILE *fp)
 {
-  _IO_ssize_t delta;
+  ssize_t delta;
   wint_t retval = 0;
 
   /*    char* ptr = cur_ptr(); */
@@ -511,9 +493,9 @@ _IO_wfile_sync (_IO_FILE *fp)
       /* We have to find out how many bytes we have to go back in the
 	 external buffer.  */
       struct _IO_codecvt *cv = fp->_codecvt;
-      _IO_off64_t new_pos;
+      off64_t new_pos;
 
-      int clen = (*cv->__codecvt_do_encoding) (cv);
+      int clen = __libio_codecvt_encoding (cv);
 
       if (clen > 0)
 	/* It is easy, a fixed number of input bytes are used for each
@@ -526,25 +508,24 @@ _IO_wfile_sync (_IO_FILE *fp)
 	     generate the wide characters up to the current reading
 	     position.  */
 	  int nread;
-
+	  size_t wnread = (fp->_wide_data->_IO_read_ptr
+			   - fp->_wide_data->_IO_read_base);
 	  fp->_wide_data->_IO_state = fp->_wide_data->_IO_last_state;
-	  nread = (*cv->__codecvt_do_length) (cv, &fp->_wide_data->_IO_state,
-					      fp->_IO_read_base,
-					      fp->_IO_read_end, delta);
+	  nread = __libio_codecvt_length (cv, &fp->_wide_data->_IO_state,
+					  fp->_IO_read_base,
+					  fp->_IO_read_end, wnread);
 	  fp->_IO_read_ptr = fp->_IO_read_base + nread;
 	  delta = -(fp->_IO_read_end - fp->_IO_read_base - nread);
 	}
 
       new_pos = _IO_SYSSEEK (fp, delta, 1);
-      if (new_pos != (_IO_off64_t) EOF)
+      if (new_pos != (off64_t) EOF)
 	{
 	  fp->_wide_data->_IO_read_end = fp->_wide_data->_IO_read_ptr;
 	  fp->_IO_read_end = fp->_IO_read_ptr;
 	}
-#ifdef ESPIPE
       else if (errno == ESPIPE)
 	; /* Ignore error from unseekable devices. */
-#endif
       else
 	retval = WEOF;
     }
@@ -563,11 +544,11 @@ libc_hidden_def (_IO_wfile_sync)
 
    Returns 0 on success and -1 on error with the _IO_ERR_SEEN flag set.  */
 static int
-adjust_wide_data (_IO_FILE *fp, bool do_convert)
+adjust_wide_data (FILE *fp, bool do_convert)
 {
   struct _IO_codecvt *cv = fp->_codecvt;
 
-  int clen = (*cv->__codecvt_do_encoding) (cv);
+  int clen = __libio_codecvt_encoding (cv);
 
   /* Take the easy way out for constant length encodings if we don't need to
      convert.  */
@@ -584,12 +565,12 @@ adjust_wide_data (_IO_FILE *fp, bool do_convert)
     {
 
       fp->_wide_data->_IO_last_state = fp->_wide_data->_IO_state;
-      status = (*cv->__codecvt_do_in) (cv, &fp->_wide_data->_IO_state,
-				       fp->_IO_read_base, fp->_IO_read_ptr,
-				       &read_stop,
-				       fp->_wide_data->_IO_read_base,
-				       fp->_wide_data->_IO_buf_end,
-				       &fp->_wide_data->_IO_read_end);
+      status = __libio_codecvt_in (cv, &fp->_wide_data->_IO_state,
+				   fp->_IO_read_base, fp->_IO_read_ptr,
+				   &read_stop,
+				   fp->_wide_data->_IO_read_base,
+				   fp->_wide_data->_IO_buf_end,
+				   &fp->_wide_data->_IO_read_end);
 
       /* Should we return EILSEQ?  */
       if (__glibc_unlikely (status == __codecvt_error))
@@ -610,10 +591,10 @@ done:
 /* ftell{,o} implementation for wide mode.  Don't modify any state of the file
    pointer while we try to get the current state of the stream except in one
    case, which is when we have unflushed writes in append mode.  */
-static _IO_off64_t
-do_ftell_wide (_IO_FILE *fp)
+static off64_t
+do_ftell_wide (FILE *fp)
 {
-  _IO_off64_t result, offset = 0;
+  off64_t result, offset = 0;
 
   /* No point looking for offsets in the buffer if it hasn't even been
      allocated.  */
@@ -667,7 +648,7 @@ do_ftell_wide (_IO_FILE *fp)
 	}
 
       struct _IO_codecvt *cv = fp->_codecvt;
-      int clen = (*cv->__codecvt_do_encoding) (cv);
+      int clen = __libio_codecvt_encoding (cv);
 
       if (!unflushed_writes)
 	{
@@ -682,9 +663,9 @@ do_ftell_wide (_IO_FILE *fp)
 
 	      size_t delta = wide_read_ptr - wide_read_base;
 	      __mbstate_t state = fp->_wide_data->_IO_last_state;
-	      nread = (*cv->__codecvt_do_length) (cv, &state,
-						  fp->_IO_read_base,
-						  fp->_IO_read_end, delta);
+	      nread = __libio_codecvt_length (cv, &state,
+					      fp->_IO_read_base,
+					      fp->_IO_read_end, delta);
 	      offset -= fp->_IO_read_end - fp->_IO_read_base - nread;
 	    }
 	}
@@ -707,9 +688,8 @@ do_ftell_wide (_IO_FILE *fp)
 	      enum __codecvt_result status;
 
 	      __mbstate_t state = fp->_wide_data->_IO_last_state;
-	      status = (*cv->__codecvt_do_out) (cv, &state,
-						in, in + delta, &in,
-						out, out + outsize, &outstop);
+	      status = __libio_codecvt_out (cv, &state, in, in + delta, &in,
+					    out, out + outsize, &outstop);
 
 	      /* We don't check for __codecvt_partial because it can be
 		 returned on one of two conditions: either the output
@@ -759,11 +739,11 @@ do_ftell_wide (_IO_FILE *fp)
   return result;
 }
 
-_IO_off64_t
-_IO_wfile_seekoff (_IO_FILE *fp, _IO_off64_t offset, int dir, int mode)
+off64_t
+_IO_wfile_seekoff (FILE *fp, off64_t offset, int dir, int mode)
 {
-  _IO_off64_t result;
-  _IO_off64_t delta, new_offset;
+  off64_t result;
+  off64_t delta, new_offset;
   long int count;
 
   /* Short-circuit into a separate function.  We don't want to mix any
@@ -820,7 +800,7 @@ _IO_wfile_seekoff (_IO_FILE *fp, _IO_off64_t offset, int dir, int mode)
 	 find out which position in the external buffer corresponds to
 	 the current position in the internal buffer.  */
       cv = fp->_codecvt;
-      clen = (*cv->__codecvt_do_encoding) (cv);
+      clen = __libio_codecvt_encoding (cv);
 
       if (mode != 0 || !was_writing)
 	{
@@ -838,10 +818,10 @@ _IO_wfile_seekoff (_IO_FILE *fp, _IO_off64_t offset, int dir, int mode)
 	      delta = (fp->_wide_data->_IO_read_ptr
 		       - fp->_wide_data->_IO_read_base);
 	      fp->_wide_data->_IO_state = fp->_wide_data->_IO_last_state;
-	      nread = (*cv->__codecvt_do_length) (cv,
-						  &fp->_wide_data->_IO_state,
-						  fp->_IO_read_base,
-						  fp->_IO_read_end, delta);
+	      nread = __libio_codecvt_length (cv,
+					      &fp->_wide_data->_IO_state,
+					      fp->_IO_read_base,
+					      fp->_IO_read_end, delta);
 	      fp->_IO_read_ptr = fp->_IO_read_base + nread;
 	      fp->_wide_data->_IO_read_end = fp->_wide_data->_IO_read_ptr;
 	      offset -= fp->_IO_read_end - fp->_IO_read_base - nread;
@@ -870,14 +850,17 @@ _IO_wfile_seekoff (_IO_FILE *fp, _IO_off64_t offset, int dir, int mode)
 	  goto dumb;
       }
     }
+
+  _IO_free_wbackup_area (fp);
+
   /* At this point, dir==_IO_seek_set. */
 
   /* If destination is within current buffer, optimize: */
   if (fp->_offset != _IO_pos_BAD && fp->_IO_read_base != NULL
       && !_IO_in_backup (fp))
     {
-      _IO_off64_t start_offset = (fp->_offset
-				  - (fp->_IO_read_end - fp->_IO_buf_base));
+      off64_t start_offset = (fp->_offset
+                              - (fp->_IO_read_end - fp->_IO_buf_base));
       if (offset >= start_offset && offset < fp->_offset)
 	{
 	  _IO_setg (fp, fp->_IO_buf_base,
@@ -970,13 +953,13 @@ resync:
 libc_hidden_def (_IO_wfile_seekoff)
 
 
-_IO_size_t
-_IO_wfile_xsputn (_IO_FILE *f, const void *data, _IO_size_t n)
+size_t
+_IO_wfile_xsputn (FILE *f, const void *data, size_t n)
 {
   const wchar_t *s = (const wchar_t *) data;
-  _IO_size_t to_do = n;
+  size_t to_do = n;
   int must_flush = 0;
-  _IO_size_t count;
+  size_t count;
 
   if (n <= 0)
     return 0;
@@ -1010,13 +993,8 @@ _IO_wfile_xsputn (_IO_FILE *f, const void *data, _IO_size_t n)
 	count = to_do;
       if (count > 20)
 	{
-#ifdef _LIBC
 	  f->_wide_data->_IO_write_ptr =
 	    __wmempcpy (f->_wide_data->_IO_write_ptr, s, count);
-#else
-	  wmemcpy (f->_wide_data->_IO_write_ptr, s, count);
-	  f->_wide_data->_IO_write_ptr += count;
-#endif
 	  s += count;
 	}
       else
@@ -1042,7 +1020,7 @@ _IO_wfile_xsputn (_IO_FILE *f, const void *data, _IO_size_t n)
 libc_hidden_def (_IO_wfile_xsputn)
 
 
-const struct _IO_jump_t _IO_wfile_jumps =
+const struct _IO_jump_t _IO_wfile_jumps libio_vtable =
 {
   JUMP_INIT_DUMMY,
   JUMP_INIT(finish, _IO_new_file_finish),
@@ -1068,7 +1046,7 @@ const struct _IO_jump_t _IO_wfile_jumps =
 libc_hidden_data_def (_IO_wfile_jumps)
 
 
-const struct _IO_jump_t _IO_wfile_jumps_mmap =
+const struct _IO_jump_t _IO_wfile_jumps_mmap libio_vtable =
 {
   JUMP_INIT_DUMMY,
   JUMP_INIT(finish, _IO_new_file_finish),
@@ -1092,7 +1070,7 @@ const struct _IO_jump_t _IO_wfile_jumps_mmap =
   JUMP_INIT(imbue, _IO_default_imbue)
 };
 
-const struct _IO_jump_t _IO_wfile_jumps_maybe_mmap =
+const struct _IO_jump_t _IO_wfile_jumps_maybe_mmap libio_vtable =
 {
   JUMP_INIT_DUMMY,
   JUMP_INIT(finish, _IO_new_file_finish),

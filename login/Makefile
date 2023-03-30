@@ -1,4 +1,4 @@
-# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 # This file is part of the GNU C Library.
 
 # The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with the GNU C Library; if not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 #
 #	Sub-makefile for login portion of the library.
@@ -30,7 +30,7 @@ routines := getlogin getlogin_r setlogin getlogin_r_chk \
 	    utmp_file utmpname updwtmp getpt grantpt unlockpt ptsname \
 	    ptsname_r_chk
 
-CFLAGS-grantpt.c = -DLIBEXECDIR='"$(libexecdir)"'
+CFLAGS-grantpt.c += -DLIBEXECDIR='"$(libexecdir)"'
 
 others = utmpdump
 
@@ -43,7 +43,8 @@ endif
 subdir-dirs = programs
 vpath %.c programs
 
-tests := tst-utmp tst-utmpx tst-grantpt tst-ptsname
+tests := tst-utmp tst-utmpx tst-grantpt tst-ptsname tst-getlogin tst-updwtmpx \
+  tst-pututxline-lockfail tst-pututxline-cache
 
 # Build the -lutil library with these extra functions.
 extra-libs      := libutil
@@ -53,18 +54,15 @@ libutil-routines:= login login_tty logout logwtmp openpty forkpty
 
 include ../Rules
 
-CFLAGS-getpt.c = -fexceptions
+CFLAGS-getpt.c += -fexceptions
 
 ifeq (yesyes,$(have-fpie)$(build-shared))
 pt_chown-cflags += $(pie-ccflag)
 endif
-ifeq (yes,$(have-ssp))
-pt_chown-cflags += -fstack-protector
-endif
 ifeq (yes,$(have-libcap))
 libcap = -lcap
 endif
-CFLAGS-pt_chown.c = $(pt_chown-cflags)
+CFLAGS-pt_chown.c += $(pt_chown-cflags)
 LDLIBS-pt_chown = $(libcap)
 ifeq (yesyes,$(have-fpie)$(build-shared))
 LDFLAGS-pt_chown = -Wl,-z,now
@@ -74,3 +72,6 @@ endif
 $(inst_libexecdir)/pt_chown: $(objpfx)pt_chown $(+force)
 	$(make-target-directory)
 	-$(INSTALL_PROGRAM) -m 4755 -o root $< $@
+
+$(objpfx)tst-pututxline-lockfail: $(shared-thread-library)
+$(objpfx)tst-pututxline-cache: $(shared-thread-library)

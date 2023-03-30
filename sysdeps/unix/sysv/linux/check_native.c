@@ -1,5 +1,5 @@
 /* Determine whether interfaces use native transport.  Linux version.
-   Copyright (C) 2007-2015 Free Software Foundation, Inc.
+   Copyright (C) 2007-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #include <assert.h>
 #include <errno.h>
@@ -35,12 +35,13 @@
 
 #include <not-cancel.h>
 
+#include "netlinkaccess.h"
 
 void
 __check_native (uint32_t a1_index, int *a1_native,
 		uint32_t a2_index, int *a2_native)
 {
-  int fd = __socket (PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+  int fd = __socket (PF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
 
   struct sockaddr_nl nladdr;
   memset (&nladdr, '\0', sizeof (nladdr));
@@ -68,7 +69,7 @@ __check_native (uint32_t a1_index, int *a1_native,
   req.nlh.nlmsg_type = RTM_GETLINK;
   req.nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
   req.nlh.nlmsg_pid = 0;
-  req.nlh.nlmsg_seq = time (NULL);
+  req.nlh.nlmsg_seq = time_now ();
   req.g.rtgen_family = AF_UNSPEC;
 
   assert (sizeof (req) - offsetof (struct req, pad) == 3);
@@ -110,13 +111,17 @@ __check_native (uint32_t a1_index, int *a1_native,
     {
       struct msghdr msg =
 	{
-	  (void *) &nladdr, sizeof (nladdr),
-	  &iov, 1,
-	  NULL, 0,
-	  0
+	  .msg_name = (void *) &nladdr,
+	  .msg_namelen =  sizeof (nladdr),
+	  .msg_iov = &iov,
+	  .msg_iovlen = 1,
+	  .msg_control = NULL,
+	  .msg_controllen = 0,
+	  .msg_flags = 0
 	};
 
       ssize_t read_len = TEMP_FAILURE_RETRY (__recvmsg (fd, &msg, 0));
+      __netlink_assert_response (fd, read_len);
       if (read_len < 0)
 	goto out_fail;
 
@@ -162,7 +167,7 @@ __check_native (uint32_t a1_index, int *a1_native,
   while (! done);
 
  out:
-  close_not_cancel_no_status (fd);
+  __close_nocancel_nostatus (fd);
 
   return;
 

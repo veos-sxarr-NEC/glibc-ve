@@ -1,5 +1,5 @@
 /* Measure strspn functions.
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -14,25 +14,37 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #define TEST_MAIN
-#define TEST_NAME "strspn"
+#ifndef WIDE
+# define TEST_NAME "strspn"
+#else
+# define TEST_NAME "wcsspn"
+#endif /* WIDE */
 #include "bench-string.h"
 
-typedef size_t (*proto_t) (const char *, const char *);
-size_t simple_strspn (const char *, const char *);
-size_t stupid_strspn (const char *, const char *);
+#define BIG_CHAR MAX_CHAR
 
-IMPL (stupid_strspn, 0)
-IMPL (simple_strspn, 0)
-IMPL (strspn, 1)
+#ifndef WIDE
+# define SIMPLE_STRSPN simple_strspn
+# define SMALL_CHAR 127
+#else
+# define SIMPLE_STRSPN simple_wcsspn
+# define SMALL_CHAR 1273
+#endif /* WIDE */
+
+typedef size_t (*proto_t) (const CHAR *, const CHAR *);
+size_t SIMPLE_STRSPN (const CHAR *, const CHAR *);
+
+IMPL (SIMPLE_STRSPN, 0)
+IMPL (STRSPN, 1)
 
 size_t
-simple_strspn (const char *s, const char *acc)
+SIMPLE_STRSPN (const CHAR *s, const CHAR *acc)
 {
-  const char *r, *str = s;
-  char c;
+  const CHAR *r, *str = s;
+  CHAR c;
 
   while ((c = *s++) != '\0')
     {
@@ -45,27 +57,10 @@ simple_strspn (const char *s, const char *acc)
   return s - str - 1;
 }
 
-size_t
-stupid_strspn (const char *s, const char *acc)
-{
-  size_t ns = strlen (s), nacc = strlen (acc);
-  size_t i, j;
-
-  for (i = 0; i < ns; ++i)
-    {
-      for (j = 0; j < nacc; ++j)
-	if (s[i] == acc[j])
-	  break;
-      if (j == nacc)
-	return i;
-    }
-  return i;
-}
-
 static void
-do_one_test (impl_t *impl, const char *s, const char *acc, size_t exp_res)
+do_one_test (impl_t *impl, const CHAR *s, const CHAR *acc, size_t exp_res)
 {
-  size_t res = CALL (impl, s, acc), i, iters = INNER_LOOP_ITERS;
+  size_t res = CALL (impl, s, acc), i, iters = INNER_LOOP_ITERS_MEDIUM;
   timing_t start, stop, cur;
 
   if (res != exp_res)
@@ -92,34 +87,34 @@ static void
 do_test (size_t align, size_t pos, size_t len)
 {
   size_t i;
-  char *acc, *s;
+  CHAR *acc, *s;
 
   align &= 7;
-  if (align + pos + 10 >= page_size || len > 240 || ! len)
+  if ((align + pos + 10) * sizeof (CHAR) >= page_size || len > 240 || ! len)
     return;
 
-  acc = (char *) (buf2 + (random () & 255));
-  s = (char *) (buf1 + align);
+  acc = (CHAR *) (buf2) + (random () & 255);
+  s = (CHAR *) (buf1) + align;
 
   for (i = 0; i < len; ++i)
     {
-      acc[i] = random () & 255;
+      acc[i] = random () & BIG_CHAR;
       if (!acc[i])
-	acc[i] = random () & 255;
+	acc[i] = random () & BIG_CHAR;
       if (!acc[i])
-	acc[i] = 1 + (random () & 127);
+	acc[i] = 1 + (random () & SMALL_CHAR);
     }
   acc[len] = '\0';
 
   for (i = 0; i < pos; ++i)
     s[i] = acc[random () % len];
-  s[pos] = random () & 255;
-  if (strchr (acc, s[pos]))
+  s[pos] = random () & BIG_CHAR;
+  if (STRCHR (acc, s[pos]))
     s[pos] = '\0';
   else
     {
       for (i = pos + 1; i < pos + 10; ++i)
-	s[i] = random () & 255;
+	s[i] = random () & BIG_CHAR;
       s[i] = '\0';
     }
 
@@ -164,4 +159,4 @@ test_main (void)
   return ret;
 }
 
-#include "../test-skeleton.c"
+#include <support/test-driver.c>

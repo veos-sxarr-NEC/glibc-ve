@@ -3,7 +3,7 @@
 /* This file is distributed under the terms of the GNU Lesser General */
 /* Public License, version 2.1 or later - see the file COPYING.LIB for details.*/
 /* If you did not receive a copy of the license with this program, please*/
-/* see <http://www.gnu.org/licenses/> to obtain a copy.  */
+/* see <https://www.gnu.org/licenses/> to obtain a copy.  */
 #include <string.h>
 #include <stdint.h>
 #include "des.h"
@@ -370,13 +370,11 @@ static const uint32_t des_skb[8][64] =
 static const char shifts2[16] =
 {0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0};
 
-static void des_set_key (unsigned char *, unsigned long *) internal_function;
-static void des_encrypt (unsigned long *, unsigned long *, int)
-     internal_function;
+static void des_set_key (unsigned char *, unsigned long *);
+static void des_encrypt (unsigned long *, unsigned long *, int);
 int _des_crypt (char *, unsigned, struct desparams *);
 
 static void
-internal_function
 des_set_key (unsigned char *key, unsigned long *schedule)
 {
   register unsigned long c, d, t, s;
@@ -439,7 +437,6 @@ des_set_key (unsigned char *key, unsigned long *schedule)
 
 
 static void
-internal_function
 des_encrypt (unsigned long *buf, unsigned long *schedule, int encrypt)
 {
   register unsigned long l, r, t, u;
@@ -590,7 +587,7 @@ _des_crypt (char *buf, unsigned len, struct desparams *desp)
     }
   tin0 = tin1 = tout0 = tout1 = xor0 = xor1 = 0;
   tbuf[0] = tbuf[1] = 0;
-  __bzero (schedule, sizeof (schedule));
+  memset (schedule, 0, sizeof (schedule));
 
   return (1);
 }

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -106,6 +106,7 @@ extern char *tzname[];
 # define UCHAR_T unsigned char
 # define L_(Str) Str
 # define NLW(Sym) Sym
+# define ABALTMON_1 _NL_ABALTMON_1
 
 # if !defined STDC_HEADERS && !defined HAVE_MEMCPY
 #  define MEMCPY(d, s, n) bcopy ((s), (d), (n))
@@ -284,16 +285,12 @@ static const CHAR_T zeroes[16] = /* "0000000000000000" */
 # undef _NL_CURRENT
 # define _NL_CURRENT(category, item) \
   (current->values[_NL_ITEM_INDEX (item)].string)
-# define LOCALE_PARAM , loc
+# define LOCALE_PARAM , locale_t loc
 # define LOCALE_ARG , loc
-# define LOCALE_PARAM_DECL  __locale_t loc;
-# define LOCALE_PARAM_PROTO , __locale_t loc
 # define HELPER_LOCALE_ARG  , current
 #else
 # define LOCALE_PARAM
-# define LOCALE_PARAM_PROTO
 # define LOCALE_ARG
-# define LOCALE_PARAM_DECL
 # ifdef _LIBC
 #  define HELPER_LOCALE_ARG , _NL_CURRENT_DATA (LC_TIME)
 # else
@@ -330,14 +327,10 @@ static const CHAR_T zeroes[16] = /* "0000000000000000" */
 #define ISDIGIT(Ch) ((unsigned int) (Ch) - L_('0') <= 9)
 
 static CHAR_T *memcpy_lowcase (CHAR_T *dest, const CHAR_T *src,
-			       size_t len LOCALE_PARAM_PROTO) __THROW;
+			       size_t len LOCALE_PARAM) __THROW;
 
 static CHAR_T *
-memcpy_lowcase (dest, src, len LOCALE_PARAM)
-     CHAR_T *dest;
-     const CHAR_T *src;
-     size_t len;
-     LOCALE_PARAM_DECL
+memcpy_lowcase (CHAR_T *dest, const CHAR_T *src, size_t len LOCALE_PARAM)
 {
   while (len-- > 0)
     dest[len] = TOLOWER ((UCHAR_T) src[len], loc);
@@ -345,14 +338,10 @@ memcpy_lowcase (dest, src, len LOCALE_PARAM)
 }
 
 static CHAR_T *memcpy_uppcase (CHAR_T *dest, const CHAR_T *src,
-			       size_t len LOCALE_PARAM_PROTO) __THROW;
+			       size_t len LOCALE_PARAM) __THROW;
 
 static CHAR_T *
-memcpy_uppcase (dest, src, len LOCALE_PARAM)
-     CHAR_T *dest;
-     const CHAR_T *src;
-     size_t len;
-     LOCALE_PARAM_DECL
+memcpy_uppcase (CHAR_T *dest, const CHAR_T *src, size_t len LOCALE_PARAM)
 {
   while (len-- > 0)
     dest[len] = TOUPPER ((UCHAR_T) src[len], loc);
@@ -366,9 +355,7 @@ memcpy_uppcase (dest, src, len LOCALE_PARAM)
 # define tm_diff ftime_tm_diff
 static int tm_diff (const struct tm *, const struct tm *) __THROW;
 static int
-tm_diff (a, b)
-     const struct tm *a;
-     const struct tm *b;
+tm_diff (const struct tm *a, const struct tm *b)
 {
   /* Compute intervening leap days correctly even if year is negative.
      Take care to avoid int overflow in leap day calculations,
@@ -403,9 +390,7 @@ static int iso_week_days (int, int) __THROW;
 __inline__
 #endif
 static int
-iso_week_days (yday, wday)
-     int yday;
-     int wday;
+iso_week_days (int yday, int wday)
 {
   /* Add enough to the first operand of % to make it nonnegative.  */
   int big_enough_multiple_of_7 = (-YDAY_MINIMUM / 7 + 2) * 7;
@@ -433,8 +418,7 @@ static CHAR_T const month_name[][10] =
 #ifdef emacs
 # define my_strftime emacs_strftimeu
 # define ut_argument , ut
-# define ut_argument_spec int ut;
-# define ut_argument_spec_iso , int ut
+# define ut_argument_spec , int ut
 #else
 # ifdef COMPILE_WIDE
 #  define my_strftime wcsftime
@@ -445,15 +429,14 @@ static CHAR_T const month_name[][10] =
 # endif
 # define ut_argument
 # define ut_argument_spec
-# define ut_argument_spec_iso
 /* We don't have this information in general.  */
 # define ut 0
 #endif
 
 static size_t __strftime_internal (CHAR_T *, size_t, const CHAR_T *,
-				   const struct tm *, bool *
-				   ut_argument_spec_iso
-				   LOCALE_PARAM_PROTO) __THROW;
+				   const struct tm *, int, bool *
+				   ut_argument_spec
+				   LOCALE_PARAM) __THROW;
 
 /* Write information from TP into S according to the format
    string FORMAT, writing no more that MAXSIZE characters
@@ -463,13 +446,8 @@ static size_t __strftime_internal (CHAR_T *, size_t, const CHAR_T *,
    written, use NULL for S and (size_t) UINT_MAX for MAXSIZE.  */
 
 size_t
-my_strftime (s, maxsize, format, tp ut_argument LOCALE_PARAM)
-     CHAR_T *s;
-     size_t maxsize;
-     const CHAR_T *format;
-     const struct tm *tp;
-     ut_argument_spec
-     LOCALE_PARAM_DECL
+my_strftime (CHAR_T *s, size_t maxsize, const CHAR_T *format,
+	     const struct tm *tp ut_argument_spec LOCALE_PARAM)
 {
 #if !defined _LIBC && HAVE_TZNAME && HAVE_TZSET
   /* Solaris 2.5 tzset sometimes modifies the storage returned by localtime.
@@ -479,7 +457,7 @@ my_strftime (s, maxsize, format, tp ut_argument LOCALE_PARAM)
   tp = &tmcopy;
 #endif
   bool tzset_called = false;
-  return __strftime_internal (s, maxsize, format, tp, &tzset_called
+  return __strftime_internal (s, maxsize, format, tp, 0, &tzset_called
 			      ut_argument LOCALE_ARG);
 }
 #ifdef _LIBC
@@ -487,15 +465,9 @@ libc_hidden_def (my_strftime)
 #endif
 
 static size_t
-__strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
-		     LOCALE_PARAM)
-      CHAR_T *s;
-      size_t maxsize;
-      const CHAR_T *format;
-      const struct tm *tp;
-      bool *tzset_called;
-      ut_argument_spec
-      LOCALE_PARAM_DECL
+__strftime_internal (CHAR_T *s, size_t maxsize, const CHAR_T *format,
+		     const struct tm *tp, int yr_spec, bool *tzset_called
+		     ut_argument_spec LOCALE_PARAM)
 {
 #if defined _LIBC && defined USE_IN_EXTENDED_LOCALE_MODEL
   struct __locale_data *const current = loc->__locales[LC_TIME];
@@ -510,30 +482,46 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
      only a few elements.  Dereference the pointers only if the format
      requires this.  Then it is ok to fail if the pointers are invalid.  */
 # define a_wkday \
-  ((const CHAR_T *) _NL_CURRENT (LC_TIME, NLW(ABDAY_1) + tp->tm_wday))
+  ((const CHAR_T *) (tp->tm_wday < 0 || tp->tm_wday > 6			     \
+		     ? "?" : _NL_CURRENT (LC_TIME, NLW(ABDAY_1) + tp->tm_wday)))
 # define f_wkday \
-  ((const CHAR_T *) _NL_CURRENT (LC_TIME, NLW(DAY_1) + tp->tm_wday))
+  ((const CHAR_T *) (tp->tm_wday < 0 || tp->tm_wday > 6			     \
+		     ? "?" : _NL_CURRENT (LC_TIME, NLW(DAY_1) + tp->tm_wday)))
 # define a_month \
-  ((const CHAR_T *) _NL_CURRENT (LC_TIME, NLW(ABMON_1) + tp->tm_mon))
+  ((const CHAR_T *) (tp->tm_mon < 0 || tp->tm_mon > 11			     \
+		     ? "?" : _NL_CURRENT (LC_TIME, NLW(ABMON_1) + tp->tm_mon)))
 # define f_month \
-  ((const CHAR_T *) _NL_CURRENT (LC_TIME, NLW(MON_1) + tp->tm_mon))
+  ((const CHAR_T *) (tp->tm_mon < 0 || tp->tm_mon > 11			     \
+		     ? "?" : _NL_CURRENT (LC_TIME, NLW(MON_1) + tp->tm_mon)))
+# define a_altmonth \
+  ((const CHAR_T *) (tp->tm_mon < 0 || tp->tm_mon > 11			     \
+		     ? "?" : _NL_CURRENT (LC_TIME, NLW(ABALTMON_1) + tp->tm_mon)))
+# define f_altmonth \
+  ((const CHAR_T *) (tp->tm_mon < 0 || tp->tm_mon > 11			     \
+		     ? "?" : _NL_CURRENT (LC_TIME, NLW(ALTMON_1) + tp->tm_mon)))
 # define ampm \
   ((const CHAR_T *) _NL_CURRENT (LC_TIME, tp->tm_hour > 11		      \
 				 ? NLW(PM_STR) : NLW(AM_STR)))
 
 # define aw_len STRLEN (a_wkday)
 # define am_len STRLEN (a_month)
+# define aam_len STRLEN (a_altmonth)
 # define ap_len STRLEN (ampm)
 #else
 # if !HAVE_STRFTIME
-#  define f_wkday (weekday_name[tp->tm_wday])
-#  define f_month (month_name[tp->tm_mon])
+#  define f_wkday (tp->tm_wday < 0 || tp->tm_wday > 6	\
+		   ? "?" : weekday_name[tp->tm_wday])
+#  define f_month (tp->tm_mon < 0 || tp->tm_mon > 11	\
+		   ? "?" : month_name[tp->tm_mon])
 #  define a_wkday f_wkday
 #  define a_month f_month
+#  define a_altmonth a_month
+#  define f_altmonth f_month
 #  define ampm (L_("AMPM") + 2 * (tp->tm_hour > 11))
 
   size_t aw_len = 3;
   size_t am_len = 3;
+  size_t aam_len = 3;
   size_t ap_len = 2;
 # endif
 #endif
@@ -574,7 +562,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
       int pad = 0;		/* Padding for number ('-', '_', or 0).  */
       int modifier;		/* Field modifier ('E', 'O', or 0).  */
       int digits;		/* Max digits for numeric format.  */
-      int number_value; 	/* Numeric value to be printed.  */
+      int number_value;		/* Numeric value to be printed.  */
       int negative_number;	/* 1 if the number is negative.  */
       const CHAR_T *subfmt;
       CHAR_T *bufp;
@@ -738,12 +726,22 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
       format_char = *f;
       switch (format_char)
 	{
-#define DO_NUMBER(d, v) \
-	  digits = d > width ? d : width;				      \
-	  number_value = v; goto do_number
-#define DO_NUMBER_SPACEPAD(d, v) \
-	  digits = d > width ? d : width;				      \
-	  number_value = v; goto do_number_spacepad
+#define DO_NUMBER(d, v)				\
+	  do					\
+	    {					\
+	      digits = d > width ? d : width;	\
+	      number_value = v;			\
+	      goto do_number;			\
+	    }					\
+	  while (0)
+#define DO_NUMBER_SPACEPAD(d, v)		\
+	  do					\
+	    {					\
+	      digits = d > width ? d : width;	\
+	      number_value = v;			\
+	      goto do_number_spacepad;		\
+	    }					\
+	  while (0)
 
 	case L_('%'):
 	  if (modifier != 0)
@@ -788,17 +786,20 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	      to_uppcase = 1;
 	      to_lowcase = 0;
 	    }
-	  if (modifier != 0)
+	  if (modifier == L_('E'))
 	    goto bad_format;
 #if defined _NL_CURRENT || !HAVE_STRFTIME
-	  cpy (am_len, a_month);
+	  if (modifier == L_('O'))
+	    cpy (aam_len, a_altmonth);
+	  else
+	    cpy (am_len, a_month);
 	  break;
 #else
 	  goto underlying_strftime;
 #endif
 
 	case L_('B'):
-	  if (modifier != 0)
+	  if (modifier == L_('E'))
 	    goto bad_format;
 	  if (change_case)
 	    {
@@ -806,7 +807,10 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	      to_lowcase = 0;
 	    }
 #if defined _NL_CURRENT || !HAVE_STRFTIME
-	  cpy (STRLEN (f_month), f_month);
+	  if (modifier == L_('O'))
+	    cpy (STRLEN (f_altmonth), f_altmonth);
+	  else
+	    cpy (STRLEN (f_month), f_month);
 	  break;
 #else
 	  goto underlying_strftime;
@@ -816,7 +820,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	  if (modifier == L_('O'))
 	    goto bad_format;
 #ifdef _NL_CURRENT
-	  if (! (modifier == 'E'
+	  if (! (modifier == L_('E')
 		 && (*(subfmt =
 		       (const CHAR_T *) _NL_CURRENT (LC_TIME,
 						     NLW(ERA_D_T_FMT)))
@@ -834,11 +838,11 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	  {
 	    CHAR_T *old_start = p;
 	    size_t len = __strftime_internal (NULL, (size_t) -1, subfmt,
-					      tp, tzset_called ut_argument
-					      LOCALE_ARG);
+					      tp, yr_spec, tzset_called
+					      ut_argument LOCALE_ARG);
 	    add (len, __strftime_internal (p, maxsize - i, subfmt,
-					   tp, tzset_called ut_argument
-					   LOCALE_ARG));
+					   tp, yr_spec, tzset_called
+					   ut_argument LOCALE_ARG));
 
 	    if (to_uppcase)
 	      while (old_start < p)
@@ -913,7 +917,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 #ifdef _NL_CURRENT
 	  if (! (modifier == L_('E')
 		 && (*(subfmt =
-		       (const CHAR_T *)_NL_CURRENT (LC_TIME, NLW(ERA_D_FMT)))
+		       (const CHAR_T *) _NL_CURRENT (LC_TIME, NLW(ERA_D_FMT)))
 		     != L_('\0'))))
 	    subfmt = (const CHAR_T *) _NL_CURRENT (LC_TIME, NLW(D_FMT));
 	  goto subformat;
@@ -988,7 +992,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	    do
 	      *--bufp = u % 10 + L_('0');
 	    while ((u /= 10) != 0);
-  	  }
+	  }
 
 	do_number_sign_and_padding:
 	  if (negative_number)
@@ -1132,7 +1136,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	  DO_NUMBER (2, tp->tm_sec);
 
 	case L_('s'):		/* GNU extension.  */
-  	  {
+	  {
 	    struct tm ltm;
 	    time_t t;
 
@@ -1258,7 +1262,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	  DO_NUMBER (1, tp->tm_wday);
 
 	case L_('Y'):
-	  if (modifier == 'E')
+	  if (modifier == L_('E'))
 	    {
 #if HAVE_STRUCT_ERA_ENTRY
 	      struct era_entry *era = _nl_get_era_entry (tp HELPER_LOCALE_ARG);
@@ -1269,6 +1273,8 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 # else
 		  subfmt = era->era_format;
 # endif
+		  if (pad != 0)
+		    yr_spec = pad;
 		  goto subformat;
 		}
 #else
@@ -1290,7 +1296,9 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 	      if (era)
 		{
 		  int delta = tp->tm_year - era->start_date[0];
-		  DO_NUMBER (1, (era->offset
+		  if (yr_spec != 0)
+		    pad = yr_spec;
+		  DO_NUMBER (2, (era->offset
 				 + delta * era->absolute_direction));
 		}
 #else
@@ -1321,7 +1329,7 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
 		  *tzset_called = true;
 		}
 # endif
-	      zone = tzname[tp->tm_isdst];
+	      zone = tp->tm_isdst <= 1 ? tzname[tp->tm_isdst] : "?";
 	    }
 #endif
 	  if (! zone)
@@ -1436,11 +1444,8 @@ __strftime_internal (s, maxsize, format, tp, tzset_called ut_argument
    strftime function and does not have the extra information whether the
    TP arguments comes from a `gmtime' call or not.  */
 size_t
-emacs_strftime (s, maxsize, format, tp)
-      char *s;
-      size_t maxsize;
-      const char *format;
-      const struct tm *tp;
+emacs_strftime (char *s, size_t maxsize, const char *format,
+		const struct tm *tp)
 {
   return my_strftime (s, maxsize, format, tp, 0);
 }

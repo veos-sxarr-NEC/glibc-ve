@@ -1,4 +1,4 @@
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU C Library.
 
@@ -14,7 +14,7 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <https://www.gnu.org/licenses/>.  */
 
 #ifndef dl_machine_h
 #define dl_machine_h
@@ -149,14 +149,14 @@ _dl_start_user:\n\
 /* ELF_RTYPE_CLASS_PLT iff TYPE describes relocation of a PLT entry or
    TLS variable, so undefined references should not be allowed to
    define the value.
-   ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to one
+   ELF_RTYPE_CLASS_COPY iff TYPE should not be allowed to resolve to one
    of the main executable's symbols, as for a COPY reloc.  */
 #ifndef RTLD_BOOTSTRAP
 # define elf_machine_type_class(type) \
-  (((type) == R_MICROBLAZE_JUMP_SLOT || \
-    (type) == R_MICROBLAZE_TLSDTPREL32 || \
-    (type) == R_MICROBLAZE_TLSDTPMOD32 || \
-    (type) == R_MICROBLAZE_TLSTPREL32) \
+  (((type) == R_MICROBLAZE_JUMP_SLOT \
+    || (type) == R_MICROBLAZE_TLSDTPREL32 \
+    || (type) == R_MICROBLAZE_TLSDTPMOD32 \
+    || (type) == R_MICROBLAZE_TLSTPREL32) \
     * ELF_RTYPE_CLASS_PLT \
    | ((type) == R_MICROBLAZE_COPY) * ELF_RTYPE_CLASS_COPY)
 #else
@@ -174,6 +174,7 @@ _dl_start_user:\n\
 
 static inline Elf32_Addr
 elf_machine_fixup_plt (struct link_map *map, lookup_t t,
+		       const ElfW(Sym) *refsym, const ElfW(Sym) *sym,
 		       const Elf32_Rela *reloc,
 		       Elf32_Addr *reloc_addr, Elf32_Addr value)
 {
@@ -222,12 +223,12 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
     {
       const Elf32_Sym *const refsym = sym;
       struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
-      Elf32_Addr value = sym == NULL ? 0 : sym_map->l_addr + sym->st_value;
+      Elf32_Addr value = SYMBOL_ADDRESS (sym_map, sym, true);
 
       value += reloc->r_addend;
-      if (r_type == R_MICROBLAZE_GLOB_DAT ||
-          r_type == R_MICROBLAZE_JUMP_SLOT ||
-          r_type == R_MICROBLAZE_32)
+      if (r_type == R_MICROBLAZE_GLOB_DAT
+          || r_type == R_MICROBLAZE_JUMP_SLOT
+          || r_type == R_MICROBLAZE_32)
 	{
 	  *reloc_addr = value;
 	}

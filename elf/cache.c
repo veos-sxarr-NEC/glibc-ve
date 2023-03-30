@@ -1,4 +1,4 @@
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Andreas Jaeger <aj@suse.de>, 1999.
 
@@ -13,7 +13,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, see <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <error.h>
@@ -114,6 +114,18 @@ print_entry (const char *lib, int flag, unsigned int osversion,
     case FLAG_MIPS64_LIBN64_NAN2008:
       fputs (",64bit,nan2008", stdout);
       break;
+    case FLAG_RISCV_FLOAT_ABI_SOFT:
+      fputs (",soft-float", stdout);
+      break;
+    case FLAG_RISCV_FLOAT_ABI_DOUBLE:
+      fputs (",double-float", stdout);
+      break;
+    case FLAG_VE1_LIB64:
+      fputs (",VE1", stdout);
+      break;
+    case FLAG_VE3_LIB64:
+      fputs (",VE3", stdout);
+      break;
     case 0:
       break;
     default:
@@ -193,6 +205,11 @@ print_cache (const char *cache_name)
     }
   else
     {
+      /* Check for corruption, avoiding overflow.  */
+      if ((cache_size - sizeof (struct cache_file)) / sizeof (struct file_entry)
+	  < cache->nlibs)
+	error (EXIT_FAILURE, 0, _("File is not a cache file.\n"));
+
       size_t offset = ALIGN_CACHE (sizeof (struct cache_file)
 				   + (cache->nlibs
 				      * sizeof (struct file_entry)));
@@ -200,8 +217,8 @@ print_cache (const char *cache_name)
       cache_data = (const char *) &cache->libs[cache->nlibs];
 
       /* Check for a new cache embedded in the old format.  */
-      if (cache_size >
-	  (offset + sizeof (struct cache_file_new)))
+      if (cache_size
+	  > (offset + sizeof (struct cache_file_new)))
 	{
 
 	  cache_new = (struct cache_file_new *) ((void *)cache + offset);
@@ -448,8 +465,7 @@ save_cache (const char *cache_name)
 	error (EXIT_FAILURE, errno, _("Writing of cache data failed"));
     }
 
-  if (write (fd, strings, total_strlen) != (ssize_t) total_strlen
-      || close (fd))
+  if (write (fd, strings, total_strlen) != (ssize_t) total_strlen)
     error (EXIT_FAILURE, errno, _("Writing of cache data failed"));
 
   /* Make sure user can always read cache file */
@@ -457,6 +473,10 @@ save_cache (const char *cache_name)
     error (EXIT_FAILURE, errno,
 	   _("Changing access rights of %s to %#o failed"), temp_name,
 	   S_IROTH|S_IRGRP|S_IRUSR|S_IWUSR);
+
+  /* Make sure that data is written to disk.  */
+  if (fsync (fd) != 0 || close (fd) != 0)
+    error (EXIT_FAILURE, errno, _("Writing of cache data failed"));
 
   /* Move temporary to its final location.  */
   if (rename (temp_name, cache_name))
@@ -698,7 +718,9 @@ load_aux_cache (const char *aux_cache_name)
   if (aux_cache == MAP_FAILED
       || aux_cache_size < sizeof (struct aux_cache_file)
       || memcmp (aux_cache->magic, AUX_CACHEMAGIC, sizeof AUX_CACHEMAGIC - 1)
-      || aux_cache->nlibs >= aux_cache_size)
+      || aux_cache_size != (sizeof (struct aux_cache_file)
+			    + aux_cache->nlibs * sizeof (struct aux_cache_file_entry)
+			    + aux_cache->len_strings))
     {
       close (fd);
       init_aux_cache ();
@@ -810,7 +832,8 @@ save_aux_cache (const char *aux_cache_name)
 
   if (write (fd, file_entries, file_entries_size + total_strlen)
       != (ssize_t) (file_entries_size + total_strlen)
-      || close (fd))
+      || fdatasync (fd) != 0
+      || close (fd) != 0)
     {
       unlink (temp_name);
       goto out_fail;
