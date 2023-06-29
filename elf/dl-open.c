@@ -38,6 +38,10 @@
 #include <dl-dst.h>
 #include <dl-prop.h>
 
+#ifdef __ve__
+#include <sysve.h>
+#include <veos_defs.h>
+#endif
 
 /* We must be careful not to leave us in an inconsistent state.  Thus we
    catch any error and re-raise it after cleaning up.  */
@@ -192,7 +196,25 @@ add_to_global_update (struct link_map *new)
   atomic_write_barrier ();
   ns->_ns_main_searchlist->r_nlist = new_nlist;
 }
-
+#ifdef __ve__
+/**
+ * @brief This is a function of libsysve which  sends request
+ * to pseudo process to get original address from specified address.
+ *
+ * @param[in] Address of modified code
+ *
+ * @retval a positive value or 0 is the address of original code
+ * @retval -1 is returned and errno is set on failure.
+ */
+int64_t
+_dl_glibc_ve_get_original_addr(uint64_t mod_vemva)
+{
+        int64_t ret = -1;
+	ret = INLINE_SYSCALL(sysve, 2, VE_SYSVE_GETORGADDR, mod_vemva);
+        return ret;
+}
+rtld_hidden_def (_dl_glibc_ve_get_original_addr);
+#endif
 /* Search link maps in all namespaces for the DSO that contains the object at
    address ADDR.  Returns the pointer to the link map of the matching DSO, or
    NULL if a match is not found.  */
@@ -485,7 +507,12 @@ dl_open_worker (void *a)
   if (dst != NULL || args->nsid == __LM_ID_CALLER
       || strchr (file, '/') == NULL)
     {
+#ifdef __ve__
+      const void *caller_dlopen = (const void *)
+                 _dl_glibc_ve_get_original_addr((uint64_t) args->caller_dlopen);
+#else
       const void *caller_dlopen = args->caller_dlopen;
+#endif
 
       /* We have to find out from which object the caller is calling.
 	 By default we assume this is the main application.  */

@@ -2,7 +2,7 @@
 
 Name:		glibc-ve3
 Version:	2.31
-Release:	11%{?dist}
+Release:	12%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
@@ -54,7 +54,7 @@ Binary files for %name
 
 #Track ticket #2224
 %package -n glibc-ve-wrapper
-Version: 3.0.0
+Version: 3.1.0
 Release: 1%{?dist}
 Summary: Wrapper scripts for glibc
 Provides: %{_ve1_prefix}/bin/*

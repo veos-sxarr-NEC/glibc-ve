@@ -62,6 +62,7 @@ ld {
     _dl_deallocate_tls; _dl_make_stack_executable;
     _dl_rtld_di_serinfo; _dl_starting_up;
     _rtld_global; _rtld_global_ro;
+    _dl_glibc_ve_get_original_addr;
 
     # Only here for gdb while a better method is developed.
     _dl_debug_state;

@@ -124,7 +124,13 @@ int
 _dl_addr (const void *address, Dl_info *info,
 	  struct link_map **mapp, const ElfW(Sym) **symbolp)
 {
+#ifdef __ve__
+  const ElfW(Addr) addr = (ElfW(Addr))
+                           _dl_glibc_ve_get_original_addr((uint64_t)address);
+#else
   const ElfW(Addr) addr = DL_LOOKUP_ADDRESS (address);
+#endif
+
   int result = 0;
 
   /* Protect against concurrent loads and unloads.  */

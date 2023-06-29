@@ -116,7 +116,12 @@ __cxa_thread_atexit_impl (dtor_func func, void *obj, void *dso_symbol)
   /* See if we already encountered the DSO.  */
   if (__glibc_unlikely (dso_symbol_cache != dso_symbol))
     {
+#ifdef __ve__
+      ElfW(Addr) caller = (ElfW(Addr))
+                          _dl_glibc_ve_get_original_addr((uint64_t) dso_symbol);
+#else
       ElfW(Addr) caller = (ElfW(Addr)) dso_symbol;
+#endif
 
       struct link_map *l = _dl_find_dso_for_object (caller);
 

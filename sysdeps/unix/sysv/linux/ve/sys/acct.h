@@ -102,9 +102,9 @@ struct ve_acct_v15 {
         __u32    ac_gid;                 /*!< Real Group ID */
         __u32    ac_pid;                 /*!< Process ID */
         __u32    ac_ppid;                /*!< Parent Process ID */
-        __u32    ac_btime;               /*!< Process Creation Time */
-        float    ac_etime;               /*!< Elapsed Time */
-        comp_t   ac_utime;               /*!< User Time */
+        __u32    ac_btime;               /*!< Process Creation Time [sec]*/
+        float    ac_etime;               /*!< Elapsed Time [10ms]*/
+        comp_t   ac_utime;               /*!< User Time [10ms]*/
         comp_t   ac_stime;               /*!< System Time */
         comp_t   ac_mem;                 /*!< Average Memory Usage */
         comp_t   ac_io;                  /*!< Chars Transferred */
@@ -115,7 +115,8 @@ struct ve_acct_v15 {
         char    ac_comm[ACCT_COMM];      /*!< Command Name */
         __u32   ac_sid;                  /* session ID */
         __u32   ac_timeslice;            /* timeslice [μs] */
-        __u16   ac_max_nthread;          /* maximum number of threads whose state are  "RUNNING" or "WAIT"  at the same time*/
+        __u16   ac_max_nthread;          /* Maximum number of threads in the thread group
+					    whose state are "RUNNING" or "WAIT" at the same time */
         __u16   ac_numanode;             /* the number of NUMA node */
         double   ac_total_mem;           /* VE's total memory usage in clicks */
         __u64   ac_maxmem;               /* VE's max memory usage [kb] */
@@ -125,13 +126,13 @@ struct ve_acct_v15 {
         __u64   ac_vx;                   /* Vector execution count */
         __u64   ac_fpec;                 /* Floating point data element count */
         __u64   ac_ve;                   /* Vector elements count */
-        __u64   ac_l1lmc;                /* L1 instruction cache miss count */
+        __u64   ac_l1imc;                /* L1 instruction cache miss count */
         __u64   ac_vecc;                 /* Vector execution in microseconds */              
         __u64   ac_l1mcc;                /* L1 cache miss in microseconds */
         __u64   ac_l2mcc;                /* L2 cache miss in microseconds */
         __u64   ac_ve2;                  /* Vector elements count 2 */
         __u64   ac_varec;                /* Vector arithmetic execution in microseconds */
-        __u64   ac_l1lmcc;               /* L1 instruction cache miss in microseconds */
+        __u64   ac_l1imcc;               /* L1 instruction cache miss in microseconds */
         __u64   ac_vldec;                /* Vector load execution in microseconds */
         __u64   ac_l1omcc;               /* L1 operand cache miss in microseconds */
         __u64   ac_pccc;                 /* Port conflict in microseconds */
@@ -139,8 +140,8 @@ struct ve_acct_v15 {
         __u64   ac_vlpc;                 /* Vector load packet count */
         __u64   ac_strc;                 /* Store instruction traffic count */
         __u64   ac_vlec;                 /* Vector load element count */
-        __u64   ac_vlcme;                /* Vector load cache miss element count */
-        __u64   ac_vlcme2;               /* Vector load cache miss element count 2 */
+        __u64   ac_llvml;                /* LLC vector load cache fill line count */
+        __u64   ac_llvme;                /* LLC vector load cache miss element count */
         __u64   ac_fmaec;                /* Fused multiply add element count */
         __u64   ac_ptcc;                 /* Power throttling in microseconds */
         __u64   ac_ttcc;                 /* Thermal throttling in microseconds */
@@ -159,9 +160,9 @@ struct ve_acct_v16 {
         __u32    ac_gid;                 /*!< Real Group ID */
         __u32    ac_pid;                 /*!< Process ID */
         __u32    ac_ppid;                /*!< Parent Process ID */
-        __u32    ac_btime;               /*!< Process Creation Time */
-        float    ac_etime;               /*!< Elapsed Time */
-        comp_t   ac_utime;               /*!< User Time */
+        __u32    ac_btime;               /*!< Process Creation Time [sec]*/
+        float    ac_etime;               /*!< Elapsed Time [10ms]*/
+        comp_t   ac_utime;               /*!< User Time [10ms]*/
         comp_t   ac_stime;               /*!< System Time */
         comp_t   ac_mem;                 /*!< Average Memory Usage */
         comp_t   ac_io;                  /*!< Chars Transferred */
@@ -172,7 +173,8 @@ struct ve_acct_v16 {
         char    ac_comm[ACCT_COMM];      /*!< Command Name */
         __u32   ac_sid;                  /* session ID */
         __u32   ac_timeslice;            /* timeslice [μs] */
-        __u16 ac_max_nthread;            /* maximum number of threads whose state are  "RUNNING" or "WAIT"  at the same time */
+        __u16   ac_max_nthread;            /* Maximum number of threads whose state are
+					    "RUNNING" or "WAIT" at the same time */
         __u16   ac_numanode;             /* the number of NUMA node */
         double   ac_total_mem;           /* VE's total memory usage in clicks */
         __u64   ac_maxmem;               /* VE's max memory usage [kb] */
@@ -182,13 +184,13 @@ struct ve_acct_v16 {
         __u64   ac_vx;                   /* Vector execution count */
         __u64   ac_fpec;                 /* Floating point data element count */
         __u64   ac_ve;                   /* Vector elements count */
-        __u64   ac_l1lmc;                /* L1 instruction cache miss count */
+        __u64   ac_l1imc;                /* L1 instruction cache miss count */
         __u64   ac_vecc;                 /* Vector execution in microseconds */              
         __u64   ac_l1mcc;                /* L1 cache miss in microseconds */
         __u64   ac_l2mcc;                /* L2 cache miss in microseconds */
         __u64   ac_ve2;                  /* Vector elements count 2 */
         __u64   ac_varec;                /* Vector arithmetic execution in microseconds */
-        __u64   ac_l1lmcc;               /* L1 instruction cache miss in microseconds */
+        __u64   ac_l1imcc;               /* L1 instruction cache miss in microseconds */
         __u64   ac_vldec;                /* Vector load execution in microseconds */
         __u64   ac_l1omcc;               /* L1 operand cache miss in microseconds */
         __u64   ac_pccc;                 /* Port conflict in microseconds */
@@ -196,8 +198,8 @@ struct ve_acct_v16 {
         __u64   ac_vlpc;                 /* Vector load packet count */
         __u64   ac_strc;                 /* Store instruction traffic count */
         __u64   ac_vlec;                 /* Vector load element count */
-        __u64   ac_vlcme;                /* Vector load cache miss element count */
-        __u64   ac_vlcme2;               /* Vector load cache miss element count 2 */
+        __u64   ac_llvml;                /* LLC vector load cache fill line count */
+        __u64   ac_llvme;                /* LLC vector load cache miss element count */
         __u64   ac_fmaec;                /* Fused multiply add element count */
         __u64   ac_ptcc;                 /* Power throttling in microseconds */
         __u64   ac_ttcc;                 /* Thermal throttling in microseconds */
@@ -206,7 +208,7 @@ struct ve_acct_v16 {
         __u64   ac_l3vsme;               /* L3 VLD+SLD miss-hit element count */
         __u64   ac_l3vsml;               /* L3 VLD+SLD miss-hit cache line count */
         __u64   ac_llvsme;               /* LLC miss-hit element count */
-        __u64   ac_llvml;                /* LLC miss-hit cache line count */
+        __u64   ac_llvsml;                /* LLC miss-hit cache line count */
         __u64   padding_2[5];            /* padding */
 };
 

@@ -155,6 +155,9 @@ if test  "$$arch" = "ve1"; then
         $$VE1_CMD_PATH $$ldconfig_arg
   fi
 else
+  if [[ -x "$$VE1_CMD_PATH" ]]; then
+        $$VE1_CMD_PATH $$ldconfig_arg
+  fi
   if [[ -x "$$VE3_CMD_PATH" ]]; then
         $$VE3_CMD_PATH $$ldconfig_arg
   fi

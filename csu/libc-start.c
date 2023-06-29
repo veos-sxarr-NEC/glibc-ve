@@ -108,6 +108,7 @@ apply_irel (void)
 
 #include <libc-start.h>
 
+ElfW(auxv_t) *_dl_auxv;
 STATIC int LIBC_START_MAIN (int (*main) (int, char **, char **
 					 MAIN_AUXVEC_DECL),
 			    int argc,
@@ -139,6 +140,24 @@ LIBC_START_MAIN (int (*main) (int, char **, char ** MAIN_AUXVEC_DECL),
   int result;
 
   __libc_multiple_libcs = &_dl_starting_up && !_dl_starting_up;
+
+#ifdef __ve__
+#ifdef SHARED
+  char **ev = &argv[argc + 1];
+# ifdef HAVE_AUX_VECTOR
+#  ifndef LIBC_START_MAIN_AUXVEC_ARG
+  ElfW(auxv_t) *auxvec;
+  {
+    char **evp = ev;
+    while (*evp++ != NULL)
+      ;
+    auxvec = (ElfW(auxv_t) *) evp;
+  }
+#  endif
+  _dl_auxv = auxvec;
+# endif
+#endif
+#endif
 
 #ifndef SHARED
   _dl_relocate_static_pie ();

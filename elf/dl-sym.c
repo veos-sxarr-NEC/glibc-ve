@@ -99,7 +99,12 @@ do_sym (void *handle, const char *name, void *who,
 {
   const ElfW(Sym) *ref = NULL;
   lookup_t result;
+#ifdef __ve__
+  ElfW(Addr) caller = (ElfW(Addr))
+	               _dl_glibc_ve_get_original_addr((uint64_t) who);
+#else
   ElfW(Addr) caller = (ElfW(Addr)) who;
+#endif
 
   /* Link map of the caller if needed.  */
   struct link_map *match = NULL;

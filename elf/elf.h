@@ -2711,9 +2711,6 @@ enum
 #define EF_VE_ABI_MASK (0x000f0000)
 #define EF_VE_ABI_VER1 (0x0)
 #define EF_VE_ABI_VER2 (0x00010000)
-#define EF_VE_DYNAMIC_CD (0x00000000)
-#define EF_VE_NO_DYNAMIC_CD (0x00000100)
-#define EF_VE_DYNAMIC_CD_MASK (0x00000f00)
 
 /* Additional symbol types for Thumb.  */
 #define STT_ARM_TFUNC		STT_LOPROC /* A Thumb function.  */

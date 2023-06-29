@@ -1181,6 +1181,11 @@ extern int _dl_addr_inside_object (struct link_map *l, const ElfW(Addr) addr)
 extern void _dl_show_scope (struct link_map *new, int from)
      attribute_hidden;
 
+#ifdef __ve__
+extern int64_t _dl_glibc_ve_get_original_addr(uint64_t mod_vemva);
+rtld_hidden_proto (_dl_glibc_ve_get_original_addr)
+#endif
+
 extern struct link_map *_dl_find_dso_for_object (const ElfW(Addr) addr);
 rtld_hidden_proto (_dl_find_dso_for_object)
 
