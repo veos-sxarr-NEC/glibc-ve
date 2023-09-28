@@ -2,7 +2,7 @@
 
 Name:		glibc-ve3
 Version:	2.31
-Release:	12%{?dist}
+Release:	13%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
