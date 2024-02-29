@@ -878,11 +878,28 @@ ve_alter_search_path(char *search_path, const char*sep)
   char *exclude_path = NULL;    /* For exclude path environment string */
   char *exclude_path_dup = NULL;    /* For duplicate xclude path environment string */
 
+  if(search_path == NULL)
+    return;
+  else if(strlen(search_path) > PATH_MAX)
+    {
+      _dl_signal_error (ENAMETOOLONG, search_path, NULL,
+                      N_("Cannot alter path"));
+      return;
+    }
   init_sp = search_path;
-  exclude_path = getenv("VE3_LD_LIBRARY_EXCLUDE_PATH");
-  exclude_path = strdupa(exclude_path);
 
-  result_path = (char *) malloc(strlen(search_path) + 1);
+  exclude_path = getenv("VE3_LD_LIBRARY_EXCLUDE_PATH");
+  if(exclude_path == NULL)
+      return;
+  else if(strlen(exclude_path) > PATH_MAX)
+    {
+      _dl_signal_error (ENAMETOOLONG, exclude_path, NULL,
+                      N_("Cannot alter path"));
+      return;
+    }
+  exclude_path_dup = strdupa(exclude_path);
+
+  result_path = (char *) malloc(PATH_MAX + 1);
   if(result_path == NULL) /* ENOMEM */
     {
       _dl_signal_error (ENOMEM, NULL, NULL,
@@ -891,7 +908,7 @@ ve_alter_search_path(char *search_path, const char*sep)
     }
 
   result_path[0] = '\0';
-  while (( ep = __strsep (&exclude_path, sep)) != NULL)
+  while (( ep = __strsep (&exclude_path_dup, sep)) != NULL)
     {
       get_realpath(ep, real_ep); /* Convert to realpath  */
       //_dl_debug_printf("\nExclude_PATH=%s",real_ep);

@@ -32,7 +32,6 @@
   other than the PRESERVED state.  */
 
 
-.section        .data
 .set err,       -4095
 
 ENTRY(__getcontext)

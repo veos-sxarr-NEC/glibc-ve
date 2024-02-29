@@ -56,8 +56,9 @@ FUNC_START __fdivl
 	breq.l	%s4,%s12,.L11
 #
 	brne.l	%s6,0,.L16
-	fdiv.d	%s6,%s6,%s6
 	breq.l	%s4,0,.L10
+	lea.sl	%s4,0x3ff00000
+	fdiv.d	%s6,%s4,%s6
 	br.l.t	.L11	
 .L16:
 #

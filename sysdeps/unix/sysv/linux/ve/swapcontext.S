@@ -33,7 +33,6 @@
   This implementation is intended to be used for *synchronous* context
   switches only.  Therefore, it does not have to save anything
   other than the PRESERVED state.  */
-.section        .data
 .set err,       -4095
 
 ENTRY(__swapcontext)

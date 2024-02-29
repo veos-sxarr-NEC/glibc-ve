@@ -24,7 +24,6 @@
 #include <tcb-offsets.h>
 #include <tls.h>
 
-.section	.data
 		.align 8
 .set verr,	 -4095
 

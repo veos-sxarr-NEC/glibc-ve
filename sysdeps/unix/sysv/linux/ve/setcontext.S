@@ -32,7 +32,6 @@
   switches only.  Therefore, it does not have to restore anything
   other than the PRESERVED state.  */
 
-.section        .data
 .set err,       -4095
 
 ENTRY(__setcontext)
