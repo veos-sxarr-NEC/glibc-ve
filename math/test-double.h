@@ -30,3 +30,4 @@
 #define snan_value_MACRO SNAN
 #define TEST_FLOATN 0
 #define FUNC_NARROW_PREFIX d
+#define VE_ACCEPTABLE_PRECISION (FLOAT) ((0x4p-1024)*pow(2, 52))

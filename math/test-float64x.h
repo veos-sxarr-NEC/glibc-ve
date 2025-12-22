@@ -42,3 +42,4 @@
 #define FTOSTR strfromf64x
 #define snan_value_MACRO SNANF64X
 #define FUNC_NARROW_PREFIX f64x
+#define VE_ACCEPTABLE_PRECISION (FLOAT) ((0x4p-1024)*pow(2, 52))

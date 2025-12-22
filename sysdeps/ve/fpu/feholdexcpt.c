@@ -30,7 +30,7 @@ __feholdexcept (fenv_t *envp)
   __asm__ __volatile("smir %%s1, %%psw\n\t"
 	   "st2b %%s1, %0 " :: "m" (*&new): "%s1");
   *envp = new & 0x3fff;
- new &= ~0x3fff;
+  new = new  & ~0xfff;
   __asm__ __volatile("lpm %0\n\t"
 		     "lfr %0 " :: "r" (new));
 

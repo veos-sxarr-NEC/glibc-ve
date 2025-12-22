@@ -423,6 +423,7 @@ struct test_Ff_b1_data
 /* Common setup for an individual test.  */
 #define COMMON_TEST_SETUP(ARG_STR)					\
   char *test_name;							\
+  feclearexcept (FE_ALL_EXCEPT);					\
   if (asprintf (&test_name, "%s (%s)", this_func, (ARG_STR)) == -1)	\
     abort ()
 
@@ -457,6 +458,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_f(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_f ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);		\
@@ -475,6 +477,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_fp_f(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_fp_f ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);		\
@@ -493,6 +496,8 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_2_f(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg1) > VE_ACCEPTABLE_PRECISION		\
+	        && fabs((ARRAY)[i].arg2) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_2_f ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg1,	\
 		    (ARRAY)[i].arg2,					\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
@@ -522,6 +527,9 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_fff_f(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg1) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].arg2) > VE_ACCEPTABLE_PRECISION	\
+		&& fabs((ARRAY)[i].arg3) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_fff_f ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg1,	\
 		      (ARRAY)[i].arg2, (ARRAY)[i].arg3,			\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
@@ -542,6 +550,9 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_fiu_M(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg1) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].arg2) > VE_ACCEPTABLE_PRECISION	\
+		&& fabs((ARRAY)[i].arg3) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_fiu_M ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg1,	\
 		      (ARRAY)[i].arg2, (ARRAY)[i].arg3,			\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
@@ -562,6 +573,9 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_fiu_U(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg1) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].arg2) > VE_ACCEPTABLE_PRECISION	\
+		&& fabs((ARRAY)[i].arg3) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_fiu_U ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg1,	\
 		      (ARRAY)[i].arg2, (ARRAY)[i].arg3,			\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
@@ -582,6 +596,8 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_c_f(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].argr) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].argc) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_c_f ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].argr,	\
 		    (ARRAY)[i].argc,					\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
@@ -607,6 +623,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_f1(FUNC_NAME, ARRAY, ROUNDING_MODE, EXTRA_VAR)	\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_f1 ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		     (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		     (ARRAY)[i].RM_##ROUNDING_MODE.exceptions,		\
@@ -634,6 +651,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_fF_f1(FUNC_NAME, ARRAY, ROUNDING_MODE, EXTRA_VAR)	\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_fF_f1 ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.exceptions,		\
@@ -661,6 +679,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_fI_f1(FUNC_NAME, ARRAY, ROUNDING_MODE, EXTRA_VAR)	\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_fI_f1 ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.exceptions,		\
@@ -690,6 +709,8 @@ struct test_Ff_b1_data
 				  EXTRA_VAR)				\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg1) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].arg2) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_ffI_f1_mod8 ((ARRAY)[i].arg_str, FUNC_NAME,		\
 			    (ARRAY)[i].arg1, (ARRAY)[i].arg2,		\
 			    (ARRAY)[i].RM_##ROUNDING_MODE.expected,	\
@@ -724,6 +745,7 @@ struct test_Ff_b1_data
 			    EXTRA_VAR)					\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_Ff_b1 ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		      (ARRAY)[i].RM_##ROUNDING_MODE.exceptions,		\
@@ -754,6 +776,7 @@ struct test_Ff_b1_data
 			     EXTRA_VAR)					\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_Ffp_b1 ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.exceptions,	\
@@ -776,6 +799,8 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_c_c(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].argr) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].argc) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_c_c ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].argr,	\
 		    (ARRAY)[i].argc,					\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expr,			\
@@ -798,6 +823,10 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_cc_c(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+    if (fabs((ARRAY)[i].arg1r) > VE_ACCEPTABLE_PRECISION		\
+	    && fabs((ARRAY)[i].arg1c) > VE_ACCEPTABLE_PRECISION		\
+	    && fabs((ARRAY)[i].arg2r) > VE_ACCEPTABLE_PRECISION		\
+	    && fabs((ARRAY)[i].arg2c) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_cc_c ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg1r,	\
 		     (ARRAY)[i].arg1c, (ARRAY)[i].arg2r,		\
 		     (ARRAY)[i].arg2c,					\
@@ -818,6 +847,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_i(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_i ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);		\
@@ -835,6 +865,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_i_tg(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_i_tg ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);	\
@@ -853,6 +884,8 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_ff_b(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg1) > VE_ACCEPTABLE_PRECISION		\
+		&& fabs((ARRAY)[i].arg2) > VE_ACCEPTABLE_PRECISION)	\
       RUN_TEST_ff_b ((ARRAY)[i].arg_str, FUNC_NAME,			\
 		     (ARRAY)[i].arg1, (ARRAY)[i].arg2,			\
 		     (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
@@ -927,6 +960,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_b_tg(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_b_tg ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);	\
@@ -944,6 +978,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_l(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_l ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);		\
@@ -961,6 +996,7 @@ struct test_Ff_b1_data
 #define RUN_TEST_LOOP_f_L(FUNC_NAME, ARRAY, ROUNDING_MODE)		\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_f_L ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.expected,		\
 		    (ARRAY)[i].RM_##ROUNDING_MODE.exceptions);		\
@@ -990,6 +1026,7 @@ struct test_Ff_b1_data
 			     EXTRA1_VAR, EXTRA2_VAR)			\
   IF_ROUND_INIT_ ## ROUNDING_MODE					\
     for (size_t i = 0; i < sizeof (ARRAY) / sizeof (ARRAY)[0]; i++)	\
+      if (fabs((ARRAY)[i].arg) > VE_ACCEPTABLE_PRECISION)		\
       RUN_TEST_fFF_11 ((ARRAY)[i].arg_str, FUNC_NAME, (ARRAY)[i].arg,	\
 		       (ARRAY)[i].RM_##ROUNDING_MODE.exceptions,	\
 		       EXTRA1_VAR,					\

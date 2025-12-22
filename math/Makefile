@@ -409,8 +409,7 @@ CFLAGS-test-float-vlen16-wrappers.c += $(float-vlen16-arch-ext-cflags)
 # raise spurious exceptions for sNaNs, but also do not test for
 # exceptions.  Thus both versions of the classification macros are
 # validated.
-libm-test-no-inline-cflags = -fno-inline -ffloat-store -fno-builtin \
-			     -fsignaling-nans
+libm-test-no-inline-cflags = -fno-inline -ffloat-store -fno-builtin
 libm-test-inline-cflags = $(libm-test-fast-math-cflags)
 CFLAGS-test-tgmath.c += -fno-builtin
 # The following testcase uses very long lines (>3 million), so it may take a

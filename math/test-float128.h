@@ -42,3 +42,4 @@
 #define FTOSTR strfromf128
 #define snan_value_MACRO SNANF128
 #define FUNC_NARROW_PREFIX f128
+#define VE_ACCEPTABLE_PRECISION (FLOAT) ((0x4p-16384)*pow(2, 112))

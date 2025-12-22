@@ -31,3 +31,4 @@
 #define snan_value_MACRO SNANF
 #define TEST_FLOATN 0
 #define FUNC_NARROW_PREFIX f
+#define VE_ACCEPTABLE_PRECISION (FLOAT) ((0x4p-128)*pow(2, 23))

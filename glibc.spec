@@ -2,7 +2,7 @@
 
 Name:		glibc-ve3
 Version:	2.31
-Release:	14%{?dist}
+Release:	15%{?dist}
 Group:		System/Libraries
 Summary:	glibc library ported for VE
 License:	LGPLv2+ and LGPLv2+ with exceptions and GPLv2+
@@ -24,7 +24,7 @@ Standard glibc build and install with this spec file for VE arch.
 %define _glibc_src_name %name-%{MainVersion}
 %define _glibc_etc_base /etc/opt/nec/ve3/
 %define _glibc_var_base /var/opt/nec/ve3/
-%if 0%{?rhel} == 8
+%if 0%{?rhel} >= 8
 %global __debug_install_post /opt/nec/ve/libexec/find-debuginfo.sh --unique-debug-suffix "-%{VERSION}-%{RELEASE}.%{_arch}" -S debugsourcefiles.list %{_builddir}/%{buildsubdir} %{nil}
 %else
 %global __debug_install_post /opt/nec/ve/libexec/find-debuginfo.sh %{nil}
@@ -69,7 +69,12 @@ Wrapper scripts for both glibc-ve1 and glibc-ve3
 %build
 mkdir ../glibc_build
 pushd ../glibc_build
+%if 0%{?rhel} >= 9
+%global  __perl /usr/bin/perl
+../%{_glibc_src_name}/configure CFLAGS="" --exec-prefix=%{_prefix} --prefix=%{_prefix} --host=ve3-unknown-linux-gnu --with-headers=%{_prefix}/include --enable-obsolete-rpc CC=%{GCC} LDFLAGS="-Wl,--build-id"
+%else
 ../%{_glibc_src_name}/configure --exec-prefix=%{_prefix} --prefix=%{_prefix} --host=ve3-unknown-linux-gnu --with-headers=%{_prefix}/include --enable-obsolete-rpc CC=%{GCC} LDFLAGS="-Wl,--build-id"
+%endif
 make -j 4
 popd
 

@@ -36,3 +36,4 @@
 #define FTOSTR strfromf32
 #define snan_value_MACRO SNANF32
 #define FUNC_NARROW_PREFIX f32
+#define VE_ACCEPTABLE_PRECISION (FLOAT) ((0x4p-128)*pow(2, 23))

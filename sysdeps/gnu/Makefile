@@ -54,7 +54,7 @@ $(objpfx)errlist-compat.h: $(objpfx)errlist-compat.c
 generated += errlist-compat.c errlist-compat.h
 
 # This will force the generation above to happy if need be.
-$(foreach o,$(object-suffixes) $(object-suffixes:=.d),\
+$(foreach o,$(object-suffixes), \
 	  $(objpfx)errlist$o): $(objpfx)errlist-compat.h
 endif
 
