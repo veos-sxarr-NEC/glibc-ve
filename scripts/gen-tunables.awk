@@ -108,7 +108,7 @@ $1 == "}" {
     maxvals[top_ns,ns,tunable] = val
   }
   else if (attr == "env_alias") {
-    env_alias[top_ns,ns,tunable] = sprintf("\"%s\"", val)
+    env_alias[top_ns,ns,tunable] = sprintf("\"VE_%s\"", val)
   }
   else if (attr == "security_level") {
     if (val == "SXID_ERASE" || val == "SXID_IGNORE" || val == "NONE") {

@@ -33,7 +33,11 @@
 #include <not-errno.h>
 
 #if TUNABLES_FRONTEND == TUNABLES_FRONTEND_valstring
+#ifdef __ve__
+# define GLIBC_TUNABLES "VE_GLIBC_TUNABLES"
+#else
 # define GLIBC_TUNABLES "GLIBC_TUNABLES"
+#endif
 #endif
 
 #if TUNABLES_FRONTEND == TUNABLES_FRONTEND_valstring

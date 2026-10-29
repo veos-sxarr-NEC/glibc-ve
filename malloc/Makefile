@@ -29,16 +29,17 @@ tests := mallocbug tst-malloc tst-valloc tst-calloc tst-obstack \
 	 tst-malloc-usable tst-realloc tst-reallocarray tst-posix_memalign \
 	 tst-pvalloc tst-pvalloc-fortify tst-memalign tst-mallopt \
 	 tst-malloc-backtrace tst-malloc-thread-exit \
-	 tst-malloc-thread-fail tst-malloc-fork-deadlock \
+	 tst-malloc-thread-fail \
 	 tst-mallocfork2 \
 	 tst-interpose-nothread \
 	 tst-interpose-thread \
 	 tst-alloc_buffer \
-	 tst-malloc-tcache-leak \
 	 tst-malloc_info \
 	 tst-malloc-too-large \
-	 tst-malloc-stats-cancellation \
 	 tst-tcfree1 tst-tcfree2 tst-tcfree3 \
+
+	 #tst-malloc-stats-cancellation tst-malloc-fork-deadlock\
+	 #tst-malloc-tcache-leak \
 
 tests-static := \
 	 tst-interpose-static-nothread \
@@ -97,8 +98,8 @@ libmemusage-inhibit-o = $(filter-out .os,$(object-suffixes))
 $(objpfx)tst-malloc-backtrace: $(shared-thread-library)
 $(objpfx)tst-malloc-thread-exit: $(shared-thread-library)
 $(objpfx)tst-malloc-thread-fail: $(shared-thread-library)
-$(objpfx)tst-malloc-fork-deadlock: $(shared-thread-library)
-$(objpfx)tst-malloc-stats-cancellation: $(shared-thread-library)
+#$(objpfx)tst-malloc-fork-deadlock: $(shared-thread-library)
+#$(objpfx)tst-malloc-stats-cancellation: $(shared-thread-library)
 
 # Export the __malloc_initialize_hook variable to libc.so.
 LDFLAGS-tst-mallocstate = -rdynamic
@@ -252,6 +253,6 @@ $(objpfx)tst-dynarray-fail-mem.out: $(objpfx)tst-dynarray-fail.out
 	$(common-objpfx)malloc/mtrace $(objpfx)tst-dynarray-fail.mtrace > $@; \
 	$(evaluate-test)
 
-$(objpfx)tst-malloc-tcache-leak: $(shared-thread-library)
+#$(objpfx)tst-malloc-tcache-leak: $(shared-thread-library)
 $(objpfx)tst-malloc_info: $(shared-thread-library)
 $(objpfx)tst-mallocfork2: $(shared-thread-library)

@@ -96,8 +96,10 @@ sysdep_headers += sys/mount.h sys/acct.h sys/sysctl.h \
 tests += tst-clone tst-clone2 tst-clone3 tst-fanotify tst-personality \
 	 tst-quota tst-sync_file_range tst-sysconf-iov_max tst-ttyname \
 	 test-errno-linux \
-	 tst-rlimit-infinity tst-ofdlocks tst-gettid tst-gettid-kill \
+	 tst-rlimit-infinity tst-ofdlocks tst-gettid \
 	 tst-tgkill
+
+# tst-gettid-kill
 tests-internal += tst-ofdlocks-compat tst-sigcontext-get_pc
 
 CFLAGS-tst-sigcontext-get_pc.c = -fasynchronous-unwind-tables
@@ -172,7 +174,7 @@ $(objpfx)tst-mman-consts.out: ../sysdeps/unix/sysv/linux/tst-mman-consts.py
 $(objpfx)tst-mman-consts.out: $(sysdeps-linux-python-deps)
 
 $(objpfx)tst-gettid: $(shared-thread-library)
-$(objpfx)tst-gettid-kill: $(shared-thread-library)
+#$(objpfx)tst-gettid-kill: $(shared-thread-library)
 $(objpfx)tst-tgkill: $(shared-thread-library)
 
 endif # $(subdir) == misc

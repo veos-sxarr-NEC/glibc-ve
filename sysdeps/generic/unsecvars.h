@@ -1,7 +1,17 @@
 #if !HAVE_TUNABLES
+#ifdef __ve__
+# define GLIBC_TUNABLES_ENVVAR "VE_GLIBC_TUNABLES\0"
+#else
 # define GLIBC_TUNABLES_ENVVAR "GLIBC_TUNABLES\0"
+#endif
 #else
 # define GLIBC_TUNABLES_ENVVAR
+#endif
+
+#ifdef __ve__
+# define LD_HWCAP_MASK_ENVVAR "VE_LD_HWCAP_MASK\0"
+#else
+# define LD_HWCAP_MASK_ENVVAR "LD_HWCAP_MASK\0"
 #endif
 
 /* Environment variable to be removed for SUID programs.  The names are
@@ -16,7 +26,7 @@
   "LD_DEBUG\0"								      \
   "LD_DEBUG_OUTPUT\0"							      \
   "LD_DYNAMIC_WEAK\0"							      \
-  "LD_HWCAP_MASK\0"							      \
+  LD_HWCAP_MASK_ENVVAR							      \
   "LD_LIBRARY_PATH\0"							      \
   "LD_ORIGIN_PATH\0"							      \
   "LD_PRELOAD\0"							      \
